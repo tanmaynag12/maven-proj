@@ -1,0 +1,23 @@
+<project version="4">
+  <component name="ExternalSystemProjectTracker"><![CDATA[{
+  "projectData": {
+    "MAVEN": {
+      "dhruv": {
+        "settingsTracker": {
+          "isDirty": false,
+          "settingsFiles": {
+            "/home/student-devops/Desktop/dhruv/pom.xml": 3112039417
+          }
+        }
+      }
+    }
+  }
+}]]></component>
+  <component name="ProcessedFilesStorage">
+    <timestamps>
+      <entry key="518bed0bd48cd4c4b21c8fcddf0fbb23" value="1739938260967" />
+      <entry key="a198e9bb40b93bf14fcf5cf3c5d2e499" value="1739938033482" />
+    </timestamps>
+  </component>
+  <component name="RestoreUpdateTree">{}</component>
+</project>

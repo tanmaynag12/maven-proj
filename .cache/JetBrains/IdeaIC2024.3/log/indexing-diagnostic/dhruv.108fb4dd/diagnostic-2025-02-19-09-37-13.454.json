@@ -1,0 +1,79 @@
+{
+  "appInfo" : {
+    "build" : "243.24978.46",
+    "buildDate" : "2025-02-11T14:39:00Z[UTC]",
+    "productCode" : "IC",
+    "generated" : "2025-02-19T04:07:13.454251181Z",
+    "os" : "Linux 6.8.0-52-generic",
+    "runtime" : "JetBrains s.r.o. 21.0.6 21.0.6+8-b631.39"
+  },
+  "runtimeInfo" : {
+    "maxMemory" : 2147483648,
+    "numberOfProcessors" : 12,
+    "maxNumberOfIndexingThreads" : 11,
+    "maxSizeOfFileForIntelliSense" : 2560000,
+    "maxSizeOfFileForContentLoading" : 20971520
+  },
+  "type" : "Scanning",
+  "projectIndexingActivityHistory" : {
+    "projectName" : "dhruv",
+    "times" : {
+      "scanningReason" : "Merged changes in: \"Module 'dhruv' (all roots)\" with changes in: \"Module 'dhruv' (java, java, resources)\"",
+      "scanningType" : "PARTIAL",
+      "scanningId" : 4,
+      "creatingIteratorsTime" : 0,
+      "concurrentHandlingWallTimeWithoutPauses" : 0,
+      "concurrentHandlingWallTimeWithPauses" : 0,
+      "concurrentHandlingSumOfThreadTimesWithPauses" : 5890445,
+      "concurrentIterationAndScannersApplicationSumOfThreadTimesWithPauses" : 510543,
+      "concurrentFileCheckSumOfThreadTimesWithPauses" : 5107468,
+      "delayedPushPropertiesStageTime" : 0,
+      "indexExtensionsTime" : 27979,
+      "dumbWallTimeWithPauses" : 0,
+      "dumbWallTimeWithoutPauses" : 0,
+      "updatingStart" : "2025-02-19T04:07:13.387180317Z",
+      "updatingEnd" : "2025-02-19T04:07:13.395879341Z",
+      "totalWallTimeWithPauses" : 8699024,
+      "wallTimeOnPause" : 237557,
+      "wasInterrupted" : false,
+      "totalWallTimeWithoutPauses" : 8461467
+    },
+    "fileCount" : {
+      "numberOfFileProviders" : 2,
+      "numberOfScannedFiles" : 6,
+      "numberOfFilesIndexedByInfrastructureExtensionsDuringScan" : 0,
+      "numberOfFilesScheduledForIndexingAfterScan" : 1
+    },
+    "scanningStatistics" : [ {
+      "providerName" : "Module 'dhruv' (java, java, resources)",
+      "numberOfScannedFiles" : 1,
+      "numberOfSkippedFiles" : 0,
+      "numberOfFilesForIndexing" : 1,
+      "numberOfFilesFullyIndexedByInfrastructureExtensions" : 0,
+      "filesFullyIndexedByInfrastructureExtensions" : [ ],
+      "statusTime" : 234307,
+      "totalOneThreadTimeWithPauses" : 3995400,
+      "iterationAndScannersApplicationTime" : 145301,
+      "filesCheckTime" : 3750088,
+      "timeProcessingUpToDateFiles" : 0,
+      "timeUpdatingContentLessIndexes" : 0,
+      "timeIndexingWithoutContentViaInfrastructureExtension" : 27979,
+      "roots" : [ ]
+    }, {
+      "providerName" : "Module 'dhruv' (all roots)",
+      "numberOfScannedFiles" : 5,
+      "numberOfSkippedFiles" : 6,
+      "numberOfFilesForIndexing" : 0,
+      "numberOfFilesFullyIndexedByInfrastructureExtensions" : 0,
+      "filesFullyIndexedByInfrastructureExtensions" : [ ],
+      "statusTime" : 712678,
+      "totalOneThreadTimeWithPauses" : 1895045,
+      "iterationAndScannersApplicationTime" : 365242,
+      "filesCheckTime" : 1357380,
+      "timeProcessingUpToDateFiles" : 0,
+      "timeUpdatingContentLessIndexes" : 0,
+      "timeIndexingWithoutContentViaInfrastructureExtension" : 0,
+      "roots" : [ ]
+    } ]
+  }
+}

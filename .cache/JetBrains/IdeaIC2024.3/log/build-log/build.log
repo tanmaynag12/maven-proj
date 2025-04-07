@@ -1,0 +1,62 @@
+2025-02-20 09:04:04,039 [      3]   INFO - #o.j.j.c.BuildMain - ==================================================
+2025-02-20 09:04:04,045 [      9]   INFO - #o.j.j.c.BuildMain - Build process started. Classpath: /snap/intellij-idea-community/578/plugins/java/lib/jps-launcher.jar
+2025-02-20 09:04:04,189 [    153]   INFO - #o.j.j.c.BuildMain - Connection to IDE established in 131 ms
+2025-02-20 09:04:04,261 [    225]   INFO - #o.j.j.c.JpsModelLoaderImpl - Loading model: project path = /home/student-devops/Desktop/exp2, global options path = /home/student-devops/.config/JetBrains/IdeaIC2024.3/options
+2025-02-20 09:04:04,322 [    286]   INFO - #o.j.j.m.s.JpsProjectLoader - External project config dir is used: /home/student-devops/.cache/JetBrains/IdeaIC2024.3/projects/exp2.f00552a7/external_build_system/project
+2025-02-20 09:04:04,324 [    288]   INFO - #o.j.j.m.s.JpsProjectLoader - External project config dir is used for modules: /home/student-devops/.cache/JetBrains/IdeaIC2024.3/projects/exp2.f00552a7/external_build_system/modules
+2025-02-20 09:04:04,337 [    301]   INFO - #o.j.j.c.JpsModelLoaderImpl - Model loaded in 75 ms
+2025-02-20 09:04:04,339 [    303]   INFO - #o.j.j.c.JpsModelLoaderImpl - Project has 1 modules, 0 libraries
+2025-02-20 09:04:04,397 [    361]   INFO - #c.i.u.i.PageCacheUtils - File page caching params:
+2025-02-20 09:04:04,397 [    361]   INFO - #c.i.u.i.PageCacheUtils - 	DEFAULT_PAGE_SIZE: 10485760
+2025-02-20 09:04:04,397 [    361]   INFO - #c.i.u.i.PageCacheUtils - 	Direct memory to use, max: 713031680
+2025-02-20 09:04:04,397 [    361]   INFO - #c.i.u.i.PageCacheUtils - 	FilePageCache: regular + lock-free (LOCK_FREE_PAGE_CACHE_ENABLED:true)
+2025-02-20 09:04:04,397 [    361]   INFO - #c.i.u.i.PageCacheUtils - 	NEW_PAGE_CACHE_MEMORY_FRACTION: 0.20000000298023224
+2025-02-20 09:04:04,397 [    361]   INFO - #c.i.u.i.PageCacheUtils - 	Regular FilePageCache: 503316478 bytes
+2025-02-20 09:04:04,397 [    361]   INFO - #c.i.u.i.PageCacheUtils - 	New     FilePageCache: 125829122 bytes (+ up to 10.0% overflow)
+2025-02-20 09:04:04,397 [    361]   INFO - #c.i.u.i.PageCacheUtils - 	DirectByteBuffers pool: 0 bytes
+2025-02-20 09:04:04,451 [    415]   INFO - #o.j.j.i.s.BuildDataManager - Using DependencyGraph-based build incremental analysis
+2025-02-20 09:04:04,476 [    440]   INFO - #o.j.j.i.IncProjectBuilder - Building project; isRebuild:false; isMake:false parallel compilation:true; dependency graph enabled:true
+2025-02-20 09:04:04,477 [    441]   INFO - #o.j.k.j.b.KotlinBuilder - is Kotlin incremental compilation enabled for JVM: true
+2025-02-20 09:04:04,477 [    441]   INFO - #o.j.k.j.b.KotlinBuilder - is Kotlin incremental compilation enabled for JS: true
+2025-02-20 09:04:04,479 [    443]   INFO - #o.j.k.j.b.KotlinBuilder - is Kotlin compiler daemon enabled: true
+2025-02-20 09:04:04,479 [    443]   INFO - #o.j.k.j.b.KotlinBuilder - Label in local history: build started ec1a4494
+2025-02-20 09:04:04,482 [    446]   INFO - #o.j.j.b.i.CompilerReferenceIndex - backward reference index version doesn't exist
+2025-02-20 09:04:04,483 [    447]   INFO - #o.j.j.b.i.CompilerReferenceIndex - backward reference index version doesn't exist
+2025-02-20 09:04:04,500 [    464]   INFO - #o.j.j.i.IncProjectBuilder - Cleaned output directories in 7 ms
+2025-02-20 09:04:04,516 [    480]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph total differentiate linear time 0 ms
+2025-02-20 09:04:04,517 [    481]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph total integrate     linear time 0 ms
+2025-02-20 09:04:04,578 [    542]   INFO - #o.j.k.j.b.KotlinBuilder - KotlinTargetsIndex created in 17 ms
+2025-02-20 09:04:04,593 [    557]   INFO - #o.j.k.j.b.KotlinBuilder - Total Kotlin global compile context initialization time: 33 ms
+2025-02-20 09:04:04,608 [    572]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph exp2 differentiate done in 10 ms
+2025-02-20 09:04:04,614 [    578]   INFO - #o.j.j.i.Builder - Dependency analysis found 0 affected files
+2025-02-20 09:04:04,615 [    579]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph exp2 integrate done in 1 ms
+2025-02-20 09:04:04,627 [    591]   INFO - #o.j.j.i.j.JavaBuilder - Compiling 2 java files; module: exp2
+2025-02-20 09:04:04,889 [    853]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph exp2 differentiate done in 6 ms
+2025-02-20 09:04:04,889 [    853]   INFO - #o.j.j.i.Builder - Dependency analysis found 0 affected files
+2025-02-20 09:04:04,898 [    862]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph exp2 integrate done in 8 ms
+2025-02-20 09:04:04,912 [    876]   INFO - #o.j.j.c.BuildSession - Build duration: Builder 'Java' took 243 ms; 2 sources processed (121 ms per file)
+2025-02-20 09:04:04,913 [    877]   INFO - #o.j.j.i.j.JavaBuilder - javac 17.0.14 was used to compile [exp2]
+2025-02-20 09:04:04,925 [    889]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph total differentiate linear time 16 ms
+2025-02-20 09:04:04,925 [    889]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph total integrate     linear time 9 ms
+2025-02-20 09:04:04,925 [    889]   INFO - #o.j.j.c.BuildSession - FilePageCache stats: pageHits=0, pageFastCacheHits=1827, regularPageLoads=35, pageLoadsAboveSizeThreshold=0, pageLoadUs=19889, pageDisposalUs=38, capacityInBytes=503316478, disposedBuffers=35 maxRegisteredFiles=29 maxCacheSizeInBytes=10584064totalSizeCachedBytes=0
+2025-02-20 09:04:04,991 [      3]   INFO - #o.j.j.c.BuildMain - ==================================================
+2025-02-20 09:04:04,998 [     10]   INFO - #o.j.j.c.BuildMain - Build process started. Classpath: /snap/intellij-idea-community/578/plugins/java/lib/jps-launcher.jar
+2025-02-20 09:04:05,114 [    126]   INFO - #o.j.j.c.BuildMain - Connection to IDE established in 103 ms
+2025-02-20 09:04:05,127 [    139]   INFO - #o.j.j.c.JpsModelLoaderImpl - Loading model: project path = /home/student-devops/Desktop/exp2, global options path = /home/student-devops/.config/JetBrains/IdeaIC2024.3/options
+2025-02-20 09:04:05,196 [    208]   INFO - #o.j.j.m.s.JpsProjectLoader - External project config dir is used: /home/student-devops/.cache/JetBrains/IdeaIC2024.3/projects/exp2.f00552a7/external_build_system/project
+2025-02-20 09:04:05,198 [    210]   INFO - #o.j.j.m.s.JpsProjectLoader - External project config dir is used for modules: /home/student-devops/.cache/JetBrains/IdeaIC2024.3/projects/exp2.f00552a7/external_build_system/modules
+2025-02-20 09:04:05,211 [    223]   INFO - #o.j.j.c.JpsModelLoaderImpl - Model loaded in 83 ms
+2025-02-20 09:04:05,213 [    225]   INFO - #o.j.j.c.JpsModelLoaderImpl - Project has 1 modules, 0 libraries
+2025-02-20 09:04:05,275 [    287]   INFO - #c.i.u.i.PageCacheUtils - File page caching params:
+2025-02-20 09:04:05,276 [    288]   INFO - #c.i.u.i.PageCacheUtils - 	DEFAULT_PAGE_SIZE: 10485760
+2025-02-20 09:04:05,276 [    288]   INFO - #c.i.u.i.PageCacheUtils - 	Direct memory to use, max: 713031680
+2025-02-20 09:04:05,276 [    288]   INFO - #c.i.u.i.PageCacheUtils - 	FilePageCache: regular + lock-free (LOCK_FREE_PAGE_CACHE_ENABLED:true)
+2025-02-20 09:04:05,276 [    288]   INFO - #c.i.u.i.PageCacheUtils - 	NEW_PAGE_CACHE_MEMORY_FRACTION: 0.20000000298023224
+2025-02-20 09:04:05,276 [    288]   INFO - #c.i.u.i.PageCacheUtils - 	Regular FilePageCache: 503316478 bytes
+2025-02-20 09:04:05,276 [    288]   INFO - #c.i.u.i.PageCacheUtils - 	New     FilePageCache: 125829122 bytes (+ up to 10.0% overflow)
+2025-02-20 09:04:05,276 [    288]   INFO - #c.i.u.i.PageCacheUtils - 	DirectByteBuffers pool: 0 bytes
+2025-02-20 09:04:05,329 [    341]   INFO - #o.j.j.i.s.BuildDataManager - Using DependencyGraph-based build incremental analysis
+2025-02-20 09:04:05,366 [    378]   INFO - #o.j.j.c.BuildMain - Pre-loaded process ready in 376 ms
+2025-02-20 09:20:23,900 [ 978912]   INFO - #o.j.j.c.BuildMain - Build canceled, but no build session is running. Exiting.
+2025-02-20 09:20:23,926 [ 978938]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph total differentiate linear time 0 ms
+2025-02-20 09:20:23,926 [ 978938]   INFO - #o.j.j.i.s.BuildDataManager - DependencyGraph total integrate     linear time 0 ms

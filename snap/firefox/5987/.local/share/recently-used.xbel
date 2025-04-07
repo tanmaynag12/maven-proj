@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xbel version="1.0"
+      xmlns:bookmark="http://www.freedesktop.org/standards/desktop-bookmarks"
+      xmlns:mime="http://www.freedesktop.org/standards/shared-mime-info"
+>
+  <bookmark href="file:///home/student-devops/Downloads/plugins.docx" added="2025-02-17T09:20:48.026289Z" modified="2025-02-17T09:20:48.026293Z" visited="2025-02-17T09:20:48.026290Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox %u&apos;" modified="2025-02-17T09:20:48.026291Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/plugins(1).docx" added="2025-02-17T09:20:49.645973Z" modified="2025-02-17T09:20:49.645984Z" visited="2025-02-17T09:20:49.645975Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox %u&apos;" modified="2025-02-17T09:20:49.645979Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/plugins(2).docx" added="2025-02-17T09:20:51.383781Z" modified="2025-02-17T09:20:51.383791Z" visited="2025-02-17T09:20:51.383783Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox %u&apos;" modified="2025-02-17T09:20:51.383786Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/plugins(3).docx" added="2025-02-19T04:07:26.617331Z" modified="2025-02-19T04:07:26.617354Z" visited="2025-02-19T04:07:26.617333Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox %u&apos;" modified="2025-02-19T04:07:26.617337Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/plugins(4).docx" added="2025-02-20T03:23:30.256992Z" modified="2025-02-20T03:23:30.257001Z" visited="2025-02-20T03:23:30.256993Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox %u&apos;" modified="2025-02-20T03:23:30.256996Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/Experiment%203%20commands.odt" added="2025-02-27T02:53:44.001571Z" modified="2025-02-27T02:53:44.001576Z" visited="2025-02-27T02:53:44.001572Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/vnd.oasis.opendocument.text"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-02-27T02:53:44.001574Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/Screenshot%20from%202025-03-13%2011-07-50.png" added="2025-03-14T08:53:42.441819Z" modified="2025-03-14T08:53:42.441853Z" visited="2025-03-14T08:53:42.441820Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-03-14T08:53:42.441847Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/experiement%204.docx" added="2025-03-17T03:42:41.336677Z" modified="2025-03-17T03:42:41.336685Z" visited="2025-03-17T03:42:41.336678Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-03-17T03:42:41.336681Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/aiml.pdf" added="2025-04-03T05:07:33.027429Z" modified="2025-04-03T05:07:33.027436Z" visited="2025-04-03T05:07:33.027430Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/pdf"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-04-03T05:07:33.027433Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+</xbel>

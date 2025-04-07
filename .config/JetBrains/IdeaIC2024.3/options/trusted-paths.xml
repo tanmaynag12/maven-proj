@@ -1,0 +1,16 @@
+<application>
+  <component name="Trusted.Paths">
+    <option name="TRUSTED_PROJECT_PATHS">
+      <map>
+        <entry key="$USER_HOME$/Desktop" value="true" />
+        <entry key="$USER_HOME$/Desktop/ADO86" value="true" />
+        <entry key="$USER_HOME$/Desktop/blah" value="true" />
+        <entry key="$USER_HOME$/Desktop/dhruv" value="true" />
+        <entry key="$USER_HOME$/Desktop/exp2" value="true" />
+        <entry key="$USER_HOME$/Desktop/prog2" value="true" />
+        <entry key="$USER_HOME$/Desktop/stringreverse" value="true" />
+        <entry key="$USER_HOME$/IdeaProjects/PVB_EXP2" value="true" />
+      </map>
+    </option>
+  </component>
+</application>

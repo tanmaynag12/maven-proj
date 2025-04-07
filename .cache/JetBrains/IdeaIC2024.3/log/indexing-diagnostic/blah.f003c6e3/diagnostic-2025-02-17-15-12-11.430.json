@@ -1,0 +1,95 @@
+{
+  "appInfo" : {
+    "build" : "243.24978.46",
+    "buildDate" : "2025-02-11T14:39:00Z[UTC]",
+    "productCode" : "IC",
+    "generated" : "2025-02-17T09:42:11.431825067Z",
+    "os" : "Linux 6.8.0-52-generic",
+    "runtime" : "JetBrains s.r.o. 21.0.6 21.0.6+8-b631.39"
+  },
+  "runtimeInfo" : {
+    "maxMemory" : 2147483648,
+    "numberOfProcessors" : 12,
+    "maxNumberOfIndexingThreads" : 11,
+    "maxSizeOfFileForIntelliSense" : 2560000,
+    "maxSizeOfFileForContentLoading" : 20971520
+  },
+  "type" : "Scanning",
+  "projectIndexingActivityHistory" : {
+    "projectName" : "blah",
+    "times" : {
+      "scanningReason" : "changes in: \"Module 'blah' (all roots)\", \"Library Maven: junit:junit:4.13.2 (#0 class roots, #0 source roots)\", \"Library Maven: org.hamcrest:hamcrest-core:1.3 (#1 class roots, #0 source roots)\"",
+      "scanningType" : "PARTIAL",
+      "scanningId" : 4,
+      "creatingIteratorsTime" : 0,
+      "concurrentHandlingWallTimeWithoutPauses" : 0,
+      "concurrentHandlingWallTimeWithPauses" : 0,
+      "concurrentHandlingSumOfThreadTimesWithPauses" : 106073568,
+      "concurrentIterationAndScannersApplicationSumOfThreadTimesWithPauses" : 41422106,
+      "concurrentFileCheckSumOfThreadTimesWithPauses" : 64337825,
+      "delayedPushPropertiesStageTime" : 0,
+      "indexExtensionsTime" : 1484370,
+      "dumbModeStart" : "2025-02-17T09:42:11.403358327Z",
+      "dumbWallTimeWithPauses" : 25866644,
+      "dumbWallTimeWithoutPauses" : 25866644,
+      "updatingStart" : "2025-02-17T09:42:11.335996827Z",
+      "updatingEnd" : "2025-02-17T09:42:11.429224971Z",
+      "totalWallTimeWithPauses" : 93228144,
+      "wallTimeOnPause" : 332622,
+      "wasInterrupted" : false,
+      "totalWallTimeWithoutPauses" : 92895522
+    },
+    "fileCount" : {
+      "numberOfFileProviders" : 3,
+      "numberOfScannedFiles" : 56,
+      "numberOfFilesIndexedByInfrastructureExtensionsDuringScan" : 0,
+      "numberOfFilesScheduledForIndexingAfterScan" : 47
+    },
+    "scanningStatistics" : [ {
+      "providerName" : "Library Maven: org.hamcrest:hamcrest-core:1.3 (#1 class roots, #0 source roots)",
+      "numberOfScannedFiles" : 47,
+      "numberOfSkippedFiles" : 0,
+      "numberOfFilesForIndexing" : 47,
+      "numberOfFilesFullyIndexedByInfrastructureExtensions" : 0,
+      "filesFullyIndexedByInfrastructureExtensions" : [ ],
+      "statusTime" : 25482375,
+      "totalOneThreadTimeWithPauses" : 83075556,
+      "iterationAndScannersApplicationTime" : 22937310,
+      "filesCheckTime" : 60067595,
+      "timeProcessingUpToDateFiles" : 0,
+      "timeUpdatingContentLessIndexes" : 7917566,
+      "timeIndexingWithoutContentViaInfrastructureExtension" : 1484370,
+      "roots" : [ ]
+    }, {
+      "providerName" : "Module 'blah' (all roots)",
+      "numberOfScannedFiles" : 9,
+      "numberOfSkippedFiles" : 0,
+      "numberOfFilesForIndexing" : 0,
+      "numberOfFilesFullyIndexedByInfrastructureExtensions" : 0,
+      "filesFullyIndexedByInfrastructureExtensions" : [ ],
+      "statusTime" : 1424948,
+      "totalOneThreadTimeWithPauses" : 13418517,
+      "iterationAndScannersApplicationTime" : 9136530,
+      "filesCheckTime" : 4160958,
+      "timeProcessingUpToDateFiles" : 0,
+      "timeUpdatingContentLessIndexes" : 0,
+      "timeIndexingWithoutContentViaInfrastructureExtension" : 0,
+      "roots" : [ ]
+    }, {
+      "providerName" : "Library Maven: junit:junit:4.13.2 (#0 class roots, #0 source roots)",
+      "numberOfScannedFiles" : 0,
+      "numberOfSkippedFiles" : 0,
+      "numberOfFilesForIndexing" : 0,
+      "numberOfFilesFullyIndexedByInfrastructureExtensions" : 0,
+      "filesFullyIndexedByInfrastructureExtensions" : [ ],
+      "statusTime" : 0,
+      "totalOneThreadTimeWithPauses" : 9579495,
+      "iterationAndScannersApplicationTime" : 9348266,
+      "filesCheckTime" : 109272,
+      "timeProcessingUpToDateFiles" : 0,
+      "timeUpdatingContentLessIndexes" : 0,
+      "timeIndexingWithoutContentViaInfrastructureExtension" : 0,
+      "roots" : [ ]
+    } ]
+  }
+}

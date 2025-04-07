@@ -1,0 +1,94 @@
+<application>
+  <component name="ActionsLocalSummary">
+    <e n="$Copy">
+      <i c="1" l="1739784314407" />
+    </e>
+    <e n="$Undo">
+      <i c="23" l="1740022371406" />
+    </e>
+    <e n="EditorBackSpace">
+      <i c="63" l="1740391903147" />
+    </e>
+    <e n="EditorCopy">
+      <i c="2" l="1740022621996" />
+    </e>
+    <e n="EditorCut">
+      <i c="1" l="1740021928375" />
+    </e>
+    <e n="EditorEnter">
+      <i c="7" l="1740022012675" />
+    </e>
+    <e n="EditorEscape">
+      <i c="1" l="1739785579848" />
+    </e>
+    <e n="EditorLeft">
+      <i c="2" l="1739784803710" />
+    </e>
+    <e n="EditorLineEnd">
+      <i c="3" l="1739784804849" />
+    </e>
+    <e n="EditorPaste">
+      <i c="17" l="1740022424593" />
+    </e>
+    <e n="EditorRight">
+      <i c="2" l="1739784804030" />
+    </e>
+    <e n="EditorToggleInsertState">
+      <i c="2" l="1739784799318" />
+    </e>
+    <e n="ExternalSystem.ProjectRefreshAction">
+      <i c="1" l="1739785330835" />
+    </e>
+    <e n="Floating.CodeToolbar.Extract">
+      <i c="3" l="1740022432897" />
+    </e>
+    <e n="NewClass">
+      <i c="1" l="1740022397845" />
+    </e>
+    <e n="NewProject">
+      <i c="9" l="1740391901102" />
+    </e>
+    <e n="OpenFile">
+      <i c="2" l="1740023780170" />
+    </e>
+    <e n="Run">
+      <i c="1" l="1740022443546" />
+    </e>
+    <e n="RunAnything">
+      <i c="1" l="1739938074505" />
+    </e>
+    <e n="SaveAll">
+      <i c="14" l="1740022593632" />
+    </e>
+    <e n="SettingsEntryPoint">
+      <i c="2" l="1739782249319" />
+    </e>
+    <e n="ShowIntentionActions">
+      <i c="2" l="1740022431045" />
+    </e>
+    <e n="ShowSettings">
+      <i c="4" l="1739785875752" />
+    </e>
+    <e n="WelcomeScreen.CreateNewProject">
+      <i c="1" l="1739762882794" />
+    </e>
+    <e n="com.intellij.openapi.fileEditor.impl.tabActions.CloseTab">
+      <i c="4" l="1740386301395" />
+    </e>
+    <e n="com.intellij.openapi.wm.impl.SquareAnActionButton">
+      <i c="6" l="1740386279096" />
+    </e>
+    <e n="com.intellij.openapi.wm.impl.customFrameDecorations.header.toolbar.MainMenuButton$ShowMenuAction">
+      <i c="18" l="1740391899372" />
+    </e>
+    <e n="com.intellij.toolWindow.ToolWindowHeader$HideAction">
+      <i c="2" l="1740022450458" />
+    </e>
+    <e n="com.intellij.ui.dsl.builder.components.SegmentedButtonAction">
+      <i c="1" l="1739763157271" />
+    </e>
+    <e n="com.intellij.xdebugger.impl.breakpoints.RemoveBreakpointGutterIconAction">
+      <i c="1" l="1740022313675" />
+    </e>
+  </component>
+</application>

@@ -1,0 +1,75 @@
+{
+  "Version": "22.04",
+  "OEM": {
+    "Vendor": "HP",
+    "Product": "HP Pro Tower 280 G9 PCI Desktop PC",
+    "Family": "103C_53307F HP 200 Series"
+  },
+  "BIOS": {
+    "Vendor": "AMI",
+    "Version": "F.24"
+  },
+  "Arch": "amd64",
+  "HwCap": "x86-64-v3",
+  "GPU": [
+    {
+      "Vendor": "8086",
+      "Model": "4690"
+    }
+  ],
+  "RAM": 16.1,
+  "Partitions": [
+    127.5,
+    97.8,
+    0.3
+  ],
+  "Screens": [
+    {
+      "Size": "440mmx240mm",
+      "Resolution": "1600x900",
+      "Frequency": "59.95"
+    }
+  ],
+  "Autologin": false,
+  "LivePatch": false,
+  "Session": {
+    "DE": "ubuntu:GNOME",
+    "Name": "ubuntu",
+    "Type": "wayland"
+  },
+  "Language": "en_IN",
+  "Timezone": "Asia/Kolkata",
+  "Install": {
+    "Media": "Ubuntu 22.04.2 LTS \"Jammy Jellyfish\" - Release amd64 (20230223)",
+    "Type": "GTK",
+    "OEM": false,
+    "PartitionMethod": "manual",
+    "DownloadUpdates": true,
+    "Language": "en",
+    "Minimal": false,
+    "RestrictedAddons": false,
+    "Stages": {
+      "0": "language",
+      "19": "console_setup",
+      "21": "wireless",
+      "31": "prepare",
+      "41": "partman",
+      "47": "partman",
+      "49": "partman",
+      "56": "partman",
+      "58": "partman",
+      "106": "partman",
+      "109": "partman",
+      "140": "partman",
+      "143": "partman",
+      "152": "partman",
+      "155": "partman",
+      "157": "partman",
+      "159": "start_install",
+      "165": "timezone",
+      "167": "usersetup",
+      "194": "user_done",
+      "813": "done"
+    }
+  }
+}

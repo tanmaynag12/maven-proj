@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<application-state>
+  <context id="">
+    <application id="org.gnome.eog.desktop" score="0" last-seen="1743756756"/>
+    <application id="org.gnome.Nautilus.desktop" score="19" last-seen="1743998269"/>
+    <application id="thunderbird.desktop" score="0" last-seen="1743738575"/>
+    <application id="firefox_firefox.desktop" score="7858" last-seen="1743998273"/>
+    <application id="org.gnome.gedit.desktop" score="10" last-seen="1743998270"/>
+    <application id="snapd-desktop-integration_snapd-desktop-integration.desktop" score="1" last-seen="1743660990"/>
+    <application id="org.gnome.Terminal.desktop" score="7413" last-seen="1743998248"/>
+    <application id="rhythmbox.desktop" score="0" last-seen="1743658957"/>
+    <application id="update-manager.desktop" score="0" last-seen="1743660528"/>
+  </context>
+</application-state>

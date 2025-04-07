@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="277px" height="277px" viewBox="0 0 277 277" enable-background="new 0 0 277 277" xml:space="preserve">
+<polygon fill-rule="evenodd" clip-rule="evenodd" fill="#FFFFFF" points="29.667,23 254.667,26 255.667,194.333 153,253.667 
+	23.667,253.667 23.667,29.667 "/>
+<g>
+	<path fill="#E04646" d="M34.667,37.137h9.152l11.149,47.842L68.03,37.137h9.152l13.146,47.842l11.149-47.842h9.152L94.905,98.042
+		h-9.152L72.606,49.534L58.878,98.042h-9.152L34.667,37.137z"/>
+</g>
+<g>
+	<defs>
+		<rect id="SVGID_1_" x="17.667" y="17.667" width="241.666" height="241.667"/>
+	</defs>
+	<clipPath id="SVGID_2_">
+		<use xlink:href="#SVGID_1_"  overflow="visible"/>
+	</clipPath>
+	<path clip-path="url(#SVGID_2_)" fill-rule="evenodd" clip-rule="evenodd" fill="#E04646" d="M93.13,176.301
+		c0-23.063,8.091-42.693,24.282-58.892c16.083-16.186,35.713-24.282,58.896-24.282c22.84,0,42.419,8.096,58.726,24.282
+		c16.296,16.198,24.449,35.828,24.449,58.892c0,22.965-8.153,42.533-24.449,58.727c-16.307,16.302-35.886,24.454-58.726,24.454
+		c-23.183,0-42.813-8.152-58.896-24.454C101.221,218.834,93.13,199.266,93.13,176.301"/>
+	<path clip-path="url(#SVGID_2_)" fill-rule="evenodd" clip-rule="evenodd" fill="#E04646" d="M259.483,176.301h-9.749V35.956
+		c0-3.586-1.279-5.992-3.861-7.225c-0.89-0.446-1.928-0.786-3.104-1.002l-1.43-0.166H35.806c-3.644,0-6.047,1.253-7.222,3.771
+		c-0.728,1.46-1.123,3-1.172,4.622v205.383c0,3.578,1.253,5.964,3.777,7.142c1.452,0.724,2.995,1.151,4.618,1.258h136.22
+		l4.281,9.743H32.779c-2.521,0-5.036-0.619-7.552-1.853c-5.041-2.517-7.56-6.936-7.56-13.268V32.933c0-2.524,0.644-5.035,1.931-7.56
+		c2.521-5.04,6.915-7.556,13.181-7.556h211.59l2.345,0.249c1.903,0.282,3.644,0.842,5.211,1.684
+		c5.032,2.514,7.559,6.913,7.559,13.184V176.301z"/>
+	<rect x="125.268" y="134.865" clip-path="url(#SVGID_2_)" fill="#FCFCFC" width="101.203" height="7.561"/>
+	<rect x="125.268" y="161.039" clip-path="url(#SVGID_2_)" fill="#FCFCFC" width="101.203" height="7.561"/>
+	<rect x="125.268" y="186.34" clip-path="url(#SVGID_2_)" fill="#FCFCFC" width="69.213" height="7.561"/>
+	<rect x="125.268" y="212.513" clip-path="url(#SVGID_2_)" fill="#FCFCFC" width="36.873" height="7.561"/>
+</g>
+</svg>
