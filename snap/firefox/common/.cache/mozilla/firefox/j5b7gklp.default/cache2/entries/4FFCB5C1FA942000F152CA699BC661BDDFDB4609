@@ -1,0 +1,1302 @@
+/**
+  * jQuery Geocoding and Places Autocomplete Plugin - V 1.4
+  *
+  * @author Martin Kleppe <kleppe@ubilabs.net>, 2012
+  * @author Ubilabs http://ubilabs.net, 2012
+  * @license MIT License <http://www.opensource.org/licenses/mit-license.php>
+  */
+
+ // # $.geocomplete()
+ // ## jQuery Geocoding and Places Autocomplete Plugin - V 1.4
+ //
+ // * https://github.com/ubilabs/geocomplete/
+ // * by Martin Kleppe <kleppe@ubilabs.net>
+
+ ;(function($, window, document, undefined){
+
+   // ## Options
+   // The default options for this plugin.
+   //
+   // * `map` - Might be a selector, an jQuery object or a DOM element. Default is `false` which shows no map.
+   // * `details` - The container that should be populated with data. Defaults to `false` which ignores the setting.
+   // * `location` - Location to initialize the map on. Might be an address `string` or an `array` with [latitude, longitude] or a `google.maps.LatLng`object. Default is `false` which shows a blank map.
+   // * `bounds` - Whether to snap geocode search to map bounds. Default: `true` if false search globally. Alternatively pass a custom `LatLngBounds object.
+   // * `detailsAttribute` - The attribute's name to use as an indicator. Default: `"name"`
+   // * `mapOptions` - Options to pass to the `google.maps.Map` constructor. See the full list [here](http://code.google.com/apis/maps/documentation/javascript/reference.html#MapOptions).
+   // * `mapOptions.zoom` - The inital zoom level. Default: `14`
+   // * `mapOptions.scrollwheel` - Whether to enable the scrollwheel to zoom the map. Default: `false`
+   // * `mapOptions.mapTypeId` - The map type. Default: `"roadmap"`
+   // * `markerOptions` - The options to pass to the `google.maps.Marker` constructor. See the full list [here](http://code.google.com/apis/maps/documentation/javascript/reference.html#MarkerOptions).
+   // * `markerOptions.draggable` - If the marker is draggable. Default: `false`. Set to true to enable dragging.
+   // * `markerOptions.disabled` - Do not show marker. Default: `false`. Set to true to disable marker.
+   // * `maxZoom` - The maximum zoom level too zoom in after a geocoding response. Default: `16`
+   // * `types` - An array containing one or more of the supported types for the places request. Default: `['geocode']` See the full list [here](http://code.google.com/apis/maps/documentation/javascript/places.html#place_search_requests).
+
+   var defaults = {
+     bounds: true,
+     country: null,
+     map: false,
+     details: false,
+     detailsAttribute: "name",
+     location: false,
+
+     mapOptions: {
+       zoom: 14,
+       scrollwheel: false,
+       mapTypeId: "roadmap"
+     },
+
+     markerOptions: {
+       draggable: false
+     },
+
+     maxZoom: 16,
+     types: ['geocode']
+   };
+
+   // See: [Geocoding Types](https://developers.google.com/maps/documentation/geocoding/#Types)
+   // on Google Developers.
+   var componentTypes = ("street_address route intersection political " +
+     "country administrative_area_level_1 administrative_area_level_2 " +
+     "administrative_area_level_3 colloquial_area locality sublocality " +
+     "neighborhood premise subpremise postal_code natural_feature airport " +
+     "park point_of_interest post_box street_number floor room " +
+     "lat lng viewport location " +
+     "formatted_address location_type bounds").split(" ");
+
+   // See: [Places Details Responses](https://developers.google.com/maps/documentation/javascript/places#place_details_responses)
+   // on Google Developers.
+   var placesDetails = ("id url website vicinity reference name rating " +
+     "international_phone_number icon formatted_phone_number").split(" ");
+
+   // The actual plugin constructor.
+   function GeoComplete(input, options) {
+
+     this.options = $.extend(true, {}, defaults, options);
+
+     this.input = input;
+     this.$input = $(input);
+
+     this._defaults = defaults;
+     this._name = 'geocomplete';
+
+     this.init();
+   }
+
+   // Initialize all parts of the plugin.
+   $.extend(GeoComplete.prototype, {
+     init: function(){
+       this.initMap();
+       this.initMarker();
+       this.initGeocoder();
+       this.initDetails();
+       this.initLocation();
+     },
+
+     // Initialize the map but only if the option `map` was set.
+     // This will create a `map` within the given container
+     // using the provided `mapOptions` or link to the existing map instance.
+     initMap: function(){
+       if (!this.options.map){ return; }
+
+       if (typeof this.options.map.setCenter == "function"){
+         this.map = this.options.map;
+         return;
+       }
+
+       this.map = new google.maps.Map(
+         $(this.options.map)[0],
+         this.options.mapOptions
+       );
+     },
+
+     // Add a marker with the provided `markerOptions` but only
+     // if the option was set. Additionally it listens for the `dragend` event
+     // to notify the plugin about changes.
+     initMarker: function(){
+       if (!this.map){ return; }
+       var options = $.extend(this.options.markerOptions, { map: this.map });
+
+       if (options.disabled){ return; }
+
+       this.marker = new google.maps.Marker(options);
+       google.maps.event.addListener(
+         this.marker,
+         'dragend',
+         $.proxy(this.markerDragged, this)
+       );
+     },
+
+     // Associate the input with the autocompleter and create a geocoder
+     // to fall back when the autocompleter does not return a value.
+     initGeocoder: function(){
+
+       var options = {
+         types: this.options.types,
+         bounds: this.options.bounds === true ? null : this.options.bounds,
+         componentRestrictions: this.options.componentRestrictions
+       };
+
+       if (this.options.country){
+         options.componentRestrictions = {country: this.options.country}
+       }
+
+       this.autocomplete = new google.maps.places.Autocomplete(
+         this.input, options
+       );
+
+       this.geocoder = new google.maps.Geocoder();
+
+       // Bind autocomplete to map bounds but only if there is a map
+       // and `options.bindToMap` is set to true.
+       if (this.map && this.options.bounds === true){
+         this.autocomplete.bindTo('bounds', this.map);
+       }
+
+       // Watch `place_changed` events on the autocomplete input field.
+       google.maps.event.addListener(
+         this.autocomplete,
+         'place_changed',
+         $.proxy(this.placeChanged, this)
+       );
+
+       // Prevent parent form from being submitted if user hit enter.
+       this.$input.keypress(function(event){
+         if (event.keyCode === 13){ return false; }
+       });
+
+       // Listen for "geocode" events and trigger find action.
+       this.$input.bind("geocode", $.proxy(function(){
+         this.find();
+       }, this));
+     },
+
+     // Prepare a given DOM structure to be populated when we got some data.
+     // This will cycle through the list of component types and map the
+     // corresponding elements.
+     initDetails: function(){
+       if (!this.options.details){ return; }
+
+       var $details = $(this.options.details),
+         attribute = this.options.detailsAttribute,
+         details = {};
+
+       function setDetail(value){
+         details[value] = $details.find("[" +  attribute + "=" + value + "]");
+       }
+
+       $.each(componentTypes, function(index, key){
+         setDetail(key);
+         setDetail(key + "_short");
+       });
+
+       $.each(placesDetails, function(index, key){
+         setDetail(key);
+       });
+
+       this.$details = $details;
+       this.details = details;
+     },
+
+     // Set the initial location of the plugin if the `location` options was set.
+     // This method will care about converting the value into the right format.
+     initLocation: function() {
+
+       var location = this.options.location, latLng;
+
+       if (!location) { return; }
+
+       if (typeof location == 'string') {
+         this.find(location);
+         return;
+       }
+
+       if (location instanceof Array) {
+         latLng = new google.maps.LatLng(location[0], location[1]);
+       }
+
+       if (location instanceof google.maps.LatLng){
+         latLng = location;
+       }
+
+       if (latLng){
+         if (this.map){ this.map.setCenter(latLng); }
+       }
+     },
+
+     // Look up a given address. If no `address` was specified it uses
+     // the current value of the input.
+     find: function(address){
+       this.geocode({
+         address: address || this.$input.val()
+       });
+     },
+
+     // Requests details about a given location.
+     // Additionally it will bias the requests to the provided bounds.
+     geocode: function(request){
+       if (this.options.bounds && !request.bounds){
+         if (this.options.bounds === true){
+           request.bounds = this.map && this.map.getBounds();
+         } else {
+           request.bounds = this.options.bounds;
+         }
+       }
+
+       if (this.options.country){
+         request.region = this.options.country;
+       }
+
+       this.geocoder.geocode(request, $.proxy(this.handleGeocode, this));
+     },
+
+     // Handles the geocode response. If more than one results was found
+     // it triggers the "geocode:multiple" events. If there was an error
+     // the "geocode:error" event is fired.
+     handleGeocode: function(results, status){
+       if (status === google.maps.GeocoderStatus.OK) {
+         var result = results[0];
+         this.$input.val(result.formatted_address);
+         this.update(result);
+
+         if (results.length > 1){
+           this.trigger("geocode:multiple", results);
+         }
+
+       } else {
+         this.trigger("geocode:error", status);
+       }
+     },
+
+     // Triggers a given `event` with optional `arguments` on the input.
+     trigger: function(event, argument){
+       this.$input.trigger(event, [argument]);
+     },
+
+     // Set the map to a new center by passing a `geometry`.
+     // If the geometry has a viewport, the map zooms out to fit the bounds.
+     // Additionally it updates the marker position.
+     center: function(geometry){
+
+       if (geometry.viewport){
+         this.map.fitBounds(geometry.viewport);
+         if (this.map.getZoom() > this.options.maxZoom){
+           this.map.setZoom(this.options.maxZoom);
+         }
+       } else {
+         this.map.setZoom(this.options.maxZoom);
+         this.map.setCenter(geometry.location);
+       }
+
+       if (this.marker){
+         this.marker.setPosition(geometry.location);
+         this.marker.setAnimation(this.options.markerOptions.animation);
+       }
+     },
+
+     // Update the elements based on a single places or geoocoding response
+     // and trigger the "geocode:result" event on the input.
+     update: function(result){
+
+       if (this.map){
+         this.center(result.geometry);
+       }
+
+       if (this.$details){
+         this.fillDetails(result);
+       }
+
+       this.trigger("geocode:result", result);
+     },
+
+     // Populate the provided elements with new `result` data.
+     // This will lookup all elements that has an attribute with the given
+     // component type.
+     fillDetails: function(result){
+
+       var data = {},
+         geometry = result.geometry,
+         viewport = geometry.viewport,
+         bounds = geometry.bounds;
+
+       // Create a simplified version of the address components.
+       $.each(result.address_components, function(index, object){
+         var name = object.types[0];
+         data[name] = object.long_name;
+         data[name + "_short"] = object.short_name;
+       });
+
+       // Add properties of the places details.
+       $.each(placesDetails, function(index, key){
+         data[key] = result[key];
+       });
+
+       // Add infos about the address and geometry.
+       $.extend(data, {
+         formatted_address: result.formatted_address,
+         location_type: geometry.location_type || "PLACES",
+         viewport: viewport,
+         bounds: bounds,
+         location: geometry.location,
+         lat: geometry.location.lat(),
+         lng: geometry.location.lng()
+       });
+
+       // Set the values for all details.
+       $.each(this.details, $.proxy(function(key, $detail){
+         var value = data[key];
+         this.setDetail($detail, value);
+       }, this));
+
+       this.data = data;
+       google.maps.event.trigger(this.map, 'resize');
+
+     },
+
+     // Assign a given `value` to a single `$element`.
+     // If the element is an input, the value is set, otherwise it updates
+     // the text content.
+     setDetail: function($element, value){
+
+       if (value === undefined){
+         value = "";
+       } else if (typeof value.toUrlValue == "function"){
+         value = value.toUrlValue();
+       }
+
+       if ($element.is(":input")){
+         $element.val(value);
+       } else {
+         $element.text(value);
+       }
+     },
+
+     // Fire the "geocode:dragged" event and pass the new position.
+     markerDragged: function(event){
+       this.trigger("geocode:dragged", event.latLng);
+     },
+
+     // Restore the old position of the marker to the last now location.
+     resetMarker: function(){
+       this.marker.setPosition(this.data.location);
+       this.setDetail(this.details.lat, this.data.location.lat());
+       this.setDetail(this.details.lng, this.data.location.lng());
+     },
+
+     // Update the plugin after the user has selected an autocomplete entry.
+     // If the place has no geometry it passes it to the geocoder.
+     placeChanged: function(){
+       var place = this.autocomplete.getPlace();
+
+       if (!place.geometry){
+         this.find(place.name);
+       } else {
+         this.update(place);
+       }
+     }
+   });
+
+   // A plugin wrapper around the constructor.
+   // Pass `options` with all settings that are different from the default.
+   // The attribute is used to prevent multiple instantiations of the plugin.
+   $.fn.geocomplete = function(options) {
+
+     var attribute = 'plugin_geocomplete';
+
+     // If you call `.geocomplete()` with a string as the first parameter
+     // it returns the corresponding property or calls the method with the
+     // following arguments.
+     if (typeof options == "string"){
+
+       var instance = $(this).data(attribute) || $(this).geocomplete().data(attribute),
+         prop = instance[options];
+
+       if (typeof prop == "function"){
+         prop.apply(instance, Array.prototype.slice.call(arguments, 1));
+         return $(this);
+       } else {
+         if (arguments.length == 2){
+           prop = arguments[1];
+         }
+         return prop;
+       }
+     } else {
+       return this.each(function() {
+         // Prevent against multiple instantiations.
+         var instance = $.data(this, attribute);
+         if (!instance) {
+           instance = new GeoComplete( this, options )
+           $.data(this, attribute, instance);
+         }
+       });
+     }
+   };
+
+ })( jQuery, window, document );
+$.fn.showLoader = function(){
+	$(this).removeClass('hide');
+}
+$.fn.hideLoader = function(){
+	$(this).addClass('hide');
+}
+$(document).ready(function(){
+ /*  $('.floader').showLoader();
+  $('.facebook-share-box').ajaxForm(form.post); 
+  $.get('wall.php',function(data){
+    $('.wall').html(data);
+    $('.floader').hideLoader();
+  }); */
+	try{
+	  $("#geocomplete").geocomplete({
+	    map: ".map_canvas",
+	    details: "form",
+	    types: ["geocode", "establishment"]
+	  }); 
+	}catch(Error){
+		
+	}
+	try{ 
+	  $('body').delegate('#shareType','click', function(e) { 
+		$("#subjectVisibilityToggleDiv").hide();
+	  	e.preventDefault();
+	    var positionArray = {};
+	    positionArray['status'] = 0;
+	    positionArray['photos'] = 80;
+	    positionArray['videos'] = 160;
+	    positionArray['location'] = 231;
+	    positionArray['sms'] = 231;
+	    positionArray['email'] = 281;
+	    $('.video').hideLoader('hide');
+	    $('.image').hideLoader('hide');
+	    $('.place').hideLoader('hide');
+	    $('.shareType').val($(this).attr('class'));
+	  	$('.arrow').css("left", positionArray[$(this).attr('class')]);
+	  	$('#p_charsLeft').hide();
+	    if($(this).attr('class') == 'videos') {
+		$("#subjectVisibilityToggleDiv").hide();
+	      $('.video').showLoader('hide');
+	      $('.image').hideLoader('hide');
+	      $('.place').hideLoader('hide');
+	    }
+	    if($(this).attr('class') == 'photos') {
+	      $("#subjectVisibilityToggleDiv").hide();
+	      $('.video').hideLoader('hide');
+	      $('.image').showLoader('hide');
+	      $('.place').hideLoader('hide');
+	    }
+	    if($(this).attr('class') == 'location') {
+	    $("#subjectVisibilityToggleDiv").hide();
+	      $('.video').hideLoader('hide');
+	      $('.image').hideLoader('hide');
+	      $('.place').showLoader('hide');
+	    }
+	    if($(this).attr('class') == 'sms') {
+		$("#subjectVisibilityToggleDiv").hide();
+			if(ckeditorFlag){
+				CKEDITOR.instances.alumniTextPost.destroy(true);
+				ckeditorFlag = false;
+			}
+	    	$('#p_charsLeft').limit('140','#charsLeft');
+	    	$('#p_charsLeft').hide();
+	    	$('.video').hideLoader('hide');
+	    	$('.image').hideLoader('hide');
+	    	$('.place').showLoader('hide');
+	    }
+	    else{
+	    	if(!ckeditorFlag){
+				ckeditorFlag = true;
+				createLightCKEditor('alumniTextPost');
+			}
+	    }
+	    if($(this).attr('class') == 'email') {
+		//bookmark email
+			$("#subjectVisibilityToggleDiv").show();
+	    	$('.video').hideLoader('hide');
+	    	$('.image').showLoader('hide');
+	    	$('.place').hideLoader('hide');
+	    }
+	  	return false;
+	  });
+	}catch(Error){
+		
+	}
+  /* $(window).scroll(function(){
+    if  ($(window).scrollTop() == $(document).height() - $(window).height()){
+       loadData();
+    }
+  });       */
+});
+
+(function($){ 
+    $.fn.extend({  
+        limit: function(limit,element) {
+			
+			var interval, f;
+			var self = $(this);
+					
+			$(this).focus(function(){
+				interval = window.setInterval(substring,100);
+			});
+			
+			$(this).blur(function(){
+				clearInterval(interval);
+				substring();
+			});
+			
+			substringFunction = "function substring(){ var val = $(self).val();var length = val.length;if(length > limit){$(self).val($(self).val().substring(0,limit));}";
+			if(typeof element != 'undefined')
+				substringFunction += "if($(element).html() != limit-length){$(element).html((limit-length<=0)?'0':limit-length);}";
+				
+			substringFunction += "}";
+			
+			eval(substringFunction);
+			
+			
+			
+			substring();
+			
+       } 
+   }); 
+})(jQuery);        œ  xœïc   20250331133932-8ló›  Ä¨–i,   https://erp.cmrit.ac.in/js/homepagePlugin.js      ]G  /**
+  * jQuery Geocoding and Places Autocomplete Plugin - V 1.4
+  *
+  * @author Martin Kleppe <kleppe@ubilabs.net>, 2012
+  * @author Ubilabs http://ubilabs.net, 2012
+  * @license MIT License <http://www.opensource.org/licenses/mit-license.php>
+  */
+
+ // # $.geocomplete()
+ // ## jQuery Geocoding and Places Autocomplete Plugin - V 1.4
+ //
+ // * https://github.com/ubilabs/geocomplete/
+ // * by Martin Kleppe <kleppe@ubilabs.net>
+
+ ;(function($, window, document, undefined){
+
+   // ## Options
+   // The default options for this plugin.
+   //
+   // * `map` - Might be a selector, an jQuery object or a DOM element. Default is `false` which shows no map.
+   // * `details` - The container that should be populated with data. Defaults to `false` which ignores the setting.
+   // * `location` - Location to initialize the map on. Might be an address `string` or an `array` with [latitude, longitude] or a `google.maps.LatLng`object. Default is `false` which shows a blank map.
+   // * `bounds` - Whether to snap geocode search to map bounds. Default: `true` if false search globally. Alternatively pass a custom `LatLngBounds object.
+   // * `detailsAttribute` - The attribute's name to use as an indicator. Default: `"name"`
+   // * `mapOptions` - Options to pass to the `google.maps.Map` constructor. See the full list [here](http://code.google.com/apis/maps/documentation/javascript/reference.html#MapOptions).
+   // * `mapOptions.zoom` - The inital zoom level. Default: `14`
+   // * `mapOptions.scrollwheel` - Whether to enable the scrollwheel to zoom the map. Default: `false`
+   // * `mapOptions.mapTypeId` - The map type. Default: `"roadmap"`
+   // * `markerOptions` - The options to pass to the `google.maps.Marker` constructor. See the full list [here](http://code.google.com/apis/maps/documentation/javascript/reference.html#MarkerOptions).
+   // * `markerOptions.draggable` - If the marker is draggable. Default: `false`. Set to true to enable dragging.
+   // * `markerOptions.disabled` - Do not show marker. Default: `false`. Set to true to disable marker.
+   // * `maxZoom` - The maximum zoom level too zoom in after a geocoding response. Default: `16`
+   // * `types` - An array containing one or more of the supported types for the places request. Default: `['geocode']` See the full list [here](http://code.google.com/apis/maps/documentation/javascript/places.html#place_search_requests).
+
+   var defaults = {
+     bounds: true,
+     country: null,
+     map: false,
+     details: false,
+     detailsAttribute: "name",
+     location: false,
+
+     mapOptions: {
+       zoom: 14,
+       scrollwheel: false,
+       mapTypeId: "roadmap"
+     },
+
+     markerOptions: {
+       draggable: false
+     },
+
+     maxZoom: 16,
+     types: ['geocode']
+   };
+
+   // See: [Geocoding Types](https://developers.google.com/maps/documentation/geocoding/#Types)
+   // on Google Developers.
+   var componentTypes = ("street_address route intersection political " +
+     "country administrative_area_level_1 administrative_area_level_2 " +
+     "administrative_area_level_3 colloquial_area locality sublocality " +
+     "neighborhood premise subpremise postal_code natural_feature airport " +
+     "park point_of_interest post_box street_number floor room " +
+     "lat lng viewport location " +
+     "formatted_address location_type bounds").split(" ");
+
+   // See: [Places Details Responses](https://developers.google.com/maps/documentation/javascript/places#place_details_responses)
+   // on Google Developers.
+   var placesDetails = ("id url website vicinity reference name rating " +
+     "international_phone_number icon formatted_phone_number").split(" ");
+
+   // The actual plugin constructor.
+   function GeoComplete(input, options) {
+
+     this.options = $.extend(true, {}, defaults, options);
+
+     this.input = input;
+     this.$input = $(input);
+
+     this._defaults = defaults;
+     this._name = 'geocomplete';
+
+     this.init();
+   }
+
+   // Initialize all parts of the plugin.
+   $.extend(GeoComplete.prototype, {
+     init: function(){
+       this.initMap();
+       this.initMarker();
+       this.initGeocoder();
+       this.initDetails();
+       this.initLocation();
+     },
+
+     // Initialize the map but only if the option `map` was set.
+     // This will create a `map` within the given container
+     // using the provided `mapOptions` or link to the existing map instance.
+     initMap: function(){
+       if (!this.options.map){ return; }
+
+       if (typeof this.options.map.setCenter == "function"){
+         this.map = this.options.map;
+         return;
+       }
+
+       this.map = new google.maps.Map(
+         $(this.options.map)[0],
+         this.options.mapOptions
+       );
+     },
+
+     // Add a marker with the provided `markerOptions` but only
+     // if the option was set. Additionally it listens for the `dragend` event
+     // to notify the plugin about changes.
+     initMarker: function(){
+       if (!this.map){ return; }
+       var options = $.extend(this.options.markerOptions, { map: this.map });
+
+       if (options.disabled){ return; }
+
+       this.marker = new google.maps.Marker(options);
+       google.maps.event.addListener(
+         this.marker,
+         'dragend',
+         $.proxy(this.markerDragged, this)
+       );
+     },
+
+     // Associate the input with the autocompleter and create a geocoder
+     // to fall back when the autocompleter does not return a value.
+     initGeocoder: function(){
+
+       var options = {
+         types: this.options.types,
+         bounds: this.options.bounds === true ? null : this.options.bounds,
+         componentRestrictions: this.options.componentRestrictions
+       };
+
+       if (this.options.country){
+         options.componentRestrictions = {country: this.options.country}
+       }
+
+       this.autocomplete = new google.maps.places.Autocomplete(
+         this.input, options
+       );
+
+       this.geocoder = new google.maps.Geocoder();
+
+       // Bind autocomplete to map bounds but only if there is a map
+       // and `options.bindToMap` is set to true.
+       if (this.map && this.options.bounds === true){
+         this.autocomplete.bindTo('bounds', this.map);
+       }
+
+       // Watch `place_changed` events on the autocomplete input field.
+       google.maps.event.addListener(
+         this.autocomplete,
+         'place_changed',
+         $.proxy(this.placeChanged, this)
+       );
+
+       // Prevent parent form from being submitted if user hit enter.
+       this.$input.keypress(function(event){
+         if (event.keyCode === 13){ return false; }
+       });
+
+       // Listen for "geocode" events and trigger find action.
+       this.$input.bind("geocode", $.proxy(function(){
+         this.find();
+       }, this));
+     },
+
+     // Prepare a given DOM structure to be populated when we got some data.
+     // This will cycle through the list of component types and map the
+     // corresponding elements.
+     initDetails: function(){
+       if (!this.options.details){ return; }
+
+       var $details = $(this.options.details),
+         attribute = this.options.detailsAttribute,
+         details = {};
+
+       function setDetail(value){
+         details[value] = $details.find("[" +  attribute + "=" + value + "]");
+       }
+
+       $.each(componentTypes, function(index, key){
+         setDetail(key);
+         setDetail(key + "_short");
+       });
+
+       $.each(placesDetails, function(index, key){
+         setDetail(key);
+       });
+
+       this.$details = $details;
+       this.details = details;
+     },
+
+     // Set the initial location of the plugin if the `location` options was set.
+     // This method will care about converting the value into the right format.
+     initLocation: function() {
+
+       var location = this.options.location, latLng;
+
+       if (!location) { return; }
+
+       if (typeof location == 'string') {
+         this.find(location);
+         return;
+       }
+
+       if (location instanceof Array) {
+         latLng = new google.maps.LatLng(location[0], location[1]);
+       }
+
+       if (location instanceof google.maps.LatLng){
+         latLng = location;
+       }
+
+       if (latLng){
+         if (this.map){ this.map.setCenter(latLng); }
+       }
+     },
+
+     // Look up a given address. If no `address` was specified it uses
+     // the current value of the input.
+     find: function(address){
+       this.geocode({
+         address: address || this.$input.val()
+       });
+     },
+
+     // Requests details about a given location.
+     // Additionally it will bias the requests to the provided bounds.
+     geocode: function(request){
+       if (this.options.bounds && !request.bounds){
+         if (this.options.bounds === true){
+           request.bounds = this.map && this.map.getBounds();
+         } else {
+           request.bounds = this.options.bounds;
+         }
+       }
+
+       if (this.options.country){
+         request.region = this.options.country;
+       }
+
+       this.geocoder.geocode(request, $.proxy(this.handleGeocode, this));
+     },
+
+     // Handles the geocode response. If more than one results was found
+     // it triggers the "geocode:multiple" events. If there was an error
+     // the "geocode:error" event is fired.
+     handleGeocode: function(results, status){
+       if (status === google.maps.GeocoderStatus.OK) {
+         var result = results[0];
+         this.$input.val(result.formatted_address);
+         this.update(result);
+
+         if (results.length > 1){
+           this.trigger("geocode:multiple", results);
+         }
+
+       } else {
+         this.trigger("geocode:error", status);
+       }
+     },
+
+     // Triggers a given `event` with optional `arguments` on the input.
+     trigger: function(event, argument){
+       this.$input.trigger(event, [argument]);
+     },
+
+     // Set the map to a new center by passing a `geometry`.
+     // If the geometry has a viewport, the map zooms out to fit the bounds.
+     // Additionally it updates the marker position.
+     center: function(geometry){
+
+       if (geometry.viewport){
+         this.map.fitBounds(geometry.viewport);
+         if (this.map.getZoom() > this.options.maxZoom){
+           this.map.setZoom(this.options.maxZoom);
+         }
+       } else {
+         this.map.setZoom(this.options.maxZoom);
+         this.map.setCenter(geometry.location);
+       }
+
+       if (this.marker){
+         this.marker.setPosition(geometry.location);
+         this.marker.setAnimation(this.options.markerOptions.animation);
+       }
+     },
+
+     // Update the elements based on a single places or geoocoding response
+     // and trigger the "geocode:result" event on the input.
+     update: function(result){
+
+       if (this.map){
+         this.center(result.geometry);
+       }
+
+       if (this.$details){
+         this.fillDetails(result);
+       }
+
+       this.trigger("geocode:result", result);
+     },
+
+     // Populate the provided elements with new `result` data.
+     // This will lookup all elements that has an attribute with the given
+     // component type.
+     fillDetails: function(result){
+
+       var data = {},
+         geometry = result.geometry,
+         viewport = geometry.viewport,
+         bounds = geometry.bounds;
+
+       // Create a simplified version of the address components.
+       $.each(result.address_components, function(index, object){
+         var name = object.types[0];
+         data[name] = object.long_name;
+         data[name + "_short"] = object.short_name;
+       });
+
+       // Add properties of the places details.
+       $.each(placesDetails, function(index, key){
+         data[key] = result[key];
+       });
+
+       // Add infos about the address and geometry.
+       $.extend(data, {
+         formatted_address: result.formatted_address,
+         location_type: geometry.location_type || "PLACES",
+         viewport: viewport,
+         bounds: bounds,
+         location: geometry.location,
+         lat: geometry.location.lat(),
+         lng: geometry.location.lng()
+       });
+
+       // Set the values for all details.
+       $.each(this.details, $.proxy(function(key, $detail){
+         var value = data[key];
+         this.setDetail($detail, value);
+       }, this));
+
+       this.data = data;
+       google.maps.event.trigger(this.map, 'resize');
+
+     },
+
+     // Assign a given `value` to a single `$element`.
+     // If the element is an input, the value is set, otherwise it updates
+     // the text content.
+     setDetail: function($element, value){
+
+       if (value === undefined){
+         value = "";
+       } else if (typeof value.toUrlValue == "function"){
+         value = value.toUrlValue();
+       }
+
+       if ($element.is(":input")){
+         $element.val(value);
+       } else {
+         $element.text(value);
+       }
+     },
+
+     // Fire the "geocode:dragged" event and pass the new position.
+     markerDragged: function(event){
+       this.trigger("geocode:dragged", event.latLng);
+     },
+
+     // Restore the old position of the marker to the last now location.
+     resetMarker: function(){
+       this.marker.setPosition(this.data.location);
+       this.setDetail(this.details.lat, this.data.location.lat());
+       this.setDetail(this.details.lng, this.data.location.lng());
+     },
+
+     // Update the plugin after the user has selected an autocomplete entry.
+     // If the place has no geometry it passes it to the geocoder.
+     placeChanged: function(){
+       var place = this.autocomplete.getPlace();
+
+       if (!place.geometry){
+         this.find(place.name);
+       } else {
+         this.update(place);
+       }
+     }
+   });
+
+   // A plugin wrapper around the constructor.
+   // Pass `options` with all settings that are different from the default.
+   // The attribute is used to prevent multiple instantiations of the plugin.
+   $.fn.geocomplete = function(options) {
+
+     var attribute = 'plugin_geocomplete';
+
+     // If you call `.geocomplete()` with a string as the first parameter
+     // it returns the corresponding property or calls the method with the
+     // following arguments.
+     if (typeof options == "string"){
+
+       var instance = $(this).data(attribute) || $(this).geocomplete().data(attribute),
+         prop = instance[options];
+
+       if (typeof prop == "function"){
+         prop.apply(instance, Array.prototype.slice.call(arguments, 1));
+         return $(this);
+       } else {
+         if (arguments.length == 2){
+           prop = arguments[1];
+         }
+         return prop;
+       }
+     } else {
+       return this.each(function() {
+         // Prevent against multiple instantiations.
+         var instance = $.data(this, attribute);
+         if (!instance) {
+           instance = new GeoComplete( this, options )
+           $.data(this, attribute, instance);
+         }
+       });
+     }
+   };
+
+ })( jQuery, window, document );
+$.fn.showLoader = function(){
+	$(this).removeClass('hide');
+}
+$.fn.hideLoader = function(){
+	$(this).addClass('hide');
+}
+$(document).ready(function(){
+ /*  $('.floader').showLoader();
+  $('.facebook-share-box').ajaxForm(form.post); 
+  $.get('wall.php',function(data){
+    $('.wall').html(data);
+    $('.floader').hideLoader();
+  }); */
+	try{
+	  $("#geocomplete").geocomplete({
+	    map: ".map_canvas",
+	    details: "form",
+	    types: ["geocode", "establishment"]
+	  }); 
+	}catch(Error){
+		
+	}
+	try{ 
+	  $('body').delegate('#shareType','click', function(e) { 
+		$("#subjectVisibilityToggleDiv").hide();
+	  	e.preventDefault();
+	    var positionArray = {};
+	    positionArray['status'] = 0;
+	    positionArray['photos'] = 80;
+	    positionArray['videos'] = 160;
+	    positionArray['location'] = 231;
+	    positionArray['sms'] = 231;
+	    positionArray['email'] = 281;
+	    $('.video').hideLoader('hide');
+	    $('.image').hideLoader('hide');
+	    $('.place').hideLoader('hide');
+	    $('.shareType').val($(this).attr('class'));
+	  	$('.arrow').css("left", positionArray[$(this).attr('class')]);
+	  	$('#p_charsLeft').hide();
+	    if($(this).attr('class') == 'videos') {
+		$("#subjectVisibilityToggleDiv").hide();
+	      $('.video').showLoader('hide');
+	      $('.image').hideLoader('hide');
+	      $('.place').hideLoader('hide');
+	    }
+	    if($(this).attr('class') == 'photos') {
+	      $("#subjectVisibilityToggleDiv").hide();
+	      $('.video').hideLoader('hide');
+	      $('.image').showLoader('hide');
+	      $('.place').hideLoader('hide');
+	    }
+	    if($(this).attr('class') == 'location') {
+	    $("#subjectVisibilityToggleDiv").hide();
+	      $('.video').hideLoader('hide');
+	      $('.image').hideLoader('hide');
+	      $('.place').showLoader('hide');
+	    }
+	    if($(this).attr('class') == 'sms') {
+		$("#subjectVisibilityToggleDiv").hide();
+			if(ckeditorFlag){
+				CKEDITOR.instances.alumniTextPost.destroy(true);
+				ckeditorFlag = false;
+			}
+	    	$('#p_charsLeft').limit('140','#charsLeft');
+	    	$('#p_charsLeft').hide();
+	    	$('.video').hideLoader('hide');
+	    	$('.image').hideLoader('hide');
+	    	$('.place').showLoader('hide');
+	    }
+	    else{
+	    	if(!ckeditorFlag){
+				ckeditorFlag = true;
+				createLightCKEditor('alumniTextPost');
+			}
+	    }
+	    if($(this).attr('class') == 'email') {
+		//bookmark email
+			$("#subjectVisibilityToggleDiv").show();
+	    	$('.video').hideLoader('hide');
+	    	$('.image').showLoader('hide');
+	    	$('.place').hideLoader('hide');
+	    }
+	  	return false;
+	  });
+	}catch(Error){
+		
+	}
+  /* $(window).scroll(function(){
+    if  ($(window).scrollTop() == $(document).height() - $(window).height()){
+       loadData();
+    }
+  });       */
+});
+
+(function($){ 
+    $.fn.extend({  
+        limit: function(limit,element) {
+			
+			var interval, f;
+			var self = $(this);
+					
+			$(this).focus(function(){
+				interval = window.setInterval(substring,100);
+			});
+			
+			$(this).blur(function(){
+				clearInterval(interval);
+				substring();
+			});
+			
+			substringFunction = "function substring(){ var val = $(self).val();var length = val.length;if(length > limit){$(self).val($(self).val().substring(0,limit));}";
+			if(typeof element != 'undefined')
+				substringFunction += "if($(element).html() != limit-length){$(element).html((limit-length<=0)?'0':limit-length);}";
+				
+			substringFunction += "}";
+			
+			eval(substringFunction);
+			
+			
+			
+			substring();
+			
+       } 
+   }); 
+})(jQuery);Ó˜ÀÙ¯   ¥       ø2‡‰      window     ¸O€      document   I<Á      bounds     ¸~Qf      country    9Ì      map    ¶œÕc      details    ‘p)1      detailsAttribute   0+QA      location   F),Ø
+      mapOptions	     ¥{ø       zoom
+   #[*û      scrollwheel    Ë1T	      mapTypeId      üUtS      roadmap    €Ÿñ      markerOptions      HL
+	      draggable      
+à      maxZoom    ‰;¡      types      Îşšg      geocode    š      componentTypes     /èø       placesDetails      nÙÏ       GeoComplete     :y‹      options    »làô      extend      xÖ…      $input!     ';'	      _defaults"      •É0      _name#      €=IÁ      geocomplete$    ’u`      init%   ğ»‚Ã      initMap&    ñüå
+      initMarker'     5Ë²×      initGeocoder(   ã»°I      initDetails)    (ŒwE      initLocation*   %ü		      setCenter+      Ö‡GÄ      google,     -1c      maps-   zƒw      disabled.   Î{V¯      marker/     úºTk      Marker0     II·P      event1      €(      addListener2    ªïÔP      dragend3    \Pš“      markerDragged4      _øŞÿ      componentRestrictions5      k÷Ğ      autocomplete6   ¨%kª      places7     Á]ÿ5      Autocomplete8   N(:      geocoder9   2zõ“      Geocoder:   An€B      bindTo;     T%û      place_changed<      ¤R      placeChanged=   ¨±V      keypress>   ­5      keyCode?    àÍ      bind@   ~UÎ      $detailsA   È¬G	      attributeB      Œrº	      setDetailC      Bü¿;      keyD    t)Ë      _shortE     «%£      latLngF     1A7@      LatLngG     &Ú›      valH    l(      requestI    Lè	      getBoundsJ      ş}º      handleGeocodeK      pz      GeocoderStatusL     º–­      formatted_addressM      Ÿÿc9      updateN     ù!pÂ      triggerO    µÿ      geocode:multipleP   zŸÊÀ      geocode:errorQ      áç±y      argumentR   rLtš      centerS     TÏXY      geometryT   Ş#“c      viewportU   ]O;	      fitBoundsV      0˜NÅ      getZoomW    cs”      setZoomX    >n      setPositionY    Qâ·D      setAnimationZ   kïå^	      animation[      ›P±g      fillDetails\    ¹¦/      geocode:result]     6—(      data^   ‹ı`      address_components_     Šá‘B	      long_name`      ë´‘ˆ
+      short_namea     WÆ‡      location_typeb       Êue      PLACESc     ±NN½      latd    Şh`      lnge    @âí      $detailf    µÑ‘      $elementg   âÊı
+      toUrlValueh      ¹øÍ      :inputi     ˆ3Àµ      textj   o'©M      geocode:draggedk    Äô™Ğ      resetMarkerl    4ô†Ù      placem      £Â{,      getPlacen    «Ñ      plugin_geocompleteo     ä¤ëô      instancep   ÒPÉ      propq   Ø… Ì      slicer      >å/      jQuerys     Í6¯
+      showLoadert     ö+      removeClassu    Ÿvô}      hidev   $~ãß
+      hideLoaderw     BŒ|      addClassx   ¢„
+      readyy      s„ú1      #geocompletez   h©      .map_canvas{    *gÒÛ      form|   ê$N»      establishment}      ˜h;      body~   ÛdAb      delegate   ³ ¶F
+      #shareType€     ŸªâX      click      îoøú      #subjectVisibilityToggleDiv‚    B9ºÀ      preventDefaultƒ     `ùÎ      positionArray„      ‘¾      photos…     Ú#"|      videos†     Ø‚      sms‡    <Ûñ      emailˆ      G•*)      .video‰     ‚"Bd      .imageŠ     y}×_      .place‹     fOí
+      .shareTypeŒ     A¢½      attr   ´Åá      .arrow     >Ÿ      css    õ]‡      left   ‘‹V       #p_charsLeft‘   çãÙ¶      ckeditorFlag’   ‘(e      CKEDITOR“   El\ä	      instances”      Ê8ãD      alumniTextPost•     Îóı      destroy–     Iô¡      limit—      u[/{
+      #charsLeft˜     ÛÖ      createLightCKEditor™    H‡’K      showš   sz‚Ş      interval›   Á¤\l      selfœ   KÌí      focus      ìˆ       setInterval    ßYã	      substringŸ      Äºá%      blur    bPk      clearInterval¡      ¾£›      substringFunction¢      \¤‚ˆ      function substring(){ var val = $(self).val();var length = val.length;if(length > limit){$(self).val($(self).val().substring(0,limit));}£   Ê­,n[      if($(element).html() != limit-length){$(element).html((limit-length<=0)?'0':limit-length);}¤    Wcûj     street_address route intersection political country administrative_area_level_1 administrative_area_level_2 administrative_area_level_3 colloquial_area locality sublocality neighborhood premise subpremise postal_code natural_feature airport park point_of_interest post_box street_number floor room lat lng viewport location formatted_address location_type bounds¥     ÃéüDd      id url website vicinity reference name rating international_phone_number icon formatted_phone_number¦   ­Åí      initGeocoder/<¨     G’ï      initDetails/<©      ´#      fillDetails/<ª      "»-¶      $.fn.geocomplete«   VxBƒ      $.fn.geocomplete/<¬     brÌŠ      $.fn.showLoader­    \¦¤ç      $.fn.hideLoader®    
+_¬l      limit/<     &   ‘  (   &              ï%,‰                                                                                                                                                                        	      	           
+      	                 	                                                                                                                                                                                                                                                                                                                                                                                                     !                                   "      $       
+   #      %           $      %           %      ³OŒc                         $ `     t `n  `  P  P  P                ‹                 ‹                 ‹                   ‹                   ‹                0                ‹                 @  PA  P  PB  P‹                P                 C                 C                  E  ‹                  ‹               H  ‹               Ü    Û  ‹               0  Q  ‹               S  ‹               Û  ‹               Û `]  PS  T    ‹                 u  {                 C              C  e  P  ‹                f  P              0  ‹                 ‹                 l  ‹                 PA  Po  p     ‹                 o  ‹                 ‹                 ‹                            ˆ              e  ƒ  ‹            ˆ               $ `  `‹  `‡  `             –  P  `š  Pf `›  P  `‹  `‡  `                                ¯Â0°Iô$KE®úš        
+   2                                	  
+               U     $  %  &  '  (  )  °     J  N  R  M  [  B  3  k  <                        4                                       #    L  a  T      c  d                               –  ‡&Õª!«!&   Ø      Ê€¥·Ø   q                          m    »   »   »   w ß»   J   m   L   ß»   J   m	   L
+   ß»    »   s áJ   äm   w ßm    »   w ß¥@`F€ ²ÿÿÿîP`•`•`ÿÿÿÿP
+ÿÿÿúPD€ `F€ /ÿÿÿÿP	Px  ˜-äöx  ¯                @       ½  Î   ß½ Î   ßm   Î   ß9   <   <   <   <      <   <	   9
+   <   <      <   <   9   <   <   <   h      i    <   Î   ß   áJ   ä   s Î   ß   áJ   ä   s Î   ßÁ   áJ   äÁ   J   9   m   <   m   <    m!   <"   m#   <$   m%   <&   m'   <(   m)   <*   m+   <   m,   <-   m.   </   m0   <1   m2   <3   m4   <5   m6   <7   m8   <9   m:   <;   m<   <=   w ßÁ   J>   m?   L@   ß¥@`%&&&&*F%'&O"%K&'š@,`L20UI6`,@UIH`	
+%JTJeJuJ€  ¢J€  ¼J€  ÖJ€  ŞJ€  ñJ€ J€ J€ J€ ,J€ XJ€ hJ€ mJ€ uJHPD€ ƒ`•@€ ¤PĞ   0öĞ   ~                      ŞÍ   ß¾   Á   áJ   ä9   Á   ¼ s L   ß¾   ¼  L   ß¾   Á    ¼  s L   ß¾   Á   L   ß¾      L   ß¾   áJ	   äw  ß¥F`‘ 
+ÿÿÿåPI`-`
+ÿÿÿşPI`/`O
+`P$P”   ®æè”   R                
+        ŞÍ   ß¾   áJ   äw  ß¾   áJ   äw  ß¾   áJ   äw  ß¾   áJ   äw  ß¾   áJ   äw  ß¥&`P$`P$`P$`P$`P$P  Ücç  ±                       ŞÍ   ß¾   J   J   ›   —    ¢—   ¾   J   J   J      š$   —	   ¾   ¾   J   J   L   ß ¢—   ¾   »   J   J   €Á    ¾   J   J   s K¾   J   J   ã   L   ß¥&`˜ `AF`¤ 
+`˜ 
+`AF`” 
+ÿÿÿşP%
+’@PIP€€€H  ZWÁH  Ù         
+              ŞÍ  ß¾  J   ›   —    ¢—   Á   áJ   ä¾  J   J   9   ¾  J   <   s Í   ß¾   J   š   —    ¢—   ¾  »   J   J	   €¾   ã   L
+   ß»   J   J   áJ   ä¾  J
+      Á   áJ   ä¾  J   ¾  s w ß¥&`“ `AF`	ÿÿÿÛPH`“ `AF`” %ÿÿÿéP)`– 
+%
+	ÿÿÿæPCPDP€  xQM  ï        
+       ?       ŞÍ  ß9   ¾  J   J   <   ¾  J   J   š   —   ™   —   ¾  J   J   —
+   <   ¾  J   J   <   Í   ß¾  J   J   š,   —   ¾   9   ¾  J   J   <   L   ß—   ¾  »   J	   J
+   J   €¾  J   ¾   ã   L   ß¾  »   J	   J   €ã    L   ß¾  J   œ   —$   ß¾  J   J   —'   š,   —(   ¾  J   áJ   ä   ¾  J   w ß—,   »   J	   J   áJ   ä¾  J      Á   áJ   ä¾  J   ¾  s w ß¾  J   áJ   äm   w ß¾  J   áJ   ä   Á   áJ   äm   ¾  s w ß¥F`%
+“ 
+½ 
+˜@`˜ 
+`	!@`™ 
+	HPI`˜ PI`³ 
+`• #	ÿÿÿïPI`– 
+%
+	ÿÿÿçPCPD ` ÿÿÿ÷PD%`• E'D%&PÿÿÿîPD(P€€€H   ¿¯xH                            ¼  J   š   —   ¢—   ¥ `• `!V@   š?şM@                           ŞÍ   ß¾   áJ   äw  ß¥&
+`P$P$  ¼©?$  ¿                       ŞÍ   ßm   Î   ß¾   J   J   ›   —    ¢—   Á   ¾   J   J   s Î   ß¾   J   J   Î   ß9   Î   ßÁ  áJ   äÁ  m   w ßÁ  áJ   äÁ  m   w ß¾   Á   L	   ß¾   Á   L   ß¥‘ `˜ `AF`ÿÿÿÿP)`” `K`ÿÿÿëPD`ÿÿÿìPD`/`/Pl   şOÊˆl   5                         Á   ¼  Á   áJ   ä   Á   &   &¼  &   &s Nß¥ 
+`” 
+ÿÿÿâP%P€€€\   tv\\   !                         Á    ¼ w ßÁ    ¼    &w ß¥ 
+`
+ÿÿÿÿP$
+`
+	ÿÿÿÿP$P€@   ıÒTæ@                            Á    ¼ w ß¥ 
+`
+ÿÿÿÿP$P€€€„  †×’„                         ŞÍ  ß¾  J   J   Í   ß¾   ›   —    ¢—   ¾   š   —   ¾  áJ   ä¾   w ß ¢—   ¾   »   !š2   —
+   »   J   J   €¾   K¾   Kã   Í  ß—   ¾   »   J   J   !š   —   ¾   Í  ß—   ¾  š5   —   ¾  J   š"   —   ¾  J   áJ	   ä¾  w ß—   ¥F`“@``AF` 
+`
+ÿÿÿûP$
+`AF` 
+`  
+ÿÿÿÜPM`š 
+`N`.`“ ` ÿÿÿöPIP€€€|   Ù]Vú|   F                       ŞÍ   ß¾   áJ   ä9   ¼     —   ß¾   J   áJ   äs  —   <   w ß¥&`%
+  PMPDP€€t  Ù9PŞt                        ŞÍ   ß¾   J   J   œ   —   ß¼  J   —   šz   —   ¾   J   J   šD   —
+   ¼  ¾   J   œ   —   ß¾   J   áJ   äs  —   L   ß™!   —   ¼  ¾   J   J   L   ß—   ¾   J   J   š!   —   ¼  ¾   J   J   L   ß—   ¾   J   áJ   ä¼  Á   áJ	   ä¾   J
+   ¾   s w ß¥&`™ ˜ `š `§ &P˜ `œ@	`˜ 
+`œ@` 		ÿÿÿæPÿÿÿíP$P€€   !ø‘æ   ¹                       ŞÍ  ß¼ »   J   J   J   šy   —   ¼  KÍ   ß¾  J   áJ   ä¾   J   w ß¾  áJ   ä¾   w ß¼  J	   š!   —   ¾  áJ
+   ä   ¼  w ß—   ™!   —   ¾  áJ
+   ä   ¼ w ß—   ¥&`Ÿ `*
+` 	ÿÿÿüP$
+`ÿÿÿùPD`” ` !ÿÿÿäP“0
+ 
+` ÿÿÿçPIP€€`   ¬Ø
+`   +                       ŞÍ   ß¾   J   áJ   ä¼  h   ¼ i    w ß¥&` ÿÿÿğP$P€¸  â·wì¸  0               '       ŞÍ   ß¼  J   š~   —   ¾   J   áJ   ä¼  J   w ß¾   J   áJ   äs  ¾   J   J   š,   —   ¾   J   áJ   ä¾   J   J   w ß—   ™H   —   ¾   J   áJ   ä¾   J   J   w ß¾   J   áJ   ä¼  J	   w ß—   ¾   J
+   šM   —   ¾   J
+   áJ   ä¼  J	   w ß¾   J
+   áJ   ä¾   J   J   J   w ß—'   ¥F`’ 
+` ÿÿÿöP$` 	P™ ` ÿÿÿøP“0 
+` ÿÿÿøP$
+` ÿÿÿöPI`“ 
+` ÿÿÿôP$
+` “ ÿÿÿóPIP€€€È   1N§oÈ   w                       ŞÍ   ß¾   J   š!   —   ¾   áJ   ä¼  J   w ß—   ¾   J   š   —   ¾   áJ   ä¼  w ß—	   ¾   áJ   ä   ¼  w ß¥F`“ 
+`ÿÿÿùPI`“ 
+`ÿÿÿôPI
+` ÿÿÿæP$P  Ğ[Dù  ƒ               ,      ½  Î   ßŞÍ  ß9   Î   ßÁ   J   Í   ß¾   J   Í  ß¾   J   Í  ßÁ  áJ   äÁ   J   m   w ßÁ  áJ   äÁ  m   w ßÁ  áJ	   äÁ   9
+   Á   J   <   ¾   J      —   ß   —   <   ¾  <   ¾  <   ¾   J   <   ¾   J   áJ   äs  <   ¾   J   áJ   äs  <   w ßÁ  áJ   ä¾  J   Á  áJ   äm   ¾  s w ß¾  Á   L   ß»   J   J   áJ   ä¾  J      w ß¥O`+`/`.`N`
+ÿÿÿàPD`ÿÿÿìPD`	%
+/
+£ 
+)
+)
+.
+ P(
+ PH
+PD`	E"DPÿÿÿëPD$`/`– ÿÿÿøPD'P€l   »Õ!l   <                        ¼ J   KÍ   ßÁ   ¾   ¼ J   NßÁ   ¾      &¼ J   Nß¥ `/
+`“ 
+`™ P€<   óƒ<                            Á   ¼ Á   ¼ KNß¥ 
+`“ P`   áŸÍh`   +                       ŞÍ  ßÁ   ¼  KÍ   ß¾  áJ   ä¼ ¾   w ß¥&`.
+`	ÿÿÿíP$P€ü   ó½ÆNü   £                         ¼ Á   š   —      Ì ß™4   —   ¼ J      š   —   ¼ áJ   äs  Ì ß—   ¼  áJ   ä   s š    —   ¼  áJ   ä¼ w ß™   —   ¼  áJ   ä¼ w ß—   ¥@`
+ 
+`“ `™ 
+`
+PL`	P-
+`
+ÿÿÿüP 
+`
+ÿÿÿûPIP€T   ÂŞ
+T   #                       ŞÍ   ß¾   áJ   ä   ¼  J   w ß¥&`  ÿÿÿåP$P€è   fyÄ·è   “                        ŞÍ   ß¾   J   áJ   ä¾   J   J   w ß¾   áJ   ä¾   J   J   ¾   J   J   áJ   äs  w ß¾   áJ   ä¾   J   J   ¾   J   J   áJ   äs  w ß¥&` ÿÿÿôP$`• PÿÿÿÑP$`• PÿÿÿÑP$P€€€´   şgÃ´   l                
+        ŞÍ  ß¾  J   áJ   äs  Í   ß¾   J   ›'   —   ¾  áJ   ä¾   J   w ß™   —   ¾  áJ   ä¾   w ß—
+   ¥&` PH`“ 
+`
+	ÿÿÿûP 
+`ÿÿÿùPIPè  úká-è  D                      ½  Î   ßÜÍ  ßŞÍ  ß   Î   ßÁ   šş   —   Á   ¾  s áJ   äÁ   s 1   —   ßÁ   ¾  s áJ   äs  áJ   äÁ   s —   Í   ß¾   Á   KÍ  ß¾  šN   —   ¾  áJ   ä¾   »   J   J   áJ   ä¾  s w ßÁ   ¾  s ¢™5   —   ¾  J	   š   —   ¾  KÍ  ß—   ¾  ¢—   ™   —   ¾  áJ
+   äm   s ¢—   ¥•@`K
+`‘@	`ÿÿÿÿP
+ÿÿÿûP” ÿÿÿşP
+P
+ÿÿÿûP-`O` 
+`
+– ÿÿÿûPÿÿÿÚP$
+`	ÿÿÿşPC; `– `@
+`D0 `ÿÿÿûPCV€€Ä   ›Õ<Ä   o                        ŞÍ  ßÁ  áJ   ä¾  Á   s Í   ß¾   ›B   —   Á  €¾  Á   ã   Í   ßÁ  áJ   ä¾  Á   ¾   w ß—   ¥F`ÿÿÿõP(`.`	ÿÿÿéP(`ÿÿÿêPIP€€€X   ŸM÷ZX   $                        ŞÍ   ß»    ¾   s áJ   ä   w ß¥&`ÿÿÿÿPPP€€€X   ŸM÷ZX   $                        ŞÍ   ß»    ¾   s áJ   ä   w ß¥&`ÿÿÿÿPPP€€€T  f¿âÎ  ·                        $«»       s áJ   ä9      <      <   h   	   i    
+   i   <   w ß™   —	    ¤­°±   ß±   ßÒ—	   «»       s áJ   ä      m   w ß™   —    ¤­°±   ß±   ßÒ—   ¥0!`P
+%**@P‘@‘0!`P” (ÿÿÿáP‘@N‘0VP€T  4     ^      ÿÿÿÿ   ¥      ÿÿÿÿ           U           p   -   $  WÚ.d$  K        	       ³       ŞÍ  ß»       s áJ   äw  ß¼  áJ   äw  ß9   Í   ß¾   L   ß¾   PL   ß¾     L   ß¾   ç L	   ß¾   ç L
+   ß¾   L   ß»       s áJ   ä   w ß»       s áJ   ä   w ß»       s áJ   ä   w ß»       s áJ   ä»    ¾  s áJ   ä   s w ß»       s áJ   ä   ¾   »    ¾  s áJ   ä   s Kw ß»       s áJ   äw  ß»    ¾  s áJ   ä   s    š}   —4   »       s áJ   äw  ß»       s áJ   ä   w ß»       s áJ   ä   w ß»       s áJ   ä   w ß—D   »    ¾  s áJ   ä   s    š}   —J   »       s áJ   äw  ß»       s áJ   ä   w ß»       s áJ   ä   w ß»       s áJ   ä   w ß—Z   »    ¾  s áJ   ä   s 	   š}   —`   »       s áJ   äw  ß»       s áJ   ä   w ß»       s áJ   ä   w ß»       s áJ   ä   w ß—p   »    ¾  s áJ   ä   s 
+   šù   —v   »       s áJ   äw  ß»   š1   —|   »   J   J   áJ   äw ß·   Ê   ß—ƒ   »       s áJ   ä       w ß»       s áJ   äw  ß»       s áJ   ä   w ß»       s áJ   ä   w ß»       s áJ   ä   w ß™4   ——   »   ›%   —™   ·   Ê   ß»!       w ß—   »    ¾  s áJ   ä   s    š}   —£   »       s áJ"   äw  ß»       s áJ   ä   w ß»       s áJ   ä   w ß»       s áJ   ä   w ß—³   ¢¥&`P
+ P$`
+P$`*`+`,`-`-`-`-`PP$`PP$`PP$`P
+ÿÿÿşPPÿÿÿôP$`P
+ÿÿÿşPPÿÿÿŞP$`P
+P$	`ÿÿÿÿPP“ `P
+ P$`PP$`PP$`PPI	`ÿÿÿÿPP“ `P
+ P$`PP$`PP$`PPI	`ÿÿÿÿPP“ `P
+ P$`PP$`PP$`PPI"	`ÿÿÿÿPP“ `P
+ P$`/`— "P$`‘@(`P” P$`P
+P$`PP$`PP$`PP>. 
+`/`,`PI4	`ÿÿÿÿPP“@6`P
+ P$`PP$`PP$`PPI;`!Q€€€t   Š;ÇŞt   C                        ½  Î   ßÜÎ   ßŞÎ   ß5Î   ßÁ   J   áJ   ä9   m   <   w ß¥ `‘ %	J
+P4Ph  ÏåLáh  ì   '                     ½  Î   ß½ Î   ßÜÎ   ßŞÎ   ß5Î 	  ßº    Á   s Î   ßº    Á   s áJ   äm   w ßº    Á   s áJ   äm   w ß¸      È   ßÁ   €š"   —   ¸   áÄ      &.È   ß—   ¸   áÄ   	   &.È   ßº
+    º   z è(  ßº    w  ß¥§0 `ÿÿÿÿPI`ÿÿÿÿP
+ÿÿÿúPD	`ÿÿÿÿP
+ÿÿÿûPD` `‘ `@`˜@`ÿÿÿûI`JPL   ,‚	L                             º   áJ   äº   ds Î   ß¥ `ÿÿÿôP)PL   n	CL                             º    Á   w ßº    w  ß¥ `ÿÿÿÿP$`*P3õØ  `     @       !  #  "  $    `%  &  '  (  )    `    *  v  +  ,  ¥      `          @-  +  ,  /  .  0  1  2  Ä  3    `>    `°     `  @      4      @+  ,  6  7    5  9  8    :  0  1  ;  Ä  <     =    p?      p
+  `°   [  =  ]    `D    `	  `
+  p        @Œ     p  p@    `    °   €  +  ,  F    *    `  	  @   G       `      I    Ï  8    Ä  J    `+  ,  K  ®    G  L  M  I  N  O  P    `   N    `T    U  V      W  *    .  X  Y    Z    `  R  S  @  [  N  \    `  _  D  `    `  `B    `
+  @S  T    Œ   ^    p  p    @L  a  b    c  d    Ä    p]  +  ,  0  N    Ø    `   g  v  œ h  G  i    `N  j  E    `.  X  ]    B    c  d    `5  m  S  °   {  M    `]    `n  ]  #     €  Ã  q  6   I  Œ     p  `  p  @        {        @	  
+          @          ¤  Ş     ¥    Ã    @  p$    p%    p&    p'  	  p(    p)    p°     p  pJ    pN    pR    pM    p[    pB    p3    pk    p<  ×   p#    `$  t  u    `$  w  u  "  `$    u  ‚    @  „  …    †  ‡  ˆ  v  ‰  Š  ‹  G  Œ  A           s  ‘  ’  “  ”  •  –  Œ  —  ˜  ™     `$  y  #    @z    {      |    !  `}  ~    €  !  p#  `&  `       '  `     %  `$  œ  $  pŸ  %  p¡  ¢  £  }        $  `×     @#  p–     `  pr       $  ×   ps    pv  x     p"  pÿX„ƒ                ë   A                 
+           
+      $           	   %              &        -      '        )      ¦        +      ¦        R   
+   (        J      B        O      ¨        Q      ¨        \   
+   )        f      °         l              w      J        „      N        ‡      R        –      M        ¦      [              ©        £      ©        ¤      ©        Á      B        É      3        Í   	   k        Ö      <        ß      ª        İ      «        ,     ¬        0     ­        W               4  #             }               q     –        j     ®        n     ®        H©À      ]G      ]G                €¹  ¶9  ±  ¶9                ‚  a  n  a  I              Å  S  ½  S  X               7  \  /  \  c               3  ‘  +  ‘  t              =  F  5  F  „                Y    Q    ¤   %             6    6  ©   4           ‚  [    [  ±                Ş  >  Ì  >  ¸               f  ¹  ^  ¹  ¼   '            â    Ú    Á   &                     Ë               ‹   ì   ƒ   ì   å              }!  *#  u!  *#  í              $  y%  ÿ#  y%                Û%  #&  Ó%  #&               ú&  î(  ò&  î(               )  ^*  ‡)  ^*  +            ‚+  Ú/  +  Ú/  ;               ,  º,  ,  º,  C  2            -  K-  -  K-  J  &           /  y/  /  y/  Z  -            ‘0  Ã1  ‰0  Ã1  g             &2  k2  2  k2  w             Ñ2  •3  É2  •3  |              C4  ò4  ;4  ò4  „             ‚â5  ±9  Ú5  ±9  ’             ¦8  £9  8  £9  ¨  !            ï9  :  ç9  :  ´              -:  M:  %:  M:  ·              h:  jD  `:  jD  º              ÿ;  ¸C  ÷;  ¸C  Ë  5          ‚.wD  SG  oD  SG    
+          ƒ.¨D  HG   D  HG                E  BE   E  BE                 aE  —E  YE  —E               5¡İêÚ•÷ºh<      gøŞógøŞóH¿Şgøåp   V    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/homepagePlugin.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|ac23b1d8-4a38-6584-001f-25c4ffd59889|
+Accept-Ranges: bytes
+ETag: W/"18269-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 18269
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|ac23b1d8-4a38-6584-001f-25c4ffd59889|
+Accept-Ranges: bytes
+ETag: W/"18269-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 18269
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=88
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 532 net-response-time-onstop 533 alt-data 1;18269,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1   ã„

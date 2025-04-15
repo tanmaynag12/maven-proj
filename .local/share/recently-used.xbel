@@ -14,27 +14,6 @@
       </metadata>
     </info>
   </bookmark>
-  <bookmark href="file:///home/student-devops/Desktop/exp2/pom.xml" added="2025-02-20T03:56:53.205425Z" modified="2025-03-07T03:51:23.496912Z" visited="2025-02-20T03:56:53.205425Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-maven+xml"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T03:51:23.496911Z" count="3"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/Desktop/my-project/pom.xml" added="2025-02-20T05:35:14.259053Z" modified="2025-03-07T03:55:11.654708Z" visited="2025-02-20T05:35:14.259053Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-maven+xml"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T03:51:51.376903Z" count="13"/>
-          <bookmark:application name="org.gnome.Nautilus" exec="&apos;gedit %U&apos;" modified="2025-03-07T03:55:11.654698Z" count="5"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
   <bookmark href="file:///home/student-devops/Downloads/plugins(5).docx" added="2025-02-20T05:37:59.276225Z" modified="2025-03-12T03:20:36.572352Z" visited="2025-02-20T05:37:59.276226Z">
     <info>
       <metadata owner="http://freedesktop.org">
@@ -100,69 +79,6 @@
       </metadata>
     </info>
   </bookmark>
-  <bookmark href="file:///home/student-devops/my-project4/pom.xml" added="2025-03-06T05:42:31.830861Z" modified="2025-03-06T05:48:59.638916Z" visited="2025-03-06T05:42:31.830861Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-maven+xml"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-06T05:48:59.638915Z" count="8"/>
-          <bookmark:application name="org.gnome.Nautilus" exec="&apos;gedit %U&apos;" modified="2025-03-06T05:48:55.006917Z" count="2"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/HelloMaven/my-project/pom.xml" added="2025-03-06T05:52:24.746936Z" modified="2025-03-06T06:03:44.347687Z" visited="2025-03-06T05:52:24.746936Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-maven+xml"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-06T06:03:44.347683Z" count="17"/>
-          <bookmark:application name="org.gnome.Nautilus" exec="&apos;gedit %U&apos;" modified="2025-03-06T05:56:04.778121Z" count="3"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/HelloMaven/my-project/target/my-project-1.0-SNAPSHOT.jar" added="2025-03-06T06:05:09.393259Z" modified="2025-03-06T06:05:09.393262Z" visited="2025-03-06T06:05:09.393259Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="application/x-java-archive"/>
-        <bookmark:applications>
-          <bookmark:application name="File Roller" exec="&apos;file-roller&apos;" modified="2025-03-06T06:05:09.393260Z" count="1"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/Desktop/Devops" added="2025-03-07T03:18:42.618924Z" modified="2025-03-07T03:18:42.618940Z" visited="2025-03-07T03:18:42.618925Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="inode/directory"/>
-        <bookmark:applications>
-          <bookmark:application name="org.gnome.Nautilus" exec="&apos;org.gnome.Nautilus %u&apos;" modified="2025-03-07T03:18:42.618926Z" count="1"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/Desktop/Devops/my-app-DarchetypeArtifactId=maven-archetype-quickstart/pom.xml" added="2025-03-07T03:22:31.814853Z" modified="2025-03-07T03:34:20.225652Z" visited="2025-03-07T03:22:31.814853Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-maven+xml"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T03:33:48.234359Z" count="9"/>
-          <bookmark:application name="org.gnome.Nautilus" exec="&apos;gedit %U&apos;" modified="2025-03-07T03:34:20.225648Z" count="1"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/Desktop/ADO86/pom.xml" added="2025-03-07T03:27:22.212542Z" modified="2025-03-07T03:46:30.707510Z" visited="2025-03-07T03:27:22.212542Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-maven+xml"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T03:46:30.707509Z" count="2"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
   <bookmark href="file:///home/student-devops/Desktop/Devops/my-app/pom.xml" added="2025-03-07T03:40:28.258897Z" modified="2025-03-13T04:17:06.591159Z" visited="2025-03-07T03:40:28.258898Z">
     <info>
       <metadata owner="http://freedesktop.org">
@@ -170,90 +86,6 @@
         <bookmark:applications>
           <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-13T04:17:06.591159Z" count="34"/>
           <bookmark:application name="org.gnome.Nautilus" exec="&apos;gedit %U&apos;" modified="2025-03-07T03:57:47.241392Z" count="3"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/my-app/src/main/java/com/example/App.java" added="2025-03-07T03:59:11.465251Z" modified="2025-03-07T07:59:31.595142Z" visited="2025-03-07T03:59:11.465251Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-java"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T07:59:31.595138Z" count="10"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/my-app/pom.xml" added="2025-03-07T04:00:00.802711Z" modified="2025-03-07T08:02:36.294339Z" visited="2025-03-07T04:00:00.802712Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-maven+xml"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T08:02:36.294339Z" count="7"/>
-          <bookmark:application name="org.gnome.Nautilus" exec="&apos;gedit %U&apos;" modified="2025-03-07T04:00:34.157206Z" count="2"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/HelloMavenGradle/src/main/java/App.java" added="2025-03-07T04:04:55.700450Z" modified="2025-03-07T04:04:55.700451Z" visited="2025-03-07T04:04:55.700450Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-java"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T04:04:55.700450Z" count="1"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/Desktop/Devops/my-app/src/main/java/com/example/App.java" added="2025-03-07T04:07:46.486405Z" modified="2025-03-07T04:07:46.486408Z" visited="2025-03-07T04:07:46.486406Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-java"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T04:07:46.486407Z" count="1"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/HelloMavenGradle/build.gradle" added="2025-03-07T08:05:37.865263Z" modified="2025-03-07T08:06:28.701438Z" visited="2025-03-07T08:05:37.865263Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="text/x-gradle"/>
-        <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-03-07T08:06:28.701435Z" count="2"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Exp42.png" added="2025-03-07T08:08:31.787179Z" modified="2025-03-07T08:08:31.800002Z" visited="2025-03-07T08:08:31.787180Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="image/png"/>
-        <bookmark:applications>
-          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-03-07T08:08:31.787183Z" count="1"/>
-          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-03-07T08:08:31.800000Z" count="1"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Exp4.png" added="2025-03-07T08:08:31.787200Z" modified="2025-03-07T08:08:31.800010Z" visited="2025-03-07T08:08:31.787201Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="image/png"/>
-        <bookmark:applications>
-          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-03-07T08:08:31.787202Z" count="1"/>
-          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-03-07T08:08:31.800009Z" count="1"/>
-        </bookmark:applications>
-      </metadata>
-    </info>
-  </bookmark>
-  <bookmark href="file:///home/student-devops/Pictures/Screenshots/exp41.png" added="2025-03-07T08:08:31.787207Z" modified="2025-03-07T08:08:31.800016Z" visited="2025-03-07T08:08:31.787207Z">
-    <info>
-      <metadata owner="http://freedesktop.org">
-        <mime:mime-type type="image/png"/>
-        <bookmark:applications>
-          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-03-07T08:08:31.787208Z" count="1"/>
-          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-03-07T08:08:31.800015Z" count="1"/>
         </bookmark:applications>
       </metadata>
     </info>
@@ -432,12 +264,247 @@
       </metadata>
     </info>
   </bookmark>
-  <bookmark href="file:///home/student-devops/013/MyMavenApp/src/main/java/com/example/App.java" added="2025-04-07T03:53:42.712750Z" modified="2025-04-07T03:57:39.119600Z" visited="2025-04-07T03:53:42.712750Z">
+  <bookmark href="file:///home/student-devops/013/MyMavenApp/src/main/java/com/example/App.java" added="2025-04-07T03:53:42.712750Z" modified="2025-04-07T04:36:37.253472Z" visited="2025-04-07T03:53:42.712750Z">
     <info>
       <metadata owner="http://freedesktop.org">
         <mime:mime-type type="text/x-java"/>
         <bookmark:applications>
-          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-04-07T03:57:39.119599Z" count="3"/>
+          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-04-07T04:36:37.253469Z" count="7"/>
+          <bookmark:application name="org.gnome.Nautilus" exec="&apos;gedit %U&apos;" modified="2025-04-07T04:17:06.852742Z" count="3"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/code" added="2025-04-07T10:20:32.708618Z" modified="2025-04-07T10:20:33.018745Z" visited="2025-04-07T10:20:32.708620Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="text/plain"/>
+        <bookmark:applications>
+          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-04-07T10:20:33.018744Z" count="2"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/experiment%207" added="2025-04-11T03:17:54.987354Z" modified="2025-04-11T03:17:54.987361Z" visited="2025-04-11T03:17:54.987355Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="inode/directory"/>
+        <bookmark:applications>
+          <bookmark:application name="org.gnome.Nautilus" exec="&apos;org.gnome.Nautilus %u&apos;" modified="2025-04-11T03:17:54.987357Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/hosts.ini" added="2025-04-11T03:21:09.403493Z" modified="2025-04-11T07:57:59.123662Z" visited="2025-04-11T03:21:09.403494Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="text/plain"/>
+        <bookmark:applications>
+          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-04-11T07:57:59.123659Z" count="2"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/setup.yaml" added="2025-04-11T03:21:51.851738Z" modified="2025-04-11T07:59:37.324348Z" visited="2025-04-11T03:21:51.851739Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/x-yaml"/>
+        <bookmark:applications>
+          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-04-11T07:59:37.324343Z" count="3"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/experiment%207/setup.yaml" added="2025-04-11T03:24:17.545792Z" modified="2025-04-11T03:24:26.913234Z" visited="2025-04-11T03:24:17.545792Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/x-yaml"/>
+        <bookmark:applications>
+          <bookmark:application name="gedit" exec="&apos;gedit %u&apos;" modified="2025-04-11T03:24:26.913231Z" count="2"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Screenshot%20from%202025-04-11%2008-59-38.png" added="2025-04-11T03:31:18.895893Z" modified="2025-04-11T03:31:18.907794Z" visited="2025-04-11T03:31:18.895894Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T03:31:18.895897Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T03:31:18.907793Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Screenshot%20from%202025-04-11%2008-59-13.png" added="2025-04-11T03:31:27.455881Z" modified="2025-04-11T03:31:27.472376Z" visited="2025-04-11T03:31:27.455882Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T03:31:27.455885Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T03:31:27.472372Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Screenshot%20from%202025-04-11%2008-58-41.png" added="2025-04-11T03:31:42.095877Z" modified="2025-04-11T03:31:42.107024Z" visited="2025-04-11T03:31:42.095878Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T03:31:42.095881Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T03:31:42.107021Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Screenshot%20from%202025-04-11%2008-58-02.png" added="2025-04-11T03:31:52.951933Z" modified="2025-04-11T03:32:48.962245Z" visited="2025-04-11T03:31:52.951934Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:groups>
+          <bookmark:group>Graphics</bookmark:group>
+        </bookmark:groups>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T03:31:52.951938Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T03:31:52.962828Z" count="1"/>
+          <bookmark:application name="Image Viewer" exec="&apos;eog %u&apos;" modified="2025-04-11T03:32:48.962243Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Screenshot%20from%202025-03-13%2009-04-09.png" added="2025-04-11T03:32:42.029139Z" modified="2025-04-11T03:32:42.029141Z" visited="2025-04-11T03:32:42.029139Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:groups>
+          <bookmark:group>Graphics</bookmark:group>
+        </bookmark:groups>
+        <bookmark:applications>
+          <bookmark:application name="Image Viewer" exec="&apos;eog %u&apos;" modified="2025-04-11T03:32:42.029140Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Exp7" added="2025-04-11T07:52:52.486636Z" modified="2025-04-11T07:59:48.066503Z" visited="2025-04-11T07:52:52.486637Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="inode/directory"/>
+        <bookmark:applications>
+          <bookmark:application name="org.gnome.Nautilus" exec="&apos;org.gnome.Nautilus %u&apos;" modified="2025-04-11T07:59:48.066501Z" count="3"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Exp71.png" added="2025-04-11T08:10:41.789834Z" modified="2025-04-11T08:10:41.806280Z" visited="2025-04-11T08:10:41.789835Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T08:10:41.789838Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T08:10:41.806278Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Exp7.png" added="2025-04-11T08:10:41.789857Z" modified="2025-04-11T08:10:41.806288Z" visited="2025-04-11T08:10:41.789857Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T08:10:41.789859Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T08:10:41.806287Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/WhatsApp_Image_2022-11-02_at_13.35.36.jpeg" added="2025-04-11T09:22:26.825279Z" modified="2025-04-11T09:23:03.315467Z" visited="2025-04-11T09:22:26.825279Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/jpeg"/>
+        <bookmark:groups>
+          <bookmark:group>Graphics</bookmark:group>
+        </bookmark:groups>
+        <bookmark:applications>
+          <bookmark:application name="Image Viewer" exec="&apos;eog %u&apos;" modified="2025-04-11T09:22:26.825281Z" count="1"/>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T09:23:03.298737Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T09:23:03.315463Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/WhatsApp_Image_2022-11-02_at_13.35.37.jpeg" added="2025-04-11T09:24:47.850850Z" modified="2025-04-11T09:25:51.701402Z" visited="2025-04-11T09:24:47.850852Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/jpeg"/>
+        <bookmark:groups>
+          <bookmark:group>Graphics</bookmark:group>
+        </bookmark:groups>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T09:25:51.683444Z" count="3"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T09:25:51.701398Z" count="3"/>
+          <bookmark:application name="Image Viewer" exec="&apos;eog %u&apos;" modified="2025-04-11T09:25:10.232522Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/WhatsApp_Image_2022-11-02_at_13.35.37(1).jpeg" added="2025-04-11T09:26:02.924562Z" modified="2025-04-11T09:26:02.924566Z" visited="2025-04-11T09:26:02.924563Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/jpeg"/>
+        <bookmark:groups>
+          <bookmark:group>Graphics</bookmark:group>
+        </bookmark:groups>
+        <bookmark:applications>
+          <bookmark:application name="Image Viewer" exec="&apos;eog %u&apos;" modified="2025-04-11T09:26:02.924565Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/Screenshot%20from%202025-04-11%2015-02-12.png" added="2025-04-11T09:32:27.335504Z" modified="2025-04-11T09:32:27.347885Z" visited="2025-04-11T09:32:27.335505Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T09:32:27.335508Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T09:32:27.347881Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Pictures/Screenshots/sign.png" added="2025-04-11T09:33:20.696057Z" modified="2025-04-11T09:33:20.708936Z" visited="2025-04-11T09:33:20.696058Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/png"/>
+        <bookmark:applications>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T09:33:20.696061Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T09:33:20.708933Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/WhatsApp_Image_2022-11-02_at_13.35.34_(1).jpeg" added="2025-04-11T09:34:13.526273Z" modified="2025-04-11T09:34:20.904407Z" visited="2025-04-11T09:34:13.526273Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/jpeg"/>
+        <bookmark:groups>
+          <bookmark:group>Graphics</bookmark:group>
+        </bookmark:groups>
+        <bookmark:applications>
+          <bookmark:application name="Image Viewer" exec="&apos;eog %u&apos;" modified="2025-04-11T09:34:13.526276Z" count="1"/>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-11T09:34:20.896998Z" count="1"/>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-11T09:34:20.904405Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/experiment%206" added="2025-04-15T07:58:42.369356Z" modified="2025-04-15T08:10:10.225142Z" visited="2025-04-15T07:58:42.369357Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/octet-stream"/>
+        <bookmark:applications>
+          <bookmark:application name="xdg-desktop-portal-gnome" exec="&apos;xdg-desktop-portal-gnome %u&apos;" modified="2025-04-15T08:10:10.225139Z" count="2"/>
+          <bookmark:application name="snap.firefox" exec="&apos;gio open %u&apos;" modified="2025-04-15T08:10:10.210818Z" count="2"/>
         </bookmark:applications>
       </metadata>
     </info>

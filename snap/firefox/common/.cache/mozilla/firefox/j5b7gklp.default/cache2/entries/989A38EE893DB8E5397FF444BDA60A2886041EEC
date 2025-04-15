@@ -1,0 +1,1447 @@
+
+/*
+ * author:Kiran Badave & Ankita Kusalkar
+ * Info: Previous auto selection
+ * Ticket No: #812380
+ * */
+/*$(document).ready(function(){
+	junoAutoSelection.autoPreviousSelections('getOnLoad');
+});*/
+var junoAutoSelection = {
+		openMenu:()=>{
+			setTimeout(()=>{
+				$('#menuMaster-DropDown').addClass('open');
+			},500);
+		}
+};
+junoAutoSelection.gPreSelectionArrayList=null;
+junoAutoSelection.validationArr = [null,'0','-','Select','undifined',''];
+junoAutoSelection.autoPreviousSelectionsChangeEventBindFlag= false;
+junoAutoSelection.escapeHtml = function(unsafe) {
+    return unsafe
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+};
+
+/*$(document).ready(function() {
+	junoAutoSelection.autoPreviousSelections('get');
+});*/
+
+junoAutoSelection.comboSelectedArray = function(){ //cmbArr, lastSelCombId
+	var arr = new Array();
+	var lastSelCombId = null;
+	$('select').each(function(){
+		if(!junoAutoSelection.validationArr.includes($(this).val())){
+			if((($(this).is(':visible') && ($(this).prop('id')!="")) ||  ($(this).hasClass('chzn-done') && $('#'+$(this).prop('id')+'_chzn').is(':visible'))) && arr.length<6){
+				arr.push({
+					id:$(this).prop('id'),
+					val:$(this).val()
+				});
+				lastSelCombId = $(this).prop('id');
+			}	
+		}else{
+			if((($(this).is(':visible') && ($(this).prop('id')!="")) ||  ($(this).hasClass('chzn-done') && $('#'+$(this).prop('id')+'_chzn').is(':visible'))) && arr.length<6){
+				lastSelCombId = $(this).prop('id');
+			}
+		}
+	});
+	
+	return {cmbArr:arr, lastSelCombId: lastSelCombId};
+};
+
+
+junoAutoSelection.autoPreviousSelections = function(flg){
+	try{
+		var flag="set";
+		var parameters ="";
+		var validationArr = [null,'0','-','Select','undifined',''];
+		if(flg!=undefined && ['get','set', 'getOnLoad'].includes(flg)){//|| $('#chkPreSelectionKirn').is(':checked')==true
+			var arr = junoAutoSelection.comboSelectedArray().cmbArr;		
+			var lastSelCombId = junoAutoSelection.comboSelectedArray().lastSelCombId;
+			if(flg!=undefined && (flg=='get' || flg=='getOnLoad')){
+				flag = 'get';
+				if(lastSelCombId==null){
+					return;
+				}
+			}else{
+				//junoAutoSelection.AutoPreviousSelectionsChangeEventBind(lastSelCombId);
+				parameters = JSON.stringify(arr);
+				flag="set";
+			}
+		}else{
+			flag="delete";
+		}
+		$.ajax({
+			url:'getSetAndDeleteAutoPreviousSelection.json',
+			data:{
+				parameters:parameters.toString(),
+				linkURL: location.pathname,
+				flag:flag
+			},
+			type:'POST',
+			dataType:'json',
+			asyc:true,
+			success:function(jArray){
+				if(flg!=undefined && flg == 'getOnLoad'){
+					if(jArray.length>0){
+						$('body').eq(0).append(`<div class="restoreSelectionBtnCommonCls restoreSelectionBtnCss" style="position:absolute;top:150px;right:-300px;" onclick="breadcrumbSideMenuOptions(7);">
+									<i class="fa fa-retweet"></i> Restore Selections
+								</div>`);
+						//<i class="fa fa-info-circle" title="Auto Previous Selection" onclick="junoAutoSelection.openMenu()"></i>
+						setTimeout(()=>{
+							$(".restoreSelectionBtnCommonCls").animate({right: '0px'}, function(){
+								var tmpThis = this;
+								setTimeout(()=>{
+								    $(tmpThis).animate({right: '-300px'},function(){$(this).remove();});  
+								}, 15000);
+							});
+						},1000);
+					}
+				}else if(flag=='get'){
+					if(jArray.length>0){
+						/*setTimeout(function(){
+							$('#chkPreSelectionKirn').prop('checked',true);	
+						},3500);*/
+						junoAutoSelection.gPreSelectionArrayList=jArray;
+						junoAutoSelection.autoPreviousSelectCmb();
+					}else{
+						jAlert("No previous selection available! Save your current selection to remember.")
+					}
+				}
+			},
+			error:function(){
+				//getCustomAlertMessage("alert_error");
+			}
+		}); 
+	}catch(e){}
+}
+
+
+junoAutoSelection.AutoPreviousSelectionsChangeEventBind = function(lastSelectCombId){
+	var arr=0;
+	if(junoAutoSelection.autoPreviousSelectionsChangeEventBindFlag!=true && lastSelectCombId!=undefined){
+		var lastSelectDom = $('#'+lastSelectCombId);
+		/*$('select').each(function(){
+			if(($(this).is(':visible') || $(this).hasClass('chzn-done')) && arr<6){
+				arr++;
+				lastSelectDom = $(this);
+			}	
+		});*/
+		if(lastSelectDom!=undefined){
+			$(lastSelectDom).off('autoSelect:on').on("autoSelect:on", function(){
+				if($('#chkPreSelectionKirn').is(':checked')){
+					junoAutoSelection.gPreSelectionArrayList=null;
+					junoAutoSelection.autoPreviousSelections();
+				}
+			});
+			$(lastSelectDom).change(function(){
+				$(this).trigger('autoSelect:on');
+			});
+		}
+		junoAutoSelection.autoPreviousSelectionsChangeEventBindFlag= true;
+	}
+	
+}
+
+var newArrayAutoPreviousSelectCmbflag = Array();
+
+junoAutoSelection.autoPreviousSelectCmbInterval = null;
+junoAutoSelection.autoPreviousSelectCmb = function(){
+	
+	if(junoAutoSelection.gPreSelectionArrayList!=null){
+		setTimeout(function(){
+			junoAutoSelection.autoPreviousSelectCmbInterval = setInterval(function() {
+				var comboSelectDoneCount = 0;
+				for(var i in junoAutoSelection.gPreSelectionArrayList){
+					var srcTmp = $('#'+junoAutoSelection.gPreSelectionArrayList[i].id);
+					if(srcTmp!=undefined){
+						if(srcTmp.val() != junoAutoSelection.gPreSelectionArrayList[i].val){
+							srcTmp.val(junoAutoSelection.gPreSelectionArrayList[i].val);
+							if($(srcTmp).hasClass('chzn-done')){
+								$(srcTmp).trigger("liszt:updated");	
+							}
+							if(!junoAutoSelection.validationArr.includes($(srcTmp).val())){
+								if(($('#'+$($(srcTmp)).prop('id')+' option').length >1 && !$(srcTmp).hasClass('chzn-done'))  || ($('#'+$($(srcTmp).prop('id')+' option').length > 2))){
+									$(srcTmp).trigger('change');
+								}
+							}
+							var cccccnt = junoAutoSelection.gPreSelectionArrayList[i].checkCount;
+							junoAutoSelection.gPreSelectionArrayList[i].checkCount = cccccnt!=undefined?cccccnt+1:1; 
+							if(junoAutoSelection.gPreSelectionArrayList[i].checkCount>5){
+								console.log("Infinte Call - Terminate Interval - Stop Auto Select")
+								clearInterval(junoAutoSelection.autoPreviousSelectCmbInterval);
+							}
+							//console.log("interval ---- "+junoAutoSelection.gPreSelectionArrayList[i].id+" count: -- "+junoAutoSelection.gPreSelectionArrayList[i].checkCount);
+						}else{
+							junoAutoSelection.gPreSelectionArrayList[i].done = true;
+							comboSelectDoneCount++;
+						}
+					}
+					
+				}
+				//console.log("lastCount --- "+gPreSelectionArrayList.length+"=="+comboSelectDoneCount);
+				if(junoAutoSelection.gPreSelectionArrayList.length==comboSelectDoneCount){
+					console.log("Interval Finish");
+					clearInterval(junoAutoSelection.autoPreviousSelectCmbInterval);
+					//junoAutoSelection.AutoPreviousSelectionsChangeEventBind(junoAutoSelection.gPreSelectionArrayList[junoAutoSelection.gPreSelectionArrayList.length-1].id);		
+				}
+			}, 1500);
+			
+			setTimeout(function(){
+				clearInterval(junoAutoSelection.autoPreviousSelectCmbInterval);
+			},20000);
+		},200);
+	}
+}
+
+
+
+
+function breadcrumbSideMenuOptions(flg){
+	if(flg==2){
+		$.ajax({
+			url:'getEmployeeForDutyAllocationByLevelNo.json?linkurl='+ window.location.toString().split('_')[1],
+			dataType:'json',
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray)
+			{
+				var boiler = '<fieldset class="custom-fieldset"><legend><i class="fa fa-share"></i> Share with</legend><input type="text" id="sharePageWithEmployeeTo" />'+
+				'<br/>'+
+				'<span onclick="junoAutoSelection.sharePageWithUser()" class="btn btn-info btn-mini"><i class="fa fa-share"></i> <b>Share Page</b></span>'+
+				'</fieldset>';
+				
+				$('#gemsCommonDialogModal .modal-header h3').text("Share Page Link");
+				$('#gemsCommonDialogModal .modal-body').html(boiler);
+				$('#gemsCommonDialogModal').modal('show');
+
+				$('#sharePageWithEmployeeTo').tokenInput(jArray,{
+					theme: "facebook",
+					resultsLimit: 10,
+					tokenLimit:5,
+					placeholder: 'Select Employee',
+					propertyToSearch: "name",
+					preventDuplicates: true,
+					resultsFormatter: function(item){ return "<li><img src='" + item.imageUrl + "' title='" + item.name + "' style='height:25px; width:25px;' />" +
+						"<div style='display: inline-block; padding-left: 10px;'><div class='full_name'>" + item.name +
+						"</div><div class='email'>" + item.desc + "</div></div></li>";
+					},
+					tokenFormatter: function(item) { return "<li><p><img src='"+item.imageUrl+"' title='"+item.name+"' style='height:25px; width:25px;'/>"
+						+item.name+"</p></li>";}
+
+				});
+				
+			},
+			error:function(){
+				getCustomAlertMessage("alert_error");
+			}
+		});
+	}
+
+	if(flg=='pageInfo'){
+		var ticketBoiler = `<textarea style="width: 100%; height: 200px;font-size: var(--juno-font-size-heading);border: #fff;" id="genrateTicketTxtArea">
+Name : ${juno.login_userFullName}
+Email : ${juno.login_emailId}
+Client : ${juno.customerHelper}
+Role : ${juno.currentRoleName}
+Breadcrumb : ${$('<div>'+firstTimebreadCrumbs+'</div>').text()}
+</textarea><button class="btn btn-inverse btn-mini" id="copyTicketTxtArea">Copy</button>`;
+
+		juno.modal({
+			header:'<i class="fa fa-exclamation-circle"></i> Page Info',
+			body: ticketBoiler
+		});
+	}
+	if(flg==3){
+		var ticketBoiler = '<textarea style="width: 100%; height: 200px;font-size: var(--juno-font-size-heading);border: #fff;" id="genrateTicketTxtArea">Ticket No :  \n'+
+		'Client : '+(juno.customerHelper)+' \n'+
+		'Role : '+(juno.currentRoleName)+' \n'+
+		'Breadcrumb : '+$('<div>'+firstTimebreadCrumbs+'</div>').text()+' \n'+
+		'Change requested by : \n'+
+		'Changes About : Requirement/Bug \n'+
+		'DESC : </textarea><button class="btn btn-inverse btn-mini" id="copyTicketTxtArea">Copy</button>';
+
+		juno.modal({
+			header:'<i class="fa fa-bookmark-o"></i> Ticket',
+			body: ticketBoiler
+		});		
+	}
+
+	if(flg==4){
+
+		if(juno!=undefined && juno.label!=undefined){
+			/* Ticket - #618369 -Kiran Badave */
+			var labelsBoiler = '<div class="alert alert-info"><b>Note: Add common Labels in Label.properties if not exist.</b>'
+				+'<br/> <b>Examples: For common - </b>'+junoAutoSelection.escapeHtml(juno.label["a.download.json"])+','
+				+'<br/> <b>JS code -</b> juno.label[\"a.download.json\"].setIndexedArgs(\'1001\', \'TEXT\', \'myDocument.docx\',\'Download\') '
+				+'<br/> <b>JAVA code -</b> MessageFormat.format(ApplicationProperty.getGeneralisedProperty(\"a.download.json\"),\"1001\", \"TEXT\", \"myDocument.docx\", \"Download\"); '
+				+'<br/> <b>Outout -</b> &lt;a href="documentDownload.json?id=1001&amp;type=TEXT&amp;name=myDocument.docx" target="_blank"&gt; Download &lt;/a&gt;'
+				+'</div><table class="table table-bordered table-condenced" id="junoLblTbl" style="font-size: 12px;"><thead><tr><th>Label</th><th>JSP</th><th>JS</th></tr></thead><tbody>';
+
+			for(var contx in juno.label){
+				labelsBoiler+= '<tr><td>'+(junoAutoSelection.escapeHtml(juno.label[contx]))+'</td><td>&lt;fmt:message key=&quot;'+contx+'&quot;/&gt;</td><td>juno.label[&quot;'+contx+'&quot;]</td></tr>';
+			}
+			labelsBoiler+='</tbody></table>';
+
+			$('#gemsCommonDialogModal .modal-header h3').text("Labels from Label.properties");
+			$('#gemsCommonDialogModal .modal-body').html(labelsBoiler);
+			$('#gemsCommonDialogModal').modal('show');
+			gemsCommonPopupModalCssLayout('#gemsCommonDialogModal', 900);
+			$('#junoLblTbl').dataTable({
+				"sDom": "<'row'<'margin-left-22'l><'pull-right'f>r>t<'row'<'margin-left-22'i><'pull-right'p>>",
+				"iDisplayLength":-1,
+				"bLengthChange" : false,
+				"bPaginate" : false,
+			});
+		}
+
+	}
+
+	if(flg==5){
+		/*setTimeout(function(){$('#menuMaster-DropDown').addClass('open');},3);
+		setTimeout(function(){
+			var chkOb = $('#chkPreSelectionKirn');
+			chkOb.prop('checked',chkOb.is(':checked')==true?false:true);
+			if(chkOb.is('checked')==false){*/
+				junoAutoSelection.autoPreviousSelections('set');
+			/*}
+		},20);*/		
+	}
+	if(flg==7){
+		$('.restoreSelectionBtnCommonCls').animate({right: '-300px'},function(){$(this).remove();});
+		junoAutoSelection.autoPreviousSelections('get');
+	}
+	
+	if(flg==6){
+		$('#gemsCommonDialogModal .modal-header h3').html('<i class="fa fa-medkit fa-lg"></i> Support');
+		$('#gemsCommonDialogModal .modal-body').html('<iframe style="width:100%;height:400px;" src="mySupport.htm?hflg=true&breadcrumb='+encodeURIComponent(firstTimebreadCrumbs)+'"/>');
+		$('#gemsCommonDialogModal').modal('show');
+		gemsCommonPopupModalCssLayout('#gemsCommonDialogModal', 1100);
+	}
+	
+	if(flg==8){
+		var ticketBoiler = `<fieldset class="custom-fieldset"><legend><i class="fa fa-share"></i> Note: Go To ADMIN PANEL And Set Application Properties</legend>
+					<table class="table table-bordered table-condenced" id="junoLblTbl" style="font-size: 12px;"><thead><tr><th>For What</th><th>Flag</th><th>value</th></tr></thead>`;
+			console.log("firstTimebreadCrumbs",firstTimebreadCrumbs);
+				if(firstTimebreadCrumbs.includes("Remittance"))	
+						ticketBoiler+=`<tr><td>Show options (Send Email/NEFT Format/RTGS Format) In the Remitance letter </td><td>bankTransferLeterOptionOn</td><td>true/false</td></tr>`;
+			ticketBoiler+=`</table></fieldset>`;
+		
+		
+		/*var ticketBoiler = '<textarea style="width: 100%; height: 200px;font-size: var(--juno-font-size-heading);border: #fff;" id="genrateTicketTxtArea">Ticket No :  \n'+
+		'Client : '+(juno.customerHelper)+' \n'+
+		'Role : '+(juno.currentRoleName)+' \n'+
+		'Breadcrumb : '+$('<div>'+firstTimebreadCrumbs+'</div>').text()+' \n'+
+		'Change requested by : \n'+
+		'Changes About : Requirement/Bug \n'+
+		'DESC : </textarea><button class="btn btn-inverse btn-mini" id="copyTicketTxtArea">Copy</button>';*/
+
+		juno.modal({
+			header:'<i class="fa fa-navicon"></i> Application Properties',
+			body: ticketBoiler
+		});		
+	}
+	
+	
+	$('#copyTicketTxtArea').off('click').click(function(){
+		var copyText = document.getElementById("genrateTicketTxtArea");
+		copyText.select();
+		document.execCommand("copy");
+		$(this).text("Copied!").removeClass('btn-inverse').addClass("btn-success");
+		setTimeout(function(){$('#copyTicketTxtArea').text("Copy").removeClass('btn-success').addClass("btn-inverse");},2000);
+	});
+}
+
+junoAutoSelection.sharePageWithUser = function(){
+
+	var parameters = JSON.stringify(arr);
+	var shareWithEmpIds = $.trim($('#sharePageWithEmployeeTo').val());
+	if(shareWithEmpIds==''){
+		jAlert('Please select Employee!')
+		return;
+	}
+	
+	$.ajax({
+		url:'sharePageWithUserWithAutoSelection.json',
+		data:{
+			parameters:parameters.toString(),
+			linkURL: location.pathname,
+			shareWithEmpIds:shareWithEmpIds
+		},
+		type:'POST',
+		dataType:'json',
+		asyc:true,
+		success:function(jArray){
+			
+		},
+		error:function(){
+			getCustomAlertMessage("alert_error");
+		}
+	}); 
+}
+
+
+junoAutoSelection.fallbackCopyTextToClipboard = function(text) {
+	var textArea = document.createElement("textarea");
+	textArea.value = text;
+
+	// Avoid scrolling to bottom
+	textArea.style.top = "0";
+	textArea.style.left = "0";
+	textArea.style.position = "fixed";
+
+	document.body.appendChild(textArea);
+	textArea.focus();
+	textArea.select();
+
+	try {
+		var successful = document.execCommand('copy');
+		var msg = successful ? 'successful' : 'unsuccessful';
+		console.log('Fallback: Copying text command was ' + msg);
+	} catch (err) {
+		console.error('Fallback: Oops, unable to copy', err);
+	}
+	document.body.removeChild(textArea);
+}
+junoAutoSelection.copyTextToClipboard = function(text) {
+	if (!navigator.clipboard) {
+		junoAutoSelection.fallbackCopyTextToClipboard(text);
+		return;
+	}
+	navigator.clipboard.writeText(text).then(function() {
+		console.log('Async: Copying to clipboard was successful!');
+	}, function(err) {
+		console.error('Async: Could not copy text: ', err);
+	});
+}
+
+/*function DeleteThis_autoPreviousSelectCmb(src){
+
+	if(src!=undefined && gPreSelectionArrayList!=null ){
+		setTimeout(function(){
+			if(src!=undefined && gPreSelectionArrayList!=null ){
+				var autoPreviousSelectCmbflag=false;
+				var count=0;
+				for(var i=0; i<gPreSelectionArrayList.length;i++){
+					if((gPreSelectionArrayList[i]["id"]==$(src).prop('id')) && !newArrayAutoPreviousSelectCmbflag.includes($(src).prop('id'))){
+						var setValueInAutoPreviousSelectCmb = false;
+						$(src).val(gPreSelectionArrayList[i]["val"]);
+						//	console.log(i+' : '+$(src).prop('id')+' -- '+gPreSelectionArrayList[i]["val"]);
+						if($(src).hasClass('chzn-done')){
+							$(src).trigger("liszt:updated");	
+						}
+						if(!validationArr.includes($(src).val())){
+							if(($('#'+$($(src)).prop('id')+' option').length >1 && !$(src).hasClass('chzn-done'))  || ($('#'+$($(src).prop('id')+' option').length > 2))){
+								$(src).trigger('change');
+								newArrayAutoPreviousSelectCmbflag.push($(src).prop('id'));
+								setValueInAutoPreviousSelectCmb =true;
+							}
+						}		
+
+						if(gPreSelectionArrayList[i]["id"]==$(src).prop('id') && setValueInAutoPreviousSelectCmb==true){
+							gPreSelectionArrayList.splice(gPreSelectionArrayList[i]["id"],1);
+						}
+					}
+
+				}
+				console.log("last : "+gPreSelectionArrayList);
+
+				if(gPreSelectionArrayList!=null && gPreSelectionArrayList!=undefined){
+					for(var i=0; i<newArrayAutoPreviousSelectCmbflag.length;i++){
+						for(var j=0; j<gPreSelectionArrayList.length;j++){
+							if((gPreSelectionArrayList[j]["id"] !=newArrayAutoPreviousSelectCmbflag[i])){
+								autoPreviousSelectCmbflag=true;
+							}
+						}
+					}
+				}else{
+					autoPreviousSelectCmbflag=true;
+				}
+
+				recursive();
+
+				if(autoPreviousSelectCmbflag==true){
+					setTimeout(function(){
+						gPreSelectionArrayList=null;
+						newArrayAutoPreviousSelectCmbflag=null;
+						AutoPreviousSelectionsChangeEventBind();
+					},300);
+				}
+			}
+		},200);
+	}
+}*/
+
+/*
+class BreadcrumbComponent extends React.Component {
+	  constructor(props) {
+	    super(props);
+	    this.state = {
+	    	breadcrumb:document.title,
+	    	time:"",
+	    	timeInMillis:this.props.timestamp,
+	    	startMarkCls:'fa fa-star-o-menu',
+		  	startMarkTitle:'Add to Shortcut'
+	    };
+	    
+	    this.timer = 0;
+		this.bookmarkStartClickEvent = this.bookmarkStartClickEvent.bind(this);
+	  }
+
+	  componentDidMount() {
+		  this.breadcrumbText();
+	  }
+	  
+	  render() {
+
+		  let DropdownListComp = () => (<span className="btn-group pull-right" style={{marginLeft:'10px'}} id="menuMaster-DropDown">
+			<span className="dropdown-toggle btn btn-inverse btn-mini" data-toggle="dropdown"><i className="fa fa-ellipsis-v fa-lg" aria-hidden="true"></i></span>
+			<ul className="dropdown-menu">
+			<li><a href="javascript:void(0)" onClick={breadcrumbSideMenuOptions(5)}>
+			 	<div className="material-switch-chk" style={{margin:"0px 0px"}}><input id="chkPreSelectionKirn" type="checkbox" checked={gPreSelectionArrayList!=null?'checked':''}/>
+			 	<label className="label-success"></label></div> <b style={{marginLeft:'33px'}} title="Auto Previous Selection"> Auto Selection</b></a></li>
+			</ul>
+			</span>
+			);
+		  
+		  
+		  //	- {this.props.headerlinktype} -
+		  var headerlinktypeList = ['student', 'orgadmin','parentadmin'
+		                            ,'alumniadmin','applicantStudent','applicantEmployee'
+		                            ,'alumnistudent','vendor','companyHR','referee','occupant'
+		                            , 'hrAdmin'];
+		  if(headerlinktypeList.includes(this.props.headerlinktype)){
+			  return (<React.Fragment>
+			  	{this.state.breadcrumb} 
+			  	<b style={{fontSize:'13px'}} className="pull-right">{this.state.time}</b>
+			  	<b style={{fontSize:'13px',marginRight:'5px'}} id="timelable" className="pull-right">{this.state.dateString}</b>
+			  </React.Fragment>);
+		  }else{
+			  this.state.startMarkCls = 'fa fa-star-o-menu';
+			  this.state.startMarkTitle = 'Add to Shortcut';
+			  if(menuShortcutId!=0 && menuShortcutId!="0" && menuShortcutId!=undefined){
+				  this.state.startMarkCls = 'fa fa-star-menu';
+				  this.state.startMarkTitle = 'Remove from Shortcut'; 
+			  }
+			  
+			  return (<React.Fragment>
+			  	<i className={this.state.startMarkCls} title={this.state.startMarkTitle} id='selectedMenuId' onClick={(e)=>this.bookmarkStartClickEvent(pid)} style={{cursor:'pointer', marginRight:'5px'}}></i>
+			  	
+			  	{this.state.breadcrumb}
+			  	
+			  	<b style={{fontSize:'13px'}} className="pull-right">{this.state.time}</b>
+			  	
+			  	<b style={{fontSize:'13px',marginRight:'5px'}} id="timelable" className="pull-right">{this.state.dateString}</b>
+			  	<DropdownListComp />
+			  </React.Fragment>);
+		  }
+	  }
+	  
+	  breadcrumbText() {
+		  var loc = window.location.pathname;
+		  loc = loc.substring(loc.lastIndexOf('/') + 1);
+		  var currentObject = $('#global-nav-id').find('a[href ="' + loc + '"]');
+		  var breadCrum = new Array();
+		  breadCrum.push(currentObject.text());
+		  console.log($(currentObject).attr("pid"));
+		  pid = $(currentObject).attr("pid");
+		  menuShortcutId = $(currentObject).attr("menuShortcutId");
+		  while (currentObject.parent().parent().prev().prop('tagName') == 'A') {
+			  breadCrum.push(currentObject.parent().parent().prev().text());
+			  currentObject = currentObject.parent().parent().prev();
+		  }
+		  var temp = new Array();
+		  for(var i in breadCrum){
+			  temp.push(breadCrum.pop());
+		  }
+		  var breadCrumbsTx = temp.join(" ¬ª ");
+		  if(temp.length==0){
+			  breadCrumbsTx=document.title;
+		  }
+		  this.setState({
+			  breadcrumb:breadCrumbsTx
+		  });
+	  }
+	  
+	 bookmarkStartClickEvent(menuMasterId){
+			if($('#selectedMenuId').hasClass('fa-star-o-menu')){
+				var isForShortcut = true;
+				this.state.startMarkCls = 'fa fa-star-menu';
+				this.state.startMarkTitle = 'Remove from Shortcut';
+				$.ajax({
+					url:'addSelectedMenuInShortcut.json?menuMasterId='+menuMasterId,
+					dataType:'json',
+					async:true,
+					success:function(jArray){
+						$('.shortcutMenuLink').remove(); 
+						getMenuList(isForShortcut);
+					},
+					error:function(){
+						getCustomAlertMessage("alert_error");
+					}
+				});
+			}else if($('#selectedMenuId').hasClass('fa-star-menu')){
+				var isForShortcut = true;
+				this.state.startMarkCls = 'fa fa-star-o-menu';
+				this.state.startMarkTitle = 'Add to Shortcut';
+				
+				$.ajax({
+					url:'deleteSelectedMenuInShortcut.json?menuMasterId='+menuMasterId,
+					dataType:'json',
+					async:true,
+					success:function(jArray){
+						$('.shortcutMenuLink').remove(); 
+						getMenuList(isForShortcut);
+					},
+					error:function(){
+						getCustomAlertMessage("alert_error");
+					}
+				});
+			}
+	 }
+}
+
+class TimerCounter extends React.Component {
+	  constructor(props) {
+	    super(props);
+	    this.state = {
+	    	time:"",
+	    	timeInMillis:this.props.timestamp
+	    };
+	    this.timer = 0;
+		this.countDown = this.countDown.bind(this);
+	  }
+	  componentDidMount() {
+		  var datetimeObj = new Date(this.props.timestamp);
+		  this.setState({ 
+			  time: datetimeObj.toLocaleTimeString(),
+			  timeInMillis:this.props.timestamp,
+			  dateString: datetimeObj.toJunoDateFormat(),
+		  });
+		  setInterval(this.countDown, 1000);
+	  }
+	  
+	  render() {
+			  return (<React.Fragment>
+			  	<b style={{fontSize:'13px'}} className="pull-right">{this.state.time}</b>
+			  	<b style={{fontSize:'13px',marginRight:'5px'}} id="timelable" className="pull-right">{this.state.dateString}</b>
+			  	<DropdownListComp />
+			  </React.Fragment>);
+	  }
+	  countDown() {
+			var datetimeObj = new Date(this.state.timeInMillis + 1000);
+			this.setState({ 
+				time: datetimeObj.toLocaleTimeString(),
+				timeInMillis:this.state.timeInMillis+1000,
+				dateString: datetimeObj.toJunoDateFormat()
+			});
+	 }
+}*/
+
+        ¬  x¬=   20250331133932-8l”¬  +xGº,   https://erp.cmrit.ac.in/js/menuMasterPage.js      Ã[  
+/*
+ * author:Kiran Badave & Ankita Kusalkar
+ * Info: Previous auto selection
+ * Ticket No: #812380
+ * */
+/*$(document).ready(function(){
+	junoAutoSelection.autoPreviousSelections('getOnLoad');
+});*/
+var junoAutoSelection = {
+		openMenu:()=>{
+			setTimeout(()=>{
+				$('#menuMaster-DropDown').addClass('open');
+			},500);
+		}
+};
+junoAutoSelection.gPreSelectionArrayList=null;
+junoAutoSelection.validationArr = [null,'0','-','Select','undifined',''];
+junoAutoSelection.autoPreviousSelectionsChangeEventBindFlag= false;
+junoAutoSelection.escapeHtml = function(unsafe) {
+    return unsafe
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+};
+
+/*$(document).ready(function() {
+	junoAutoSelection.autoPreviousSelections('get');
+});*/
+
+junoAutoSelection.comboSelectedArray = function(){ //cmbArr, lastSelCombId
+	var arr = new Array();
+	var lastSelCombId = null;
+	$('select').each(function(){
+		if(!junoAutoSelection.validationArr.includes($(this).val())){
+			if((($(this).is(':visible') && ($(this).prop('id')!="")) ||  ($(this).hasClass('chzn-done') && $('#'+$(this).prop('id')+'_chzn').is(':visible'))) && arr.length<6){
+				arr.push({
+					id:$(this).prop('id'),
+					val:$(this).val()
+				});
+				lastSelCombId = $(this).prop('id');
+			}	
+		}else{
+			if((($(this).is(':visible') && ($(this).prop('id')!="")) ||  ($(this).hasClass('chzn-done') && $('#'+$(this).prop('id')+'_chzn').is(':visible'))) && arr.length<6){
+				lastSelCombId = $(this).prop('id');
+			}
+		}
+	});
+	
+	return {cmbArr:arr, lastSelCombId: lastSelCombId};
+};
+
+
+junoAutoSelection.autoPreviousSelections = function(flg){
+	try{
+		var flag="set";
+		var parameters ="";
+		var validationArr = [null,'0','-','Select','undifined',''];
+		if(flg!=undefined && ['get','set', 'getOnLoad'].includes(flg)){//|| $('#chkPreSelectionKirn').is(':checked')==true
+			var arr = junoAutoSelection.comboSelectedArray().cmbArr;		
+			var lastSelCombId = junoAutoSelection.comboSelectedArray().lastSelCombId;
+			if(flg!=undefined && (flg=='get' || flg=='getOnLoad')){
+				flag = 'get';
+				if(lastSelCombId==null){
+					return;
+				}
+			}else{
+				//junoAutoSelection.AutoPreviousSelectionsChangeEventBind(lastSelCombId);
+				parameters = JSON.stringify(arr);
+				flag="set";
+			}
+		}else{
+			flag="delete";
+		}
+		$.ajax({
+			url:'getSetAndDeleteAutoPreviousSelection.json',
+			data:{
+				parameters:parameters.toString(),
+				linkURL: location.pathname,
+				flag:flag
+			},
+			type:'POST',
+			dataType:'json',
+			asyc:true,
+			success:function(jArray){
+				if(flg!=undefined && flg == 'getOnLoad'){
+					if(jArray.length>0){
+						$('body').eq(0).append(`<div class="restoreSelectionBtnCommonCls restoreSelectionBtnCss" style="position:absolute;top:150px;right:-300px;" onclick="breadcrumbSideMenuOptions(7);">
+									<i class="fa fa-retweet"></i> Restore Selections
+								</div>`);
+						//<i class="fa fa-info-circle" title="Auto Previous Selection" onclick="junoAutoSelection.openMenu()"></i>
+						setTimeout(()=>{
+							$(".restoreSelectionBtnCommonCls").animate({right: '0px'}, function(){
+								var tmpThis = this;
+								setTimeout(()=>{
+								    $(tmpThis).animate({right: '-300px'},function(){$(this).remove();});  
+								}, 15000);
+							});
+						},1000);
+					}
+				}else if(flag=='get'){
+					if(jArray.length>0){
+						/*setTimeout(function(){
+							$('#chkPreSelectionKirn').prop('checked',true);	
+						},3500);*/
+						junoAutoSelection.gPreSelectionArrayList=jArray;
+						junoAutoSelection.autoPreviousSelectCmb();
+					}else{
+						jAlert("No previous selection available! Save your current selection to remember.")
+					}
+				}
+			},
+			error:function(){
+				//getCustomAlertMessage("alert_error");
+			}
+		}); 
+	}catch(e){}
+}
+
+
+junoAutoSelection.AutoPreviousSelectionsChangeEventBind = function(lastSelectCombId){
+	var arr=0;
+	if(junoAutoSelection.autoPreviousSelectionsChangeEventBindFlag!=true && lastSelectCombId!=undefined){
+		var lastSelectDom = $('#'+lastSelectCombId);
+		/*$('select').each(function(){
+			if(($(this).is(':visible') || $(this).hasClass('chzn-done')) && arr<6){
+				arr++;
+				lastSelectDom = $(this);
+			}	
+		});*/
+		if(lastSelectDom!=undefined){
+			$(lastSelectDom).off('autoSelect:on').on("autoSelect:on", function(){
+				if($('#chkPreSelectionKirn').is(':checked')){
+					junoAutoSelection.gPreSelectionArrayList=null;
+					junoAutoSelection.autoPreviousSelections();
+				}
+			});
+			$(lastSelectDom).change(function(){
+				$(this).trigger('autoSelect:on');
+			});
+		}
+		junoAutoSelection.autoPreviousSelectionsChangeEventBindFlag= true;
+	}
+	
+}
+
+var newArrayAutoPreviousSelectCmbflag = Array();
+
+junoAutoSelection.autoPreviousSelectCmbInterval = null;
+junoAutoSelection.autoPreviousSelectCmb = function(){
+	
+	if(junoAutoSelection.gPreSelectionArrayList!=null){
+		setTimeout(function(){
+			junoAutoSelection.autoPreviousSelectCmbInterval = setInterval(function() {
+				var comboSelectDoneCount = 0;
+				for(var i in junoAutoSelection.gPreSelectionArrayList){
+					var srcTmp = $('#'+junoAutoSelection.gPreSelectionArrayList[i].id);
+					if(srcTmp!=undefined){
+						if(srcTmp.val() != junoAutoSelection.gPreSelectionArrayList[i].val){
+							srcTmp.val(junoAutoSelection.gPreSelectionArrayList[i].val);
+							if($(srcTmp).hasClass('chzn-done')){
+								$(srcTmp).trigger("liszt:updated");	
+							}
+							if(!junoAutoSelection.validationArr.includes($(srcTmp).val())){
+								if(($('#'+$($(srcTmp)).prop('id')+' option').length >1 && !$(srcTmp).hasClass('chzn-done'))  || ($('#'+$($(srcTmp).prop('id')+' option').length > 2))){
+									$(srcTmp).trigger('change');
+								}
+							}
+							var cccccnt = junoAutoSelection.gPreSelectionArrayList[i].checkCount;
+							junoAutoSelection.gPreSelectionArrayList[i].checkCount = cccccnt!=undefined?cccccnt+1:1; 
+							if(junoAutoSelection.gPreSelectionArrayList[i].checkCount>5){
+								console.log("Infinte Call - Terminate Interval - Stop Auto Select")
+								clearInterval(junoAutoSelection.autoPreviousSelectCmbInterval);
+							}
+							//console.log("interval ---- "+junoAutoSelection.gPreSelectionArrayList[i].id+" count: -- "+junoAutoSelection.gPreSelectionArrayList[i].checkCount);
+						}else{
+							junoAutoSelection.gPreSelectionArrayList[i].done = true;
+							comboSelectDoneCount++;
+						}
+					}
+					
+				}
+				//console.log("lastCount --- "+gPreSelectionArrayList.length+"=="+comboSelectDoneCount);
+				if(junoAutoSelection.gPreSelectionArrayList.length==comboSelectDoneCount){
+					console.log("Interval Finish");
+					clearInterval(junoAutoSelection.autoPreviousSelectCmbInterval);
+					//junoAutoSelection.AutoPreviousSelectionsChangeEventBind(junoAutoSelection.gPreSelectionArrayList[junoAutoSelection.gPreSelectionArrayList.length-1].id);		
+				}
+			}, 1500);
+			
+			setTimeout(function(){
+				clearInterval(junoAutoSelection.autoPreviousSelectCmbInterval);
+			},20000);
+		},200);
+	}
+}
+
+
+
+
+function breadcrumbSideMenuOptions(flg){
+	if(flg==2){
+		$.ajax({
+			url:'getEmployeeForDutyAllocationByLevelNo.json?linkurl='+ window.location.toString().split('_')[1],
+			dataType:'json',
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray)
+			{
+				var boiler = '<fieldset class="custom-fieldset"><legend><i class="fa fa-share"></i> Share with</legend><input type="text" id="sharePageWithEmployeeTo" />'+
+				'<br/>'+
+				'<span onclick="junoAutoSelection.sharePageWithUser()" class="btn btn-info btn-mini"><i class="fa fa-share"></i> <b>Share Page</b></span>'+
+				'</fieldset>';
+				
+				$('#gemsCommonDialogModal .modal-header h3').text("Share Page Link");
+				$('#gemsCommonDialogModal .modal-body').html(boiler);
+				$('#gemsCommonDialogModal').modal('show');
+
+				$('#sharePageWithEmployeeTo').tokenInput(jArray,{
+					theme: "facebook",
+					resultsLimit: 10,
+					tokenLimit:5,
+					placeholder: 'Select Employee',
+					propertyToSearch: "name",
+					preventDuplicates: true,
+					resultsFormatter: function(item){ return "<li><img src='" + item.imageUrl + "' title='" + item.name + "' style='height:25px; width:25px;' />" +
+						"<div style='display: inline-block; padding-left: 10px;'><div class='full_name'>" + item.name +
+						"</div><div class='email'>" + item.desc + "</div></div></li>";
+					},
+					tokenFormatter: function(item) { return "<li><p><img src='"+item.imageUrl+"' title='"+item.name+"' style='height:25px; width:25px;'/>"
+						+item.name+"</p></li>";}
+
+				});
+				
+			},
+			error:function(){
+				getCustomAlertMessage("alert_error");
+			}
+		});
+	}
+
+	if(flg=='pageInfo'){
+		var ticketBoiler = `<textarea style="width: 100%; height: 200px;font-size: var(--juno-font-size-heading);border: #fff;" id="genrateTicketTxtArea">
+Name : ${juno.login_userFullName}
+Email : ${juno.login_emailId}
+Client : ${juno.customerHelper}
+Role : ${juno.currentRoleName}
+Breadcrumb : ${$('<div>'+firstTimebreadCrumbs+'</div>').text()}
+</textarea><button class="btn btn-inverse btn-mini" id="copyTicketTxtArea">Copy</button>`;
+
+		juno.modal({
+			header:'<i class="fa fa-exclamation-circle"></i> Page Info',
+			body: ticketBoiler
+		});
+	}
+	if(flg==3){
+		var ticketBoiler = '<textarea style="width: 100%; height: 200px;font-size: var(--juno-font-size-heading);border: #fff;" id="genrateTicketTxtArea">Ticket No :  \n'+
+		'Client : '+(juno.customerHelper)+' \n'+
+		'Role : '+(juno.currentRoleName)+' \n'+
+		'Breadcrumb : '+$('<div>'+firstTimebreadCrumbs+'</div>').text()+' \n'+
+		'Change requested by : \n'+
+		'Changes About : Requirement/Bug \n'+
+		'DESC : </textarea><button class="btn btn-inverse btn-mini" id="copyTicketTxtArea">Copy</button>';
+
+		juno.modal({
+			header:'<i class="fa fa-bookmark-o"></i> Ticket',
+			body: ticketBoiler
+		});		
+	}
+
+	if(flg==4){
+
+		if(juno!=undefined && juno.label!=undefined){
+			/* Ticket - #618369 -Kiran Badave */
+			var labelsBoiler = '<div class="alert alert-info"><b>Note: Add common Labels in Label.properties if not exist.</b>'
+				+'<br/> <b>Examples: For common - </b>'+junoAutoSelection.escapeHtml(juno.label["a.download.json"])+','
+				+'<br/> <b>JS code -</b> juno.label[\"a.download.json\"].setIndexedArgs(\'1001\', \'TEXT\', \'myDocument.docx\',\'Download\') '
+				+'<br/> <b>JAVA code -</b> MessageFormat.format(ApplicationProperty.getGeneralisedProperty(\"a.download.json\"),\"1001\", \"TEXT\", \"myDocument.docx\", \"Download\"); '
+				+'<br/> <b>Outout -</b> &lt;a href="documentDownload.json?id=1001&amp;type=TEXT&amp;name=myDocument.docx" target="_blank"&gt; Download &lt;/a&gt;'
+				+'</div><table class="table table-bordered table-condenced" id="junoLblTbl" style="font-size: 12px;"><thead><tr><th>Label</th><th>JSP</th><th>JS</th></tr></thead><tbody>';
+
+			for(var contx in juno.label){
+				labelsBoiler+= '<tr><td>'+(junoAutoSelection.escapeHtml(juno.label[contx]))+'</td><td>&lt;fmt:message key=&quot;'+contx+'&quot;/&gt;</td><td>juno.label[&quot;'+contx+'&quot;]</td></tr>';
+			}
+			labelsBoiler+='</tbody></table>';
+
+			$('#gemsCommonDialogModal .modal-header h3').text("Labels from Label.properties");
+			$('#gemsCommonDialogModal .modal-body').html(labelsBoiler);
+			$('#gemsCommonDialogModal').modal('show');
+			gemsCommonPopupModalCssLayout('#gemsCommonDialogModal', 900);
+			$('#junoLblTbl').dataTable({
+				"sDom": "<'row'<'margin-left-22'l><'pull-right'f>r>t<'row'<'margin-left-22'i><'pull-right'p>>",
+				"iDisplayLength":-1,
+				"bLengthChange" : false,
+				"bPaginate" : false,
+			});
+		}
+
+	}
+
+	if(flg==5){
+		/*setTimeout(function(){$('#menuMaster-DropDown').addClass('open');},3);
+		setTimeout(function(){
+			var chkOb = $('#chkPreSelectionKirn');
+			chkOb.prop('checked',chkOb.is(':checked')==true?false:true);
+			if(chkOb.is('checked')==false){*/
+				junoAutoSelection.autoPreviousSelections('set');
+			/*}
+		},20);*/		
+	}
+	if(flg==7){
+		$('.restoreSelectionBtnCommonCls').animate({right: '-300px'},function(){$(this).remove();});
+		junoAutoSelection.autoPreviousSelections('get');
+	}
+	
+	if(flg==6){
+		$('#gemsCommonDialogModal .modal-header h3').html('<i class="fa fa-medkit fa-lg"></i> Support');
+		$('#gemsCommonDialogModal .modal-body').html('<iframe style="width:100%;height:400px;" src="mySupport.htm?hflg=true&breadcrumb='+encodeURIComponent(firstTimebreadCrumbs)+'"/>');
+		$('#gemsCommonDialogModal').modal('show');
+		gemsCommonPopupModalCssLayout('#gemsCommonDialogModal', 1100);
+	}
+	
+	if(flg==8){
+		var ticketBoiler = `<fieldset class="custom-fieldset"><legend><i class="fa fa-share"></i> Note: Go To ADMIN PANEL And Set Application Properties</legend>
+					<table class="table table-bordered table-condenced" id="junoLblTbl" style="font-size: 12px;"><thead><tr><th>For What</th><th>Flag</th><th>value</th></tr></thead>`;
+			console.log("firstTimebreadCrumbs",firstTimebreadCrumbs);
+				if(firstTimebreadCrumbs.includes("Remittance"))	
+						ticketBoiler+=`<tr><td>Show options (Send Email/NEFT Format/RTGS Format) In the Remitance letter </td><td>bankTransferLeterOptionOn</td><td>true/false</td></tr>`;
+			ticketBoiler+=`</table></fieldset>`;
+		
+		
+		/*var ticketBoiler = '<textarea style="width: 100%; height: 200px;font-size: var(--juno-font-size-heading);border: #fff;" id="genrateTicketTxtArea">Ticket No :  \n'+
+		'Client : '+(juno.customerHelper)+' \n'+
+		'Role : '+(juno.currentRoleName)+' \n'+
+		'Breadcrumb : '+$('<div>'+firstTimebreadCrumbs+'</div>').text()+' \n'+
+		'Change requested by : \n'+
+		'Changes About : Requirement/Bug \n'+
+		'DESC : </textarea><button class="btn btn-inverse btn-mini" id="copyTicketTxtArea">Copy</button>';*/
+
+		juno.modal({
+			header:'<i class="fa fa-navicon"></i> Application Properties',
+			body: ticketBoiler
+		});		
+	}
+	
+	
+	$('#copyTicketTxtArea').off('click').click(function(){
+		var copyText = document.getElementById("genrateTicketTxtArea");
+		copyText.select();
+		document.execCommand("copy");
+		$(this).text("Copied!").removeClass('btn-inverse').addClass("btn-success");
+		setTimeout(function(){$('#copyTicketTxtArea').text("Copy").removeClass('btn-success').addClass("btn-inverse");},2000);
+	});
+}
+
+junoAutoSelection.sharePageWithUser = function(){
+
+	var parameters = JSON.stringify(arr);
+	var shareWithEmpIds = $.trim($('#sharePageWithEmployeeTo').val());
+	if(shareWithEmpIds==''){
+		jAlert('Please select Employee!')
+		return;
+	}
+	
+	$.ajax({
+		url:'sharePageWithUserWithAutoSelection.json',
+		data:{
+			parameters:parameters.toString(),
+			linkURL: location.pathname,
+			shareWithEmpIds:shareWithEmpIds
+		},
+		type:'POST',
+		dataType:'json',
+		asyc:true,
+		success:function(jArray){
+			
+		},
+		error:function(){
+			getCustomAlertMessage("alert_error");
+		}
+	}); 
+}
+
+
+junoAutoSelection.fallbackCopyTextToClipboard = function(text) {
+	var textArea = document.createElement("textarea");
+	textArea.value = text;
+
+	// Avoid scrolling to bottom
+	textArea.style.top = "0";
+	textArea.style.left = "0";
+	textArea.style.position = "fixed";
+
+	document.body.appendChild(textArea);
+	textArea.focus();
+	textArea.select();
+
+	try {
+		var successful = document.execCommand('copy');
+		var msg = successful ? 'successful' : 'unsuccessful';
+		console.log('Fallback: Copying text command was ' + msg);
+	} catch (err) {
+		console.error('Fallback: Oops, unable to copy', err);
+	}
+	document.body.removeChild(textArea);
+}
+junoAutoSelection.copyTextToClipboard = function(text) {
+	if (!navigator.clipboard) {
+		junoAutoSelection.fallbackCopyTextToClipboard(text);
+		return;
+	}
+	navigator.clipboard.writeText(text).then(function() {
+		console.log('Async: Copying to clipboard was successful!');
+	}, function(err) {
+		console.error('Async: Could not copy text: ', err);
+	});
+}
+
+/*function DeleteThis_autoPreviousSelectCmb(src){
+
+	if(src!=undefined && gPreSelectionArrayList!=null ){
+		setTimeout(function(){
+			if(src!=undefined && gPreSelectionArrayList!=null ){
+				var autoPreviousSelectCmbflag=false;
+				var count=0;
+				for(var i=0; i<gPreSelectionArrayList.length;i++){
+					if((gPreSelectionArrayList[i]["id"]==$(src).prop('id')) && !newArrayAutoPreviousSelectCmbflag.includes($(src).prop('id'))){
+						var setValueInAutoPreviousSelectCmb = false;
+						$(src).val(gPreSelectionArrayList[i]["val"]);
+						//	console.log(i+' : '+$(src).prop('id')+' -- '+gPreSelectionArrayList[i]["val"]);
+						if($(src).hasClass('chzn-done')){
+							$(src).trigger("liszt:updated");	
+						}
+						if(!validationArr.includes($(src).val())){
+							if(($('#'+$($(src)).prop('id')+' option').length >1 && !$(src).hasClass('chzn-done'))  || ($('#'+$($(src).prop('id')+' option').length > 2))){
+								$(src).trigger('change');
+								newArrayAutoPreviousSelectCmbflag.push($(src).prop('id'));
+								setValueInAutoPreviousSelectCmb =true;
+							}
+						}		
+
+						if(gPreSelectionArrayList[i]["id"]==$(src).prop('id') && setValueInAutoPreviousSelectCmb==true){
+							gPreSelectionArrayList.splice(gPreSelectionArrayList[i]["id"],1);
+						}
+					}
+
+				}
+				console.log("last : "+gPreSelectionArrayList);
+
+				if(gPreSelectionArrayList!=null && gPreSelectionArrayList!=undefined){
+					for(var i=0; i<newArrayAutoPreviousSelectCmbflag.length;i++){
+						for(var j=0; j<gPreSelectionArrayList.length;j++){
+							if((gPreSelectionArrayList[j]["id"] !=newArrayAutoPreviousSelectCmbflag[i])){
+								autoPreviousSelectCmbflag=true;
+							}
+						}
+					}
+				}else{
+					autoPreviousSelectCmbflag=true;
+				}
+
+				recursive();
+
+				if(autoPreviousSelectCmbflag==true){
+					setTimeout(function(){
+						gPreSelectionArrayList=null;
+						newArrayAutoPreviousSelectCmbflag=null;
+						AutoPreviousSelectionsChangeEventBind();
+					},300);
+				}
+			}
+		},200);
+	}
+}*/
+
+/*
+class BreadcrumbComponent extends React.Component {
+	  constructor(props) {
+	    super(props);
+	    this.state = {
+	    	breadcrumb:document.title,
+	    	time:"",
+	    	timeInMillis:this.props.timestamp,
+	    	startMarkCls:'fa fa-star-o-menu',
+		  	startMarkTitle:'Add to Shortcut'
+	    };
+	    
+	    this.timer = 0;
+		this.bookmarkStartClickEvent = this.bookmarkStartClickEvent.bind(this);
+	  }
+
+	  componentDidMount() {
+		  this.breadcrumbText();
+	  }
+	  
+	  render() {
+
+		  let DropdownListComp = () => (<span className="btn-group pull-right" style={{marginLeft:'10px'}} id="menuMaster-DropDown">
+			<span className="dropdown-toggle btn btn-inverse btn-mini" data-toggle="dropdown"><i className="fa fa-ellipsis-v fa-lg" aria-hidden="true"></i></span>
+			<ul className="dropdown-menu">
+			<li><a href="javascript:void(0)" onClick={breadcrumbSideMenuOptions(5)}>
+			 	<div className="material-switch-chk" style={{margin:"0px 0px"}}><input id="chkPreSelectionKirn" type="checkbox" checked={gPreSelectionArrayList!=null?'checked':''}/>
+			 	<label className="label-success"></label></div> <b style={{marginLeft:'33px'}} title="Auto Previous Selection"> Auto Selection</b></a></li>
+			</ul>
+			</span>
+			);
+		  
+		  
+		  //	- {this.props.headerlinktype} -
+		  var headerlinktypeList = ['student', 'orgadmin','parentadmin'
+		                            ,'alumniadmin','applicantStudent','applicantEmployee'
+		                            ,'alumnistudent','vendor','companyHR','referee','occupant'
+		                            , 'hrAdmin'];
+		  if(headerlinktypeList.includes(this.props.headerlinktype)){
+			  return (<React.Fragment>
+			  	{this.state.breadcrumb} 
+			  	<b style={{fontSize:'13px'}} className="pull-right">{this.state.time}</b>
+			  	<b style={{fontSize:'13px',marginRight:'5px'}} id="timelable" className="pull-right">{this.state.dateString}</b>
+			  </React.Fragment>);
+		  }else{
+			  this.state.startMarkCls = 'fa fa-star-o-menu';
+			  this.state.startMarkTitle = 'Add to Shortcut';
+			  if(menuShortcutId!=0 && menuShortcutId!="0" && menuShortcutId!=undefined){
+				  this.state.startMarkCls = 'fa fa-star-menu';
+				  this.state.startMarkTitle = 'Remove from Shortcut'; 
+			  }
+			  
+			  return (<React.Fragment>
+			  	<i className={this.state.startMarkCls} title={this.state.startMarkTitle} id='selectedMenuId' onClick={(e)=>this.bookmarkStartClickEvent(pid)} style={{cursor:'pointer', marginRight:'5px'}}></i>
+			  	
+			  	{this.state.breadcrumb}
+			  	
+			  	<b style={{fontSize:'13px'}} className="pull-right">{this.state.time}</b>
+			  	
+			  	<b style={{fontSize:'13px',marginRight:'5px'}} id="timelable" className="pull-right">{this.state.dateString}</b>
+			  	<DropdownListComp />
+			  </React.Fragment>);
+		  }
+	  }
+	  
+	  breadcrumbText() {
+		  var loc = window.location.pathname;
+		  loc = loc.substring(loc.lastIndexOf('/') + 1);
+		  var currentObject = $('#global-nav-id').find('a[href ="' + loc + '"]');
+		  var breadCrum = new Array();
+		  breadCrum.push(currentObject.text());
+		  console.log($(currentObject).attr("pid"));
+		  pid = $(currentObject).attr("pid");
+		  menuShortcutId = $(currentObject).attr("menuShortcutId");
+		  while (currentObject.parent().parent().prev().prop('tagName') == 'A') {
+			  breadCrum.push(currentObject.parent().parent().prev().text());
+			  currentObject = currentObject.parent().parent().prev();
+		  }
+		  var temp = new Array();
+		  for(var i in breadCrum){
+			  temp.push(breadCrum.pop());
+		  }
+		  var breadCrumbsTx = temp.join(" ¬ª ");
+		  if(temp.length==0){
+			  breadCrumbsTx=document.title;
+		  }
+		  this.setState({
+			  breadcrumb:breadCrumbsTx
+		  });
+	  }
+	  
+	 bookmarkStartClickEvent(menuMasterId){
+			if($('#selectedMenuId').hasClass('fa-star-o-menu')){
+				var isForShortcut = true;
+				this.state.startMarkCls = 'fa fa-star-menu';
+				this.state.startMarkTitle = 'Remove from Shortcut';
+				$.ajax({
+					url:'addSelectedMenuInShortcut.json?menuMasterId='+menuMasterId,
+					dataType:'json',
+					async:true,
+					success:function(jArray){
+						$('.shortcutMenuLink').remove(); 
+						getMenuList(isForShortcut);
+					},
+					error:function(){
+						getCustomAlertMessage("alert_error");
+					}
+				});
+			}else if($('#selectedMenuId').hasClass('fa-star-menu')){
+				var isForShortcut = true;
+				this.state.startMarkCls = 'fa fa-star-o-menu';
+				this.state.startMarkTitle = 'Add to Shortcut';
+				
+				$.ajax({
+					url:'deleteSelectedMenuInShortcut.json?menuMasterId='+menuMasterId,
+					dataType:'json',
+					async:true,
+					success:function(jArray){
+						$('.shortcutMenuLink').remove(); 
+						getMenuList(isForShortcut);
+					},
+					error:function(){
+						getCustomAlertMessage("alert_error");
+					}
+				});
+			}
+	 }
+}
+
+class TimerCounter extends React.Component {
+	  constructor(props) {
+	    super(props);
+	    this.state = {
+	    	time:"",
+	    	timeInMillis:this.props.timestamp
+	    };
+	    this.timer = 0;
+		this.countDown = this.countDown.bind(this);
+	  }
+	  componentDidMount() {
+		  var datetimeObj = new Date(this.props.timestamp);
+		  this.setState({ 
+			  time: datetimeObj.toLocaleTimeString(),
+			  timeInMillis:this.props.timestamp,
+			  dateString: datetimeObj.toJunoDateFormat(),
+		  });
+		  setInterval(this.countDown, 1000);
+	  }
+	  
+	  render() {
+			  return (<React.Fragment>
+			  	<b style={{fontSize:'13px'}} className="pull-right">{this.state.time}</b>
+			  	<b style={{fontSize:'13px',marginRight:'5px'}} id="timelable" className="pull-right">{this.state.dateString}</b>
+			  	<DropdownListComp />
+			  </React.Fragment>);
+	  }
+	  countDown() {
+			var datetimeObj = new Date(this.state.timeInMillis + 1000);
+			this.setState({ 
+				time: datetimeObj.toLocaleTimeString(),
+				timeInMillis:this.state.timeInMillis+1000,
+				dateString: datetimeObj.toJunoDateFormat()
+			});
+	 }
+}*/
+
+”ò¿Ÿ  Ì        Z≠Ü´      junoAutoSelection      V∑∞w      openMenu   3AtŸ
+      setTimeout     —2ØÕ      #menuMaster-DropDown   Bå|      addClass   óx5      open   ÂˇV      gPreSelectionArrayList     êä°…      validationArr      “Ã3∞      Select	     q†cw	      undifined
+      ¸ë‚)      autoPreviousSelectionsChangeEventBindFlag      ºJ Ó
+      escapeHtml     €      unsafe     ˛À¿Ç      &amp;      a≈ @      &lt;   ª„“      &gt;   ~Ü¸ﬂ      &quot;     ”ËÈ      &#039;     π ›7      comboSelectedArray     õcà      arr    ’ﬁø      lastSelCombId      1<Î      select     &⁄õ      val    SZK#      :visible   “P…ù      prop   7ÑÉz      hasClass   ±µ‡	      chzn-done      √°Ê      _chzn      Ñu2      push   ä‰Ä˜      cmbArr     
+ïX      autoPreviousSelections     yƒá      flg     Ä≠•ù      flag!   Ÿh`p	      getOnLoad"      nßÎ	      stringify#      æd»ê      ajax$   Ê)»Á)      getSetAndDeleteAutoPreviousSelection.json%      6ó(Å      data&   |43÷      linkURL'    0+QA      location(   –®4O      pathname)   ﬂ:      POST*   DoÄw      dataType+   ô¿o”      asyc,   …©\9      success-    ı≤z      jArray.     òh;      body/   ‹B-      append0     ¬≠=º‰      <div class="restoreSelectionBtnCommonCls restoreSelectionBtnCss" style="position:absolute;top:150px;right:-300px;" onclick="breadcrumbSideMenuOptions(7);">
+									<i class="fa fa-retweet"></i> Restore Selections
+								</div>1   «V=Ì      .restoreSelectionBtnCommonCls2      ÷q1º      animate3     ë∏.      right4      l∆T´      0px5    Óp      tmpThis6    Áúj      -300px7     *N∑∆      remove8     È◊      autoPreviousSelectCmb9      Òp^      jAlert:     fõeLI      No previous selection available! Save your current selection to remember.;      ˛tuW      error<      úá¥¶%      AutoPreviousSelectionsChangeEventBind=      ãZ‚•      lastSelectCombId>   ïä~í      lastSelectDom?      ˙¯Öﬂ      off@    Œ"E      autoSelect:onA       ó”      #chkPreSelectionKirnB   ÄÈz      :checkedC   Á˛¡      changeD     ˘!p¬      triggerE    _˜!      newArrayAutoPreviousSelectCmbflagF      ç‰ªÁ      autoPreviousSelectCmbIntervalG      Ïà       setIntervalH    Æ†˙·      comboSelectDoneCountI   .~      srcTmpJ     H©“‹      liszt:updatedK      F™A       optionL     /∫[      cccccntM    'BL&
+      checkCountN     ˛Q1      consoleO    =X˚      logP    ~ıí4      Infinte Call - Terminate Interval - Stop Auto SelectQ   bPk      clearIntervalR      ∑zËg      Interval FinishS    ï[M.      breadcrumbSideMenuOptionsT      l7∏3      getEmployeeForDutyAllocationByLevelNo.json?linkurl=U    ¯2áâ      windowV     Ñ–ˇ
+      beforeSendW     qm+Ô      startCommonAjaxSpinnerX     Dï»á      completeY   Ü*F      stopCommonAjaxSpinnerZ      1Ôf       boiler_     s”« '      #gemsCommonDialogModal .modal-header h3`    à3¿µ      texta   æ      Share Page Linkb    	OÈ"      #gemsCommonDialogModal .modal-bodyc     ‘„X      htmld   ÷{75      #gemsCommonDialogModale      ∫˚      modalf      HáíK      showg   ‚å∏<      #sharePageWithEmployeeToh   4‚
+      tokenInputi     ¢rÿ      themej      Dv¯D      facebookk   œ›ëò      resultsLimitl   1s,
+      tokenLimitm     ﬁ∞π:      placeholdern    í§L      Select Employeeo    ãNaä      propertyToSearchp   ≈$ä      preventDuplicatesq      È_˙ì      resultsFormatterr   ˝ÑÃ∫      items   }Ë“D      <li><img src='t     b*L      imageUrlu   B<0b	      ' title='x      ÏóE§      </div><div class='email'>y      ô≥Zx      descz   √⁄IΩ      </div></div></li>{      A≠*U      tokenFormatter|     YÜ∏˛      <li><p><img src='}      })ó@$      ' style='height:25px; width:25px;'/>~   u∆·‚	      </p></li>      „,K      getCustomAlertMessageÄ      á˘¥      alert_errorÅ    ı(øÿ      pageInfoÇ   :¯z      ticketBoilerÉ   Ü,UÜ      <textarea style="width: 100%; height: 200px;font-size: var(--juno-font-size-heading);border: #fff;" id="genrateTicketTxtArea">
+Name : Ñ     UIÉ{      junoÖ   ˛*Yü      login_userFullNameÜ     `π¸¢	      
+Email : á      >O¶      login_emailIdà      ª8f
+      
+Client : â     5¿ä      customerHelperä     p      
+Role : ã   Ñ^\Ù      currentRoleNameå    ﬂ›tO      
+Breadcrumb : ç     Sï      <div>é      )4õ      firstTimebreadCrumbsè   ©è^      </div>ê     ∆ÚbèY      
+</textarea><button class="btn btn-inverse btn-mini" id="copyTicketTxtArea">Copy</button>ë      kàˇ      headerí     ¯FÅC2      <i class="fa fa-exclamation-circle"></i> Page Infoõ     Dhnæ'      <i class="fa fa-bookmark-o"></i> Ticketú    ·õöı      labelsBoilerü   é&∆      a.download.json§    ^GΩ      contx•      WÄÒ      <tr><td>¶   ía=#      </td><td>&lt;fmt:message key=&quot;ß    ø‹œï%      &quot;/&gt;</td><td>juno.label[&quot;®      Ç1∏      &quot;]</td></tr>©      ï†J      </tbody></table>™   pçüﬂ      Labels from Label.properties´   W5∏¡      gemsCommonPopupModalCssLayout¨      π ïA      #junoLblTbl≠    ¸”8	      dataTableÆ      y&ﬁy      sDomØ   ì¸T      <'row'<'margin-left-22'l><'pull-right'f>r>t<'row'<'margin-left-22'i><'pull-right'p>>∞   æY      iDisplayLength±     ¿|´ã      bLengthChange≤      :n‰â	      bPaginate≥      Rwq›*      <i class="fa fa-medkit fa-lg"></i> Support¥     ˙N≠Q      <iframe style="width:100%;height:400px;" src="mySupport.htm?hflg=true&breadcrumb=µ      ÌºÚ^      "/>∂    ∆æ& ,     <fieldset class="custom-fieldset"><legend><i class="fa fa-share"></i> Note: Go To ADMIN PANEL And Set Application Properties</legend>
+					<table class="table table-bordered table-condenced" id="junoLblTbl" style="font-size: 12px;"><thead><tr><th>For What</th><th>Flag</th><th>value</th></tr></thead>∑   ±ië
+      Remittance∏     ê¯7Åë      <tr><td>Show options (Send Email/NEFT Format/RTGS Format) In the Remitance letter </td><td>bankTransferLeterOptionOn</td><td>true/false</td></tr>π      
+ò$      </table></fieldset>∫    l˚{4      <i class="fa fa-navicon"></i> Application Propertiesª   YT"8      #copyTicketTxtAreaº     ü™‚X      clickΩ      A\ä      copyTextæ   ∏OÄ      documentø   t«£      getElementById¿     #Âjó      genrateTicketTxtArea¡   é<Éb      execCommand¬    •ˇé¥      copy√   ˘™Ò      Copied!ƒ    ˆ+      removeClass≈    ú˚Ã´      btn-inverse∆    p8ﬂ      btn-success«     ˇ\      Copy»   ü≠u;      sharePageWithUser…      Ûp=1      shareWithEmpIds     óñôb      trimÀ   S„æ      Please select Employee!Ã    á$°U'      sharePageWithUserWithAutoSelection.jsonÕ    „„0E      fallbackCopyTextToClipboardŒ    D…¿      textAreaœ   DC      createElement–      ÷ŸÓ      textarea—   $√Á      top“    ı]á      left”   »Åí      position‘   å≤ÜX      fixed’      ≠$~      appendChild÷    KÃÌ      focus◊      ◊Ÿ{*
+      successfulÿ     ˇ?Xã      msgŸ    ﬁë≈Y      unsuccessful⁄   ÿ≤7#      Fallback: Copying text command was €    ºoò      err‹    ùOw‹      Fallback: Oops, unable to copy›     ˘˙K      removeChildﬁ    ß©î’      copyTextToClipboardﬂ    π„+	      navigator‡      µI‘≤	      clipboard·      z˝ú˙	      writeText‚      :˚Cœ+      Async: Copying to clipboard was successful!„    ë≤P      Async: Could not copy text: ‰   ˛ù∞ﬂ#     <fieldset class="custom-fieldset"><legend><i class="fa fa-share"></i> Share with</legend><input type="text" id="sharePageWithEmployeeTo" /><br/><span onclick="junoAutoSelection.sharePageWithUser()" class="btn btn-info btn-mini"><i class="fa fa-share"></i> <b>Share Page</b></span></fieldset>Â    Õùûót      ' style='height:25px; width:25px;' /><div style='display: inline-block; padding-left: 10px;'><div class='full_name'>Ê   _€à}ï      <textarea style="width: 100%; height: 200px;font-size: var(--juno-font-size-heading);border: #fff;" id="genrateTicketTxtArea">Ticket No :  
+Client : Á      ›ˆÛî	       
+Role : Ë      H˝1Q       
+Breadcrumb : È    ;^õ~ô       
+Change requested by : 
+Changes About : Requirement/Bug 
+DESC : </textarea><button class="btn btn-inverse btn-mini" id="copyTicketTxtArea">Copy</button>Í      ˜PCÇ      <div class="alert alert-info"><b>Note: Add common Labels in Label.properties if not exist.</b><br/> <b>Examples: For common - </b>Î     8àa+E     ,<br/> <b>JS code -</b> juno.label["a.download.json"].setIndexedArgs('1001', 'TEXT', 'myDocument.docx','Download') <br/> <b>JAVA code -</b> MessageFormat.format(ApplicationProperty.getGeneralisedProperty("a.download.json"),"1001", "TEXT", "myDocument.docx", "Download"); <br/> <b>Outout -</b> &lt;a href="documentDownload.json?id=1001&amp;type=TEXT&amp;name=myDocument.docx" target="_blank"&gt; Download &lt;/a&gt;</div><table class="table table-bordered table-condenced" id="junoLblTbl" style="font-size: 12px;"><thead><tr><th>Label</th><th>JSP</th><th>JS</th></tr></thead><tbody>Ï      +»î
+      openMenu/<Ì     7ñ ˆ      junoAutoSelection.escapeHtmlÓ   –ú˛$      junoAutoSelection.comboSelectedArrayÔ   x ≥&      junoAutoSelection.comboSelectedArray/<     E‚Á(      junoAutoSelection.autoPreviousSelectionsÚ   ã|≈ô2      junoAutoSelection.autoPreviousSelections/success/<Û     æN4      junoAutoSelection.autoPreviousSelections/success/</<Ù   Le”6      junoAutoSelection.autoPreviousSelections/success/</</<ı     èAÍÎ8      junoAutoSelection.autoPreviousSelections/success/</</</<˜   p·w©7      junoAutoSelection.AutoPreviousSelectionsChangeEventBind¯    `∫9      junoAutoSelection.AutoPreviousSelectionsChangeEventBind/<˘      áHu'      junoAutoSelection.autoPreviousSelectCmb˙    ´8˚)      junoAutoSelection.autoPreviousSelectCmb/<˚      ›Z      junoAutoSelection.autoPreviousSelectCmb/</junoAutoSelection.autoPreviousSelectCmbInterval<¸     KæˇÒ+      junoAutoSelection.autoPreviousSelectCmb/</<   ≈R7π      breadcrumbSideMenuOptions/<   ïﬁ¬      breadcrumbSideMenuOptions/</<     râp#      junoAutoSelection.sharePageWithUser   èª#-      junoAutoSelection.fallbackCopyTextToClipboard	     €{M3%      junoAutoSelection.copyTextToClipboard
+     ¨($'      junoAutoSelection.copyTextToClipboard/<     %   ‹  '   %             Ô%,â                                                                                                                                                                                	                                                                                                                                                                     	                 
+                                                                                                                                                                                                                                                  !      "                            "      $           #      $           $      ≥Oåc            E  S  ê              Ç  ú  §                                              -  Z               r               r                                ã                 Ω  ã                                                                                   P  P              ã                 P   PØ                     -                                5  Pã                                 ã                            e              =    >                                ã                                                 H  i  I  L                                Ø  …               -                              `  Œ  ◊  ÿ           €               `                               €  Ø¬0∞&     <     >     "     '     IÙ$KEÆ˙ö   #      J  *     V  X  ,  ;     (   i  k  l  m  o  p  q  {     
+      ë  .     
+    ë  .         Æ  ∞  ±  ≤           3     
+     ë  .               2             0      -            	      ê      
+    ç      
+           #    J  %  0  *  +  ,  ;        Ø  &           3          3     #     J  %  0  *  +  ,  ;        Ø  &  …  á&’™ç!´!%   P   =ZÚP  Ë                 )        ⁄   ∑   9   m   <       ﬂª   L   ﬂª   :   L   ﬂª   L	   ﬂª   m
+   L   ﬂª   m   L   ﬂª   m   L   ﬂª   m   L   ﬂ∑   ª    s      ﬂª   L   ﬂª   m   L   ﬂª   m   L   ﬂª   m   L   ﬂª   m   L   ﬂ•E	e%ê0``ê``ê0 `ê07`ê0z`ê@Ä  î)e``ê0Ä j`ê0Ä á`ê0Ä ù`ê0Ä àPÄD   
+å%D                             ª    m   Ùw ﬂ• `5CPDPÄL   p ±∫L                             ª       s ·J   ‰   w ﬂ• `PP$P∏   ’´g@∏   i                  
+       º  ·J   ‰l      s ·J   ‰l      s ·J   ‰l      s ·J   ‰l   	   s ·J   ‰l
+      s ¢• `*
+ˇˇˇ¯P*
+ˇˇˇ¯P*
+ˇˇˇ¯P*
+ˇˇˇ¯P*
+ˇˇˇ¯PQÄî   ∂«î   S                  
+        ª   Ä„  Å  Œ   ﬂŒ   ﬂª       s ·J   ‰m   w ﬂ9   ¡   <   ¡   <   ¢• `ì `'`P
+ˇˇˇ˚PD`
+QÄ¿  à≤ï¿  æ               Z        ﬁÕ   ﬂª   J   ·J   ‰ª    æ   s ·J   ‰s  s õt  ó	   ª    æ   s ·J   ‰   s ú-   ó   ﬂª    æ   s ·J   ‰	   s 
+   ó   ùr   ó   ﬂª    æ   s ·J   ‰   s úK   ó   ﬂª       ª    æ   s ·J   ‰	   s &   &s ·J   ‰   s ó#   ú   ó$   ﬂ¡   J   ó&   ö~   ó'   ¡   ·J   ‰9   ª    æ   s ·J   ‰	   s <	   ª    æ   s ·J   ‰s  <   w ﬂª    æ   s ·J   ‰	   s Œ   ﬂó8   ô  ó8   ª    æ   s ·J   ‰   s ú-   ó=   ﬂª    æ   s ·J   ‰	   s 
+   óB   ùr   óC   ﬂª    æ   s ·J   ‰   s úK   óH   ﬂª       ª    æ   s ·J   ‰	   s &   &s ·J   ‰   s óR   ú   óS   ﬂ¡   J   óU   ö,   óV   ª    æ   s ·J   ‰	   s Œ   ﬂóZ   •&`ë *ˇˇˇ˛P
+PˇˇˇÔP-	`ˇˇˇˇPPî ˇˇˇ˛PPü ˇˇˇ˛PPî ˇˇˇ˛PP
+ˇˇˇÚP"PØ `	%ˇˇˇ˛PP(ˇˇˇ˛P
+PH	PD`ˇˇˇ˛PPò0	 	`ˇˇˇˇPPî ˇˇˇ˛PPü ˇˇˇ˛PPî ˇˇˇ˛PP
+ˇˇˇÚP"PØ `ˇˇˇ˛PPNPÄÄÄ¸  r⁄$‹  8  	             /      $Ω  Œ   ﬂ´   Œ   ﬂ   Õ   ﬂh   i       i      i      i      i      i   Õ  ﬂ¡    ú=   ó   ﬂh      i       i      i   ·J	   ‰¡   s ó   ö◊   ó   ª
+   ·J   ‰s  J   Õ  ﬂª
+   ·J   ‰s  J   Õ  ﬂ¡    ú,   ó   ﬂ¡      ù   ó   ﬂ¡      ó   ö1   ó      Œ   ﬂæ  ö   ó    ¢ó   ô-   ó   ª   ·J   ‰æ  s Õ   ﬂ   Œ   ﬂó   ô   ó      Œ   ﬂó   ª   ·J   ‰9      <   9   æ   ·J   ‰s  <   ª   J   <   ¡   <   <      <       <!   <"   m#   <$   m%   <&   w ﬂô   ó/    §≠∞±  ﬂ±  ﬂ“ó/   •!`+`*`¬ `∑ 1ˇˇˇ˜Pí `P-`P-`Ω `+`ê `1@ê0@`ˇˇˇˆP(`ö0 `ê@`%*%P(/O**&J;JPë@?ëP¸  Ï  '   &     ˇˇˇˇ        
+     X  ˝™öeX                           ¡    ú   ó   ﬂ¡      ó   öc   ó   º  J   öE   ó   ª       s ·J   ‰s ·J   ‰   w ﬂª    m	   Ëw ﬂó   ôj   ó   ¡   
+   öU   ó   º  J   ö-   ó   ª   º  L   ﬂª   ·J   ‰w  ﬂô   ó   ª       w ﬂó   • `ß 	`î `P	P
+ˇˇˇ˘PD`5CPì@`ï 	`î@`.`P `PIPÄh   qI¬ph   .                          ª       s ·J   ‰9      <   m   w ﬂ• `P
+*
+ˇˇˇËPDPÄÄÄX   YÈrùX   #                        ﬁÕ   ﬂæ   Œ   ﬂª    m   ò:w ﬂ•&`*	`5CPDPÄÄl   è ∫l   .                          ª    ¡   s ·J   ‰9      <   m   w ﬂ• `ˇˇˇˇP
+
+ˇˇˇÊP$	PÄÄÄT   Ô$)T                           ﬁÕ   ﬂª    æ   s ·J   ‰w  ﬂ•`ˇˇˇˇP
+P	PÄÄÄ(   ¯‘l∆(                               •@ÄÄÄ0  û´í0  Ω                        Õ   ﬂª   J   ú   ó   ﬂº   ó   öê   ó   ª       º  &s Õ  ﬂæ   öX   ó   ª    æ  s ·J   ‰   s ·J   ‰   m   w ﬂª    æ  s ·J	   ‰m
+   w ﬂó   ª   L   ﬂó   • 
+`&`ö Wë `ˇˇˇ˚PH
+`,`ˇˇˇˇPP)ˇˇˇÏPD`ˇˇˇˇP
+ˇˇˇ˘PI`ë0PÄÄÄÄ   ïÊ[Ä   I                  
+        ª       s ·J   ‰   s ö&   ó   ª   L   ﬂª   ·J   ‰w  ﬂó
+   • `PP-`,`PIPX   /ÛÀX   $                        ﬁÕ   ﬂª    æ   s ·J   ‰   w ﬂ•&`ˇˇˇˇPP$PÄÄd    .*@d   .                          ª   J   ö   ó   ª    m   » w ﬂó   •@`ñ `5,CP9.PÄÄl   ò ‚Ól   /                          ª   ª    m   ‹s L   ﬂª    m    Nw ﬂ• `>5$C6PI&`5(C&PD)PÄà  ¯ÿ`x  D                {       Õ   ﬂª   J   ^ò   _`õÿ  ó   Õ  ª       ª   J   æ  KJ   &s Õ  ﬂæ   öë  ó   æ  ·J   ‰s  ª   J   æ  KJ   ö>  ó   æ  ·J   ‰ª   J   æ  KJ   w ﬂª    æ  s ·J   ‰   s ö'   ó    ª    æ  s ·J	   ‰
+   w ﬂó$   ª   J   ·J   ‰ª    æ  s ·J   ‰s  s õÒ   ó-   ª       ª    ª    æ  s s ·J   ‰   s &   &s J   ú(   ó:   ﬂª    æ  s ·J   ‰   s ó?   ùM   ó@   ﬂª       ª    ª    æ  s ·J   ‰   s    &s J   &s óL   ö'   óM   ª    æ  s ·J	   ‰   w ﬂóQ   ª   J   æ  KJ   Õ  ﬂª   J   æ  Kæ   ö   óZ   æ  &ô   ó[   ó[   L   ﬂª   J   æ  KJ   ö3   ób   ª   ·J   ‰   w ﬂª    ª   J   w ﬂói   ô+   ói   ª   J   æ  KL   ﬂæ   0(Õ   ﬂóo   ﬂô%˝ˇˇóo   aª   J   J   æ   ö3   ót   ª   ·J   ‰   w ﬂª    ª   J   w ﬂó{   •  `&`ù ˇˇˇ˜$`ï ˇˇˇ˚P(	`,
+`P	ü `î ˇˇˇ¸P$`ˇˇˇˇP	P-	`ˇˇˇˇP	PI
+`ë *ˇˇˇ˛P
+
+PˇˇˇÌP-`ˇˇˇ˛Pˇˇˇ˛PP
+ˇˇˇÓPï 5ˇˇˇ˛P
+Pö ˇˇˇ˛P
+P	ˇˇˇÙPˇˇˇ˙Pí 
+`ˇˇˇˇP	PI`ô `ì B® `° 	`ë P$	`
+ˇˇˇˇPì0 `ñ `ê@L`1/`ë P$`
+ˇˇˇˇPI#Pà           ‡  D   ]P¿÷D                             ª    ª   J   w ﬂ• `
+ˇˇˇˇP$PT  Px†D  l                Ã      º  öá   ó   ª   ·J   ‰9      ª   J   ·J   ‰s  ·J   ‰	   s K&<
+      <   <   m   <   m   <   m   <   m   <   w ﬂó   º     ö∞   ó      ª   J   1&   &ª   J   1&   &ª   J   1&   &ª   J   1&    &ª    !   ª"   &#   &s ·J$   ‰s  1&%   &Õ   ﬂª   ·J&   ‰9'   (   <)   æ   <*   w ﬂó:   º  öâ   ó<   +   ª   J   &,   &ª   J   &-   &ª    !   ª"   &#   &s ·J$   ‰s  &.   &Õ   ﬂª   ·J&   ‰9/   0   <)   æ   <*   w ﬂóS   º  öî  óU   ª    ú   óX   ﬂª   J1    ó[   ög  ó\   2   ª3   ·J4   ‰ª   J1   J5   s &6   &Õ  ﬂª   J1   ^òg   _`õ_   óh   Õ  æ  7   ª3   ·J4   ‰ª   J1   æ  Ks &8   &æ  &9   &æ  &:   &&.Õ  ﬂﬂôûˇˇˇóu   aæ  ;   &.Õ  ﬂª    <   s ·J$   ‰=   w ﬂª    >   s ·J?   ‰æ  w ﬂª    @   s ·J&   ‰A   w ﬂªB    @   Ñw ﬂª    C   s ·JD   ‰9E   F   <G   ˇ<H   <I   <J   w ﬂóç   º  ö   óè   ª3   ·JK   ‰L   w ﬂóí   º  öL   óî   ª    M   s ·JN   ‰9O   P   <Q   mR   w ﬂª3   ·JK   ‰S   w ﬂóû   º  öã   ó†   ª    <   s ·J?   ‰T   w ﬂª    >   s ·J?   ‰U   ªV    ª"   s &W   &w ﬂª    @   s ·J&   ‰A   w ﬂªB    @   Lw ﬂó≥   º  öô   óµ   X   Õ   ﬂªY   ·JZ   ‰"   ª"   w ﬂª"   ·J[   ‰\   s ö   óΩ   æ   ]   &.Õ   ﬂóæ   æ   ^   &.Õ   ﬂª   ·J&   ‰9_   `   <)   æ   <*   w ﬂó≈   ª    a   s ·Jb   ‰c   s ·Jc   ‰md   w ﬂ• `ê `%;ë PP+*&J	JJ(JPI.`ì `%
+í í í 
+í ˇˇˇˆP
+)Pê@7`%*I7PI<`ê `%ë ë ˇˇˇˆP
+)POE`%*IEPIK`ê@M`ó ë@O`%-ˇˇˇıPOV`ù ˇˇˇÛ$`	ˇˇˇıP
+E.í@VLY`ê@[`P,P$`P
+,ˇˇˇ˚P$`PP$`P$`P
+%*'&F_PIi`ê@o`ë PIs`ê `P
+*
+ˇˇˇÊP$`ë PIx`ê `P,P$`P
+,TˇˇˇÌP
+ˇˇˇßP$`PP$`PI`ê ` `ë #ˇˇˇÂP$`ë P-`ï `ê@Ä  ê`%*IÄ  êPIÄ  ó`PP
+ˇˇˇ˙P4Ä  ûPT        [  g   4   )òrq4                             ª    w  ﬂ• `*PÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄ8  lO}8  À                           Õ   ﬂª       s ·J   ‰   w ﬂª       s ·J   ‰æ   w ﬂª       s ·J	   ‰
+   w ﬂª       s ·J   ‰º  9      <   
+<   <      <      <   <   m   <   m   <   w ﬂ• `J`P,P$`P
+,ˇˇˇ˚P$`PPD`P
+(%*''**&JJ#PDPÄÄÄt   ?2ÚÊt   C                            º  J   &   &º  J   &   &º  J   &   &º  J   &   &¢• `/[)%ï QÄd   È>cd   4                  	          º  J   &   &º  J   &   &º  J   &   &¢• 	`/QÄÄÄ<   “‹"á<                             ª       w ﬂ• `P$PÄÄT   Ô$)T                           ﬁÕ   ﬂª    æ   s ·J   ‰w  ﬂ•`ˇˇˇˇP
+P	PÄÄÄË   ÷ÇÈõË   ë                        ﬁÕ  ﬂª   ·J   ‰   s Õ   ﬂæ   ·J   ‰w  ﬂª   ·J   ‰   w ﬂª    æ  s ·J   ‰	   s ·J
+   ‰   s ·J   ‰   w ﬂª    m   –w ﬂ•&`ë 	P(`	P$`ë 	P$`ˇˇˇˇPPPP$`ˇˇˇˇP$Pp   ™íp   =                          ª       s ·J   ‰   s ·J   ‰   s ·J   ‰   w ﬂ• `PPPPPd  dm›1d  Ú                 $        ª   ·J   ‰ª   s Õ   ﬂª   ·J   ‰ª       s ·J   ‰s  s Õ  ﬂæ     ö   ó   ª	    
+   w ﬂ ¢ó   ª   ·J   ‰9      <   9   æ   ·J   ‰s  <   ª   J   <   æ  <   <      <      <   <   m   <   m   <   w ﬂ•@`ˇˇˇˆP(`[
+Pˇˇˇ›P(`î `P$`1F	`%*%P(/N**&JJ	P4PÄ(   ñ·„¢(                              •@ÄÄÄ<   uü¸<                             ª       w ﬂ• `P$PÄÄ¸  Äë~‹  J                !      $ª   ·J   ‰   s Õ   ﬂæ   º  L   ﬂæ   J      L   ﬂæ   J      L   ﬂæ   J   	   L
+   ﬂª   J   ·J   ‰æ   w ﬂæ   ·J   ‰w  ﬂæ   ·J   ‰w  ﬂ´ª   ·J   ‰   s Õ  ﬂæ  ö   ó      ô   ó      ó   Õ  ﬂª   ·J   ‰   æ  &w ﬂô2   ó    §≠∞±  ﬂ±  ﬂª   ·J   ‰   æ  w ﬂ“ó   ª   J   ·J   ‰æ   w ﬂ• `ë 	P(`M`î `î `î@	`ë ˇˇˇÙP$`	P$`	P4!`ë 	P(`¨ `(ˇˇˇ‘Pë +`ë 0ˇˇˇÿPJ`ë ˇˇˇÙPPÄ¸  Ï       %   ˇˇˇˇ        ö   d   ¨   L§B{¨   [                         ª   J   õ   ó   ª   ·J   ‰º  w ﬂ ¢ó   ª   J   ·J   ‰º  s ·J   ‰m   m   w ﬂ• `î `.ˇˇˇ‰P$`1
+F`ë ˇˇˇˆP
+EE&P4
+PÄÄÄD   w´º>D                             ª   ·J   ‰   w ﬂ• `ë P$PÄÄÄL   √†≥L                            ª   ·J   ‰   º  w ﬂ• `ë .ˇˇˇ⁄P$PÄÄÄ3ıÿ  `W    `Y    `s  t  u  {  Â  x  y  z    `|  t  u  {  }  ~    `‰  $  _  `  a  b  c  d  e  f  g  h    @j  i  k  l  n  m  {  o  p    pq    p{    `  Ä    `$  7  
+  `$  ª  `  «  ƒ  ∆    ≈  	  `æ  ø  ¿    ¡  ¬  $  `  √  ƒ  ≈    ∆      p  `$  #     @T  U  '  "  ﬁ  _  J  B  *       pV    pX    p,    p;  Å  É  Ñ  Ö  Ü  á  à  â  ä  ã  å  ç  é  è  `  ê  e    @í  ë  .  Ê  Á  Ë  È    @õ  D  Í       ü  Î  •  ¶  ß  ®  ©  _  ™  b  c  d  f  ´  ¨  ≠    @Ø  Æ  ∞  ±  ≤    È  1  2    @6  3    pŒ   ≥  ¥  ì   µ  ∂  N  O    ∑  ∏  π    @∫  ª  ?  º    p  `$          `    p  `⁄     P    P    P    P    P    `       $    ú     ç ê       #    I    	  @  `Ä  $    å     p
+  @      `$  7    `$  2    @6  3    p  `  
+  p  `$  1  2    @4  3  	  p  `!  I  $  .  ö /  0      pŒ        8  9  :    `  `È  ê   0  -    	  Œ   !             Ç  "  s   $  #    @$  J    @"  Ø  '  (  &     %  )  0  B  *  +    p,    p;    `  `$  A  ú B           `$  D  @    `   
+  $  #  ?  @     pC    p  `     $  #  ç       D  J        K  I  C  M  N  O  P  Q  F  Å   R    `Q     F    `   G    pF      p  `         p   `!  `  Ä    `Ç  "    $     g    ê   9  À  #    @Ã  J    @"  Ø  '  (  &  …  %  )  0  B  *  +    p,     p;  "  `æ  œ  –  P  
+  0  —  “  ‘  ”  .  ’  ÷    ¡  ¬  ◊  Ÿ  N  O  ⁄  #  `;  ‹  ›  %  `N  O  ‚  &  `N  ;  „  $  `ﬂ  ‡     Õ  ·    #  p$  p   `  p     @  p      @  
+    p    p    p    p<  E  Ä  F    p8    p»  !  pÕ  "  pﬁ  ˇXÑø                ∏            !
+ ≥      Ï      ! ª      Ì        Ÿ   	   Ó        «      Ô          (           ˜      ,        Ô      Ú      ! Ï      Û        Â      Ù      ! ‚      ı             ;        <     ˜        0     ¯        8     ¯        k     ˘        d     ˙        G     ˚        `     ¸        N   e   S               V              X              ,           	   q              {        /      ;        2             >             5   	          t             p     ,        q     ;        î            ∂  	   	       Æ     
+       ≤     
+       ùH©¿      Ã[      Ã[                 Ì   E  Ì   E                    ;    ;                  -  Ò  %  Ò     (          Ä}  f  u  f  !   0            Ê  ,  ﬁ  ,  $              Äù  Í  ï  Í  8   4           '
+  ç  
+  ç  W                      ^              ÇQ  ¯  I  ¯  _   K            Ñ  Ê  Ñ  Ê  a               √  ÿ  ª  ÿ  b   :             †  ‘  ò  ‘  s               /  7  '  7  {   C            Ï  ë  ‰  ë  Ü   F            ∑  Â  Ø  Â  å   $            ’  F  Õ  F  ò   3            %  ;    ;  õ                r  ¿  j  ¿  ú   J             „  /  €  /  ¡               m  A7  K  A7  À   #            .  U  &  U  —                l  í  d  í  ‘               ß  ù!  ü  ù!  ◊               ∑  ﬁ   Ø  ﬁ   È                ˝   ä!  ı   ä!  Ì               ∞!  ‚!  ®!  ‚!  Û               Ÿ.  Ó.  —.  Ó.  ?  H           ˘5  =7  Ò5  =7  b  5             ◊6  37  œ6  37  g              q7  z9  i7  z9  k  /             9  09  9  09  ~              B9  r9  :9  r9  Å               µ9  Ú;  ≠9  Ú;  à  9           #<  R=  <  R=  û  1            ø<  =  ∑<  =  £  3             =  N=  =  N=  •            5°›êº0÷ö´ÕF‡,      g¯ﬁ˚g¯ﬁ˚H≈tg¯Âq   V    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/menuMasterPage.js necko:classified 1 strongly-framed 1 security-info FnhllAKWRHGAlo+ESXykKAAAAAAAAAAAwAAAAAAAAEaphjojH6pBabDSgSnsfLHeAAAAAgAAAAAAAAAAAAAAAAAAAAEAOQFmCjImkVxP+7sgiYWmMt8FvcOXmlQiTNWFiWlrbpbqgwAAAAAAAAZeMIIGWjCCBUKgAwIBAgIMBDRov99iNgtiT0/6MA0GCSqGSIb3DQEBCwUAMFUxCzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMSswKQYDVQQDEyJHbG9iYWxTaWduIEdDQyBSNiBBbHBoYVNTTCBDQSAyMDIzMB4XDTI0MDcwNTA5MDUyMVoXDTI1MDgwNjA5MDUyMFowGDEWMBQGA1UEAwwNKi5jbXJpdC5hYy5pbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBANYiwzmvUK2/gsxQAtHV+G0vy665aU6ugVBmPzAEwCJr64nlJzPtA4nKiKddlbF0n5wIYz6qHEYswc/VMe03LLOFEyGHZCicGajhmvAv4MI3oVgQ8r/NDmc63WY1BazuIvlaEBaSdo7TosAMIhuSMbry0ZJ+72aTDrr22XXMB8iOmiEFzf/MMVgO5/fnh69czcjxT/kUWw+hP1qsAe3vXly1XdArNERI1m6d33SNuAFIrDvCM1nFuFpNf2GhiMDoeGnkR55cLgz7lzuX3uW84dfS2rhnhGBQGP+7bBzw8lkD6N/f0u7ahswxw8H6MOhMqmSSNSt/DoT8jP24h/6jRCkCAwEAAaOCA2UwggNhMA4GA1UdDwEB/wQEAwIFoDAMBgNVHRMBAf8EAjAAMIGZBggrBgEFBQcBAQSBjDCBiTBJBggrBgEFBQcwAoY9aHR0cDovL3NlY3VyZS5nbG9iYWxzaWduLmNvbS9jYWNlcnQvZ3NnY2NyNmFscGhhc3NsY2EyMDIzLmNydDA8BggrBgEFBQcwAYYwaHR0cDovL29jc3AuZ2xvYmFsc2lnbi5jb20vZ3NnY2NyNmFscGhhc3NsY2EyMDIzMFcGA1UdIARQME4wCAYGZ4EMAQIBMEIGCisGAQQBoDIKAQMwNDAyBggrBgEFBQcCARYmaHR0cHM6Ly93d3cuZ2xvYmFsc2lnbi5jb20vcmVwb3NpdG9yeS8wRAYDVR0fBD0wOzA5oDegNYYzaHR0cDovL2NybC5nbG9iYWxzaWduLmNvbS9nc2djY3I2YWxwaGFzc2xjYTIwMjMuY3JsMCUGA1UdEQQeMByCDSouY21yaXQuYWMuaW6CC2Ntcml0LmFjLmluMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAfBgNVHSMEGDAWgBS9BbfzipM8c8t5+g+FEqF3lhiRdDAdBgNVHQ4EFgQUf3W8QY8EiQ7VPwxF4aS4Vf8WetwwggF+BgorBgEEAdZ5AgQCBIIBbgSCAWoBaAB2AK8YGijWjKPgqYpMnGerCfi7vCK6rryxOKOhndP5tgMNAAABkIIkH2EAAAQDAEcwRQIgTN19xjG3exUUK8CUQTJyyW3lC6PbP7tSLIPQfg62S8oCIQDaz7bAkIsTLvQgeGmRLlxxTxm/8OIAgsCNVjTnQWVBtwB2ABLxTjS9U3JMhAYZw48/ehP457Vih4icbTAFhOvlhiY6AAABkIIkIDMAAAQDAEcwRQIhAIt6+TPWN/uXoo50HsiUEJM9gnQAwDRhGejwSPvu4YIfAiAK2/DtKUuMvI+PtbokhaSz+NDIfec2NJzVqX4f3OGimwB2AObSMWNAd4zBEEEG13G5zsHSQPaWhIb7uocyHf0eN45QAAABkIIkH24AAAQDAEcwRQIhANQJnsn2DGT93ap7L8PL4lHIMSN6km0tBxntLCxKOL1dAiBPh7iC+H2lPvlPQjkr1IVVBkirx0/Ese2qg2qGi8CEjTANBgkqhkiG9w0BAQsFAAOCAQEAGP2xoNrcnvmeqt84f+EmQYIm79CxvUEYsZ7tlMhdm3eWzs7EJ96BDr020b5bL5sELUoN3C4C56TZcJztd/ieDWR79oKAjUMEnC8yuW+FAffetYwZSK4WQ17lJowV5kntQEhh6PilWnDi45Na5/gyiXCPmAXEFMV/vBsIgUOy1k6VFTUccxUXCRbIgusxYDvoiA+gWAJ3QHL8JKKYLtScUcBJxvTRyi6HeUiGfayu/RZ3gDOontPyOWJVqALAh/qiOa5roMxXrK4EVQyhwvGWLEASIzHPejj66HxM5RiMmWyH0BGrTF2lCI/Ts/132GUlMHdFs60B8CqcyGGBxYkBosAwAAMAAAAAAAEBAAAFAAAABG5vbmUAAAAQUlNBLVBLQ1MxLVNIQTUxMgADZgoyJpFcT/u7IImFpjLfBb3Dl5pUIkzVhYlpa26W6oMAAAAAAAAGXjCCBlowggVCoAMCAQICDAQ0aL/fYjYLYk9P+jANBgkqhkiG9w0BAQsFADBVMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xvYmFsU2lnbiBudi1zYTErMCkGA1UEAxMiR2xvYmFsU2lnbiBHQ0MgUjYgQWxwaGFTU0wgQ0EgMjAyMzAeFw0yNDA3MDUwOTA1MjFaFw0yNTA4MDYwOTA1MjBaMBgxFjAUBgNVBAMMDSouY21yaXQuYWMuaW4wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDWIsM5r1Ctv4LMUALR1fhtL8uuuWlOroFQZj8wBMAia+uJ5Scz7QOJyoinXZWxdJ+cCGM+qhxGLMHP1THtNyyzhRMhh2QonBmo4ZrwL+DCN6FYEPK/zQ5nOt1mNQWs7iL5WhAWknaO06LADCIbkjG68tGSfu9mkw669tl1zAfIjpohBc3/zDFYDuf354evXM3I8U/5FFsPoT9arAHt715ctV3QKzRESNZund90jbgBSKw7wjNZxbhaTX9hoYjA6Hhp5EeeXC4M+5c7l97lvOHX0tq4Z4RgUBj/u2wc8PJZA+jf39Lu2obMMcPB+jDoTKpkkjUrfw6E/Iz9uIf+o0QpAgMBAAGjggNlMIIDYTAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADCBmQYIKwYBBQUHAQEEgYwwgYkwSQYIKwYBBQUHMAKGPWh0dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0L2dzZ2NjcjZhbHBoYXNzbGNhMjAyMy5jcnQwPAYIKwYBBQUHMAGGMGh0dHA6Ly9vY3NwLmdsb2JhbHNpZ24uY29tL2dzZ2NjcjZhbHBoYXNzbGNhMjAyMzBXBgNVHSAEUDBOMAgGBmeBDAECATBCBgorBgEEAaAyCgEDMDQwMgYIKwYBBQUHAgEWJmh0dHBzOi8vd3d3Lmdsb2JhbHNpZ24uY29tL3JlcG9zaXRvcnkvMEQGA1UdHwQ9MDswOaA3oDWGM2h0dHA6Ly9jcmwuZ2xvYmFsc2lnbi5jb20vZ3NnY2NyNmFscGhhc3NsY2EyMDIzLmNybDAlBgNVHREEHjAcgg0qLmNtcml0LmFjLmluggtjbXJpdC5hYy5pbjAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwHwYDVR0jBBgwFoAUvQW384qTPHPLefoPhRKhd5YYkXQwHQYDVR0OBBYEFH91vEGPBIkO1T8MReGkuFX/FnrcMIIBfgYKKwYBBAHWeQIEAgSCAW4EggFqAWgAdgCvGBoo1oyj4KmKTJxnqwn4u7wiuq68sTijoZ3T+bYDDQAAAZCCJB9hAAAEAwBHMEUCIEzdfcYxt3sVFCvAlEEycslt5Quj2z+7UiyD0H4OtkvKAiEA2s+2wJCLEy70IHhpkS5ccU8Zv/DiAILAjVY050FlQbcAdgAS8U40vVNyTIQGGcOPP3oT+Oe1YoeInG0wBYTr5YYmOgAAAZCCJCAzAAAEAwBHMEUCIQCLevkz1jf7l6KOdB7IlBCTPYJ0AMA0YRno8Ej77uGCHwIgCtvw7SlLjLyPj7W6JIWks/jQyH3nNjSc1al+H9zhopsAdgDm0jFjQHeMwRBBBtdxuc7B0kD2loSG+7qHMh39HjeOUAAAAZCCJB9uAAAEAwBHMEUCIQDUCZ7J9gxk/d2qey/Dy+JRyDEjepJtLQcZ7SwsSji9XQIgT4e4gvh9pT75T0I5K9SFVQZIq8dPxLHtqoNqhovAhI0wDQYJKoZIhvcNAQELBQADggEBABj9saDa3J75nqrfOH/hJkGCJu/Qsb1BGLGe7ZTIXZt3ls7OxCfegQ69NtG+Wy+bBC1KDdwuAuek2XCc7Xf4ng1ke/aCgI1DBJwvMrlvhQH33rWMGUiuFkNe5SaMFeZJ7UBIYej4pVpw4uOTWuf4Molwj5gFxBTFf7wbCIFDstZOlRU1HHMVFwkWyILrMWA76IgPoFgCd0By/CSimC7UnFHAScb00couh3lIhn2srv0Wd4AzqJ7T8jliVagCwIf6ojmua6DMV6yuBFUMocLxlixAEiMxz3o4+uh8TOUYjJlsh9ARq0xdpQiP07P9d9hlJTB3RbOtAfAqnMhhgcWJAaJmCjImkVxP+7sgiYWmMt8FvcOXmlQiTNWFiWlrbpbqgwAAAAAAAAWQMIIFjDCCA3SgAwIBAgIQfx8skC6D0OO2+zvuR4tegDANBgkqhkiG9w0BAQsFADBMMSAwHgYDVQQLExdHbG9iYWxTaWduIFJvb3QgQ0EgLSBSNjETMBEGA1UEChMKR2xvYmFsU2lnbjETMBEGA1UEAxMKR2xvYmFsU2lnbjAeFw0yMzA3MTkwMzQzMjVaFw0yNjA3MTkwMDAwMDBaMFUxCzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMSswKQYDVQQDEyJHbG9iYWxTaWduIEdDQyBSNiBBbHBoYVNTTCBDQSAyMDIzMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA00Jvk5ADppO0rgDnj1M14XIb032Aas409JJFAb8cUjipFOth7ySLdaWLe3s63oSs5x3eWwzTpX4BFkzZbxT1eoJSHfT2M0wZ5QOPcCIjsr+YB8TAvV2yJSyq+emRrN/FtgCSTaWXSJ5jipW8SJ/VAuXPMzuAP2yYpuPcjjQ5GyrssDXgu+FhtYxqyFP7BSvx9jQhh5QV5zhLycuan8n+J0Uw09WRQK6JGQ5HzDZQinkNel+fZZNRG1gE9Qeh+tHBplrkalB1g85qJkPOJ7SoEvKsmDkajggk/sSq7NPyzFaa/VBGZiRRG+FkxCBniGD5618PQ4trcwHyMojSFObOHQIDAQABo4IBXzCCAVswDgYDVR0PAQH/BAQDAgGGMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1UdDgQWBBS9BbfzipM8c8t5+g+FEqF3lhiRdDAfBgNVHSMEGDAWgBSubAWjkxPioufi1xzWx/B/yGdToDB7BggrBgEFBQcBAQRvMG0wLgYIKwYBBQUHMAGGImh0dHA6Ly9vY3NwMi5nbG9iYWxzaWduLmNvbS9yb290cjYwOwYIKwYBBQUHMAKGL2h0dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0L3Jvb3QtcjYuY3J0MDYGA1UdHwQvMC0wK6ApoCeGJWh0dHA6Ly9jcmwuZ2xvYmFsc2lnbi5jb20vcm9vdC1yNi5jcmwwIQYDVR0gBBowGDAIBgZngQwBAgEwDAYKKwYBBAGgMgoBAzANBgkqhkiG9w0BAQsFAAOCAgEAfMkkMo5g4mn1ft4d4xR2kHzYpDukhC1XYPwfSZN3A9nEBadjdKZMH7iuS1vF8uScg26/30DRPen2fFRsr662ECyUCR4OfeiiGNdoQvcesM9Xpew3HLQP4qHg+s774hNLvGRD4aKSKwFqLMrcqCw6tEAfX99tFWsD4jzbC6k8tjSLzEl0fTUlfkJaWpvLVkpg9et8tD8d51bymCg5J6J6wcXpmsSGnksBobac1+nXmgB7jQC9edU8Z41FFo87BV3kCtrWWsdkQavObMsXUPl/AO8y/jOuAWz0wyvPnKom+o6W4vKDY6/6XPypNdebOJ6mjyaILp0quoQvhjx87BzENh5s57AIOyIGpS0sDEChVDPzLEfRsH2FJ8/W5woF0nvsBTqfYSCqblQbHeDDtCj7Mlf8JfqaMuqcbE4rMSyfeHyCdZQwnc/r9ujnth691AJhxyYeCM04metJIe7cB6d4dFm+Pd5ervY4x32r0uQ1Q0spy1VjNqUJjussYuXNyMmFHSuLQQ6PrePmH5lcSMQpYKzPoD/RiNVD/PK0O3vuO5vh3o7oKb1FfzoanDsFFTrw0aLOdRW/tmLPWVNVlAb8ad+B80YJsL4HXYnQG8wYAFb8LhwSDyT9v+C1C1lcIHE7nE0AAp9JSHxDYsma9pi4g0Phg3BgOm2euTRzw7R0SzVmCjImkVxP+7sgiYWmMt8FvcOXmlQiTNWFiWlrbpbqgwAAAAAAAAWHMIIFgzCCA2ugAwIBAgIORea7A4Mzw4VlSOb/RVEwDQYJKoZIhvcNAQEMBQAwTDEgMB4GA1UECxMXR2xvYmFsU2lnbiBSb290IENBIC0gUjYxEzARBgNVBAoTCkdsb2JhbFNpZ24xEzARBgNVBAMTCkdsb2JhbFNpZ24wHhcNMTQxMjEwMDAwMDAwWhcNMzQxMjEwMDAwMDAwWjBMMSAwHgYDVQQLExdHbG9iYWxTaWduIFJvb3QgQ0EgLSBSNjETMBEGA1UEChMKR2xvYmFsU2lnbjETMBEGA1UEAxMKR2xvYmFsU2lnbjCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAJUH6HPKZvnsFMp7PPcNCPG0RQssgrRIxutbPK6DuEGSMxSkb3/pKszGsIhrxbaJ0cay/xTOURQh7ErdG1rG1ofuTToVBu1kZguSgMpE3nOUTvOniX9PeGMIyBJQbUJmL025eShNUhqKGoC3GYEOfsSKvGRMIRxDaNc9PIrFsmbVkJq3MQbFvuJtMgamHvm566qjuL++gmNQ0PAYid/kD3n16qIfKtJwLnvnvJO7bVPiSHyMEAc4/2ayd2F+4OqMPKq0pPbzlUoSB239jLKJz9CgYXfIWHSw1CM69106yqLbnQneXUQtkPGBzVeS+n68UARjNN9rkxi+azayOeSsJDa38O+2HBNXk7besvjihbdzorg1qkXy4J02oW9UivFyVm4uiMVRQkQVlO6jxTiWm05OWgtH8wY2SXcwvHE35absIQh1/OZhFj931dmRl4QKbNQCTXTAFO39OfuD8l4UoQSwC+n+7o/hbguyCLNhZglqsQY6ZZZZwPA1/cnaKI0aEYdwgQqomnUdnjqGBQCe24DWJfncBZ4nWUx2OVvq+aWh2IMP0f/fMBH5hc8zSPXKbWQULHpYT9NLCEnFlWQaYw55PfWzjMpYrZxCRXluDocZXFSxZba/jJvcE+kNb7gu3GduyYsRtYQUigAZcIN5kZeR1BonvzceMgfYFGM8KEyvAgMBAAGjYzBhMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBSubAWjkxPioufi1xzWx/B/yGdToDAfBgNVHSMEGDAWgBSubAWjkxPioufi1xzWx/B/yGdToDANBgkqhkiG9w0BAQwFAAOCAgEAgyXt6NH9lVLNnsAEoJFp5lzQhN7craJP6Ed41mWYqVuoPId8AorRbrcWc+ZfwFSY1XS+wc3iEZGtIxg93eFyRJa0lV7Ae46ZeBZDE1ZXs6KzO7V33EByrKPrmzU+sQghoefEQzd5Mr6155wsTLxDKZmOMNOsIeDjHfrYBzN2VAAiKrlNIC5waNrlU/yDXNOd8v9EDERm8tLjvUYAGm0CuiVdjaExUd1URhxN25mW7xocBFymFe944Hn+Xds+qkxV/ZoVqW/hpvvfcDDpw+5CRu3CkwWJ+n1jez/QcYF8AOiYrg54NMMl+68KnyBr3TsTjxKM4kEaSHpzoHdpx7Zcf4LIHv5YGygrqGytXm3ABdJ7t+uA/iU3/gKbaKxCXcPu9czc8FB10jZpnOZ7BN9uBmm23goJSFmH63sUYHpkqmlD75HHTOwY3WzvUy2MmeFe8nI+z1TIvWfspA9MRf/TuTAjB0yPEL+GltmZWrSZVxykzLsViVO6LAUP5MSeGbEYNNVMnbrt9x+vJJUEeKgDu+6B5dpffItKoZB0JaezPkvILFa9x8jvOOJckvB595yEunQtYQEgfn7R8k8HWV+LLUNS60YMlOH1Zkd5d9VUWx+tJDfLRVpOoERIyNiwmcUVhAn21klJwGW45hpxbqCo8YLoRT5s1gLXCmeDBVrJpBAAAAABAAAAAAEBAAAAAE10bHNmbGFnczB4MDAwMDAwMDA6ZXJwLmNtcml0LmFjLmluOjQ0M15wYXJ0aXRpb25LZXk9JTI4aHR0cHMlMkNjbXJpdC5hYy5pbiUyOQAA request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:55 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|cc23b9a8-7cc4-4749-001f-25c506b6416c|
+Accept-Ranges: bytes
+ETag: W/"23500-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 23500
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:55 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|cc23b9a8-7cc4-4749-001f-25c506b6416c|
+Accept-Ranges: bytes
+ETag: W/"23500-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 23500
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=85
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 627 net-response-time-onstop 628 alt-data 1;23500,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  ”

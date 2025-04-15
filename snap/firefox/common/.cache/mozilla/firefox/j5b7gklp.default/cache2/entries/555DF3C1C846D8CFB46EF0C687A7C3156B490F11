@@ -1,0 +1,603 @@
+/*
+ * jQuery UI Monthpicker
+ *
+ * @licensed MIT <see below>
+ * @licensed GPL <see below>
+ *
+ * @author Luciano Costa
+ * http://lucianocosta.info/jquery.mtz.monthpicker/
+ *
+ * Depends:
+ *	jquery.ui.core.js
+ */
+
+/**
+ * MIT License
+ * Copyright (c) 2011, Luciano Costa
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to deal 
+ * in the Software without restriction, including without limitation the rights 
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+ * copies of the Software, and to permit persons to whom the Software is 
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+/**
+ * GPL LIcense
+ * Copyright (c) 2011, Luciano Costa
+ * 
+ * This program is free software: you can redistribute it and/or modify it 
+ * under the terms of the GNU General Public License as published by the 
+ * Free Software Foundation, either version 3 of the License, or 
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+ * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ * for more details.
+ * 
+ * You should have received a copy of the GNU General Public License along 
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+(function ($) {
+
+    var methods = {
+        init : function (options) { 
+            return this.each(function () {
+                var 
+                    $this = $(this),
+                    data = $this.data('monthpicker'),
+                    year = (options && options.year) ? options.year : (new Date()).getFullYear(),
+                    settings = $.extend({
+                        pattern: 'mm/yyyy',
+                        selectedMonth: null,
+                        selectedMonthName: '',
+                        selectedYear: year,
+                        startYear: year - 10,
+                        finalYear: year + 10,
+                        monthNames: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                        id: "monthpicker_" + (Math.random() * Math.random()).toString().replace('.', ''),
+                        openOnFocus: true,
+                        disabledMonths: []
+                    }, options);
+
+                settings.dateSeparator = settings.pattern.replace(/(mmm|mm|m|yyyy|yy|y)/ig,'');
+
+                // If the plugin hasn't been initialized yet for this element
+                if (!data) {
+                    $(this).data('monthpicker', {
+                        'target': $this,
+                        'settings': settings
+                    });
+
+                    if (settings.openOnFocus === true) {
+                        $this.bind('focus', function () {
+                            $this.monthpicker('show');
+                        });
+                    }
+
+                    $this.monthpicker('mountWidget', settings);
+
+                    $this.bind('monthpicker-click-month', function (e, month, year) {
+                        $this.monthpicker('setValue', settings);
+                        $this.monthpicker('hide');
+                    });
+
+                    // hide widget when user clicks elsewhere on page
+                    $this.addClass("mtz-monthpicker-widgetcontainer");
+                    $(document).unbind("mousedown.mtzmonthpicker").bind("mousedown.mtzmonthpicker", function (e) {
+                        if (!e.target.className || e.target.className.toString().indexOf('mtz-monthpicker') < 0) {
+                            $(".mtz-monthpicker-widgetcontainer").each(function () {
+                                if (typeof($(this).data("monthpicker"))!="undefined") { 
+                                    $(this).monthpicker('hide'); 
+                                }
+                            });
+                        }
+                    });
+                }
+
+            });
+        },
+
+        show: function (n) {
+            var widget = $('#' + this.data('monthpicker').settings.id);
+            var monthpicker = $('#' + this.data('monthpicker').target.attr("id") + ':eq(0)');
+            widget.css("top", monthpicker.offset().top  + monthpicker.outerHeight());
+            widget.css("left", monthpicker.offset().left);
+            widget.show();
+            widget.find('select').focus();
+            this.trigger('monthpicker-show');
+        },
+
+        hide: function () {
+            var widget = $('#' + this.data('monthpicker').settings.id);
+            if (widget.is(':visible')) {
+                widget.hide();
+                this.trigger('monthpicker-hide');
+            }
+        },
+
+        setValue: function (settings) {
+            var 
+                month = settings.selectedMonth,
+                year = settings.selectedYear;
+
+            if(settings.pattern.indexOf('mmm') >= 0) {
+                month = settings.selectedMonthName;
+            } else if(settings.pattern.indexOf('mm') >= 0 && settings.selectedMonth < 10) {
+                month = '0' + settings.selectedMonth;
+            }
+
+            if(settings.pattern.indexOf('yyyy') < 0) {
+                year = year.toString().substr(2,2);
+            } 
+
+            if (settings.pattern.indexOf('y') > settings.pattern.indexOf(settings.dateSeparator)) {
+                this.val(month + settings.dateSeparator + year);
+            } else {
+                this.val(year + settings.dateSeparator + month);
+            }
+        },
+
+        disableMonths: function (months) {
+            var 
+                settings = this.data('monthpicker').settings,
+                container = $('#' + settings.id);
+
+            settings.disabledMonths = months;
+
+            container.find('.mtz-monthpicker-month').each(function () {
+                var m = parseInt($(this).data('month'));
+                if ($.inArray(m, months) >= 0) {
+                    $(this).addClass('ui-state-disabled');
+                } else {
+                    $(this).removeClass('ui-state-disabled');
+                }
+            });
+        },
+
+        mountWidget: function (settings) {
+            var
+                monthpicker = this,
+                container = $('<div id="'+ settings.id +'" class="ui-datepicker ui-widget ui-widget-content ui-helper-clearfix ui-corner-all" />'),
+                header = $('<div class="ui-datepicker-header ui-widget-header ui-helper-clearfix ui-corner-all mtz-monthpicker" />'),
+                combo = $('<select class="mtz-monthpicker mtz-monthpicker-year" />'),
+                table = $('<table class="mtz-monthpicker" />'),
+                tbody = $('<tbody class="mtz-monthpicker" />'),
+                tr = $('<tr class="mtz-monthpicker" />'),
+                td = '';
+                selectedYear = settings.selectedYear,
+                option = null;
+
+            container.css({
+                position:'absolute',
+                zIndex:999999,
+                whiteSpace:'nowrap',
+                width:'250px',
+                overflow:'hidden',
+                textAlign:'center',
+                display:'none',
+                top: monthpicker.offset().top + monthpicker.outerHeight(),
+                left: monthpicker.offset().left
+            });
+
+            // mount years combo
+            for (var i = settings.startYear; i <= settings.finalYear; i++) {
+                var option = $('<option class="mtz-monthpicker" />').attr('value', i).append(i);
+                if (settings.selectedYear === i) {
+                    option.attr('selected', 'selected');
+                }
+                combo.append(option);
+            }
+            header.append(combo).appendTo(container);
+
+            // mount months table
+            for (var i=1; i<=12; i++) {
+                td = $('<td class="ui-state-default mtz-monthpicker mtz-monthpicker-month" style="padding:5px;cursor:default;" />').attr('data-month',i);
+                td.append(settings.monthNames[i-1]);
+                tr.append(td).appendTo(tbody);
+                if (i % 3 === 0) {
+                    tr = $('<tr class="mtz-monthpicker" />'); 
+                }
+            }
+
+            table.append(tbody).appendTo(container);
+
+            container.find('.mtz-monthpicker-month').bind('click', function () {
+                var m = parseInt($(this).data('month'));
+                if ($.inArray(m, settings.disabledMonths) < 0 ) {
+                    settings.selectedMonth = $(this).data('month');
+                    settings.selectedMonthName = $(this).text();
+                    monthpicker.trigger('monthpicker-click-month', $(this).data('month'));
+                }
+            });
+
+            container.find('.mtz-monthpicker-year').bind('change', function () {
+                settings.selectedYear = $(this).val();
+                monthpicker.trigger('monthpicker-change-year', $(this).val());
+            });
+
+            container.appendTo('body');
+        },
+
+        destroy: function () {
+            return this.each(function () {
+                // TODO: look for other things to remove
+                $(this).removeData('monthpicker');
+            });
+        }
+
+    };
+
+    $.fn.monthpicker = function (method) {
+        if (methods[method]) {
+            return methods[method].apply(this, Array.prototype.slice.call( arguments, 1 ));
+        } else if (typeof method === 'object' || ! method) {
+            return methods.init.apply(this, arguments);
+        } else {
+            $.error('Method ' + method + ' does not exist on jQuery.mtz.monthpicker');
+        }    
+    };
+
+})(jQuery);        TZ  xTZ´•   20250331133932-8l7Z  q≈*4   https://erp.cmrit.ac.in/js/jquery.mtz.monthpicker.js      f(  /*
+ * jQuery UI Monthpicker
+ *
+ * @licensed MIT <see below>
+ * @licensed GPL <see below>
+ *
+ * @author Luciano Costa
+ * http://lucianocosta.info/jquery.mtz.monthpicker/
+ *
+ * Depends:
+ *	jquery.ui.core.js
+ */
+
+/**
+ * MIT License
+ * Copyright (c) 2011, Luciano Costa
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to deal 
+ * in the Software without restriction, including without limitation the rights 
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+ * copies of the Software, and to permit persons to whom the Software is 
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+/**
+ * GPL LIcense
+ * Copyright (c) 2011, Luciano Costa
+ * 
+ * This program is free software: you can redistribute it and/or modify it 
+ * under the terms of the GNU General Public License as published by the 
+ * Free Software Foundation, either version 3 of the License, or 
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
+ * or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License 
+ * for more details.
+ * 
+ * You should have received a copy of the GNU General Public License along 
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+(function ($) {
+
+    var methods = {
+        init : function (options) { 
+            return this.each(function () {
+                var 
+                    $this = $(this),
+                    data = $this.data('monthpicker'),
+                    year = (options && options.year) ? options.year : (new Date()).getFullYear(),
+                    settings = $.extend({
+                        pattern: 'mm/yyyy',
+                        selectedMonth: null,
+                        selectedMonthName: '',
+                        selectedYear: year,
+                        startYear: year - 10,
+                        finalYear: year + 10,
+                        monthNames: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                        id: "monthpicker_" + (Math.random() * Math.random()).toString().replace('.', ''),
+                        openOnFocus: true,
+                        disabledMonths: []
+                    }, options);
+
+                settings.dateSeparator = settings.pattern.replace(/(mmm|mm|m|yyyy|yy|y)/ig,'');
+
+                // If the plugin hasn't been initialized yet for this element
+                if (!data) {
+                    $(this).data('monthpicker', {
+                        'target': $this,
+                        'settings': settings
+                    });
+
+                    if (settings.openOnFocus === true) {
+                        $this.bind('focus', function () {
+                            $this.monthpicker('show');
+                        });
+                    }
+
+                    $this.monthpicker('mountWidget', settings);
+
+                    $this.bind('monthpicker-click-month', function (e, month, year) {
+                        $this.monthpicker('setValue', settings);
+                        $this.monthpicker('hide');
+                    });
+
+                    // hide widget when user clicks elsewhere on page
+                    $this.addClass("mtz-monthpicker-widgetcontainer");
+                    $(document).unbind("mousedown.mtzmonthpicker").bind("mousedown.mtzmonthpicker", function (e) {
+                        if (!e.target.className || e.target.className.toString().indexOf('mtz-monthpicker') < 0) {
+                            $(".mtz-monthpicker-widgetcontainer").each(function () {
+                                if (typeof($(this).data("monthpicker"))!="undefined") { 
+                                    $(this).monthpicker('hide'); 
+                                }
+                            });
+                        }
+                    });
+                }
+
+            });
+        },
+
+        show: function (n) {
+            var widget = $('#' + this.data('monthpicker').settings.id);
+            var monthpicker = $('#' + this.data('monthpicker').target.attr("id") + ':eq(0)');
+            widget.css("top", monthpicker.offset().top  + monthpicker.outerHeight());
+            widget.css("left", monthpicker.offset().left);
+            widget.show();
+            widget.find('select').focus();
+            this.trigger('monthpicker-show');
+        },
+
+        hide: function () {
+            var widget = $('#' + this.data('monthpicker').settings.id);
+            if (widget.is(':visible')) {
+                widget.hide();
+                this.trigger('monthpicker-hide');
+            }
+        },
+
+        setValue: function (settings) {
+            var 
+                month = settings.selectedMonth,
+                year = settings.selectedYear;
+
+            if(settings.pattern.indexOf('mmm') >= 0) {
+                month = settings.selectedMonthName;
+            } else if(settings.pattern.indexOf('mm') >= 0 && settings.selectedMonth < 10) {
+                month = '0' + settings.selectedMonth;
+            }
+
+            if(settings.pattern.indexOf('yyyy') < 0) {
+                year = year.toString().substr(2,2);
+            } 
+
+            if (settings.pattern.indexOf('y') > settings.pattern.indexOf(settings.dateSeparator)) {
+                this.val(month + settings.dateSeparator + year);
+            } else {
+                this.val(year + settings.dateSeparator + month);
+            }
+        },
+
+        disableMonths: function (months) {
+            var 
+                settings = this.data('monthpicker').settings,
+                container = $('#' + settings.id);
+
+            settings.disabledMonths = months;
+
+            container.find('.mtz-monthpicker-month').each(function () {
+                var m = parseInt($(this).data('month'));
+                if ($.inArray(m, months) >= 0) {
+                    $(this).addClass('ui-state-disabled');
+                } else {
+                    $(this).removeClass('ui-state-disabled');
+                }
+            });
+        },
+
+        mountWidget: function (settings) {
+            var
+                monthpicker = this,
+                container = $('<div id="'+ settings.id +'" class="ui-datepicker ui-widget ui-widget-content ui-helper-clearfix ui-corner-all" />'),
+                header = $('<div class="ui-datepicker-header ui-widget-header ui-helper-clearfix ui-corner-all mtz-monthpicker" />'),
+                combo = $('<select class="mtz-monthpicker mtz-monthpicker-year" />'),
+                table = $('<table class="mtz-monthpicker" />'),
+                tbody = $('<tbody class="mtz-monthpicker" />'),
+                tr = $('<tr class="mtz-monthpicker" />'),
+                td = '';
+                selectedYear = settings.selectedYear,
+                option = null;
+
+            container.css({
+                position:'absolute',
+                zIndex:999999,
+                whiteSpace:'nowrap',
+                width:'250px',
+                overflow:'hidden',
+                textAlign:'center',
+                display:'none',
+                top: monthpicker.offset().top + monthpicker.outerHeight(),
+                left: monthpicker.offset().left
+            });
+
+            // mount years combo
+            for (var i = settings.startYear; i <= settings.finalYear; i++) {
+                var option = $('<option class="mtz-monthpicker" />').attr('value', i).append(i);
+                if (settings.selectedYear === i) {
+                    option.attr('selected', 'selected');
+                }
+                combo.append(option);
+            }
+            header.append(combo).appendTo(container);
+
+            // mount months table
+            for (var i=1; i<=12; i++) {
+                td = $('<td class="ui-state-default mtz-monthpicker mtz-monthpicker-month" style="padding:5px;cursor:default;" />').attr('data-month',i);
+                td.append(settings.monthNames[i-1]);
+                tr.append(td).appendTo(tbody);
+                if (i % 3 === 0) {
+                    tr = $('<tr class="mtz-monthpicker" />'); 
+                }
+            }
+
+            table.append(tbody).appendTo(container);
+
+            container.find('.mtz-monthpicker-month').bind('click', function () {
+                var m = parseInt($(this).data('month'));
+                if ($.inArray(m, settings.disabledMonths) < 0 ) {
+                    settings.selectedMonth = $(this).data('month');
+                    settings.selectedMonthName = $(this).text();
+                    monthpicker.trigger('monthpicker-click-month', $(this).data('month'));
+                }
+            });
+
+            container.find('.mtz-monthpicker-year').bind('change', function () {
+                settings.selectedYear = $(this).val();
+                monthpicker.trigger('monthpicker-change-year', $(this).val());
+            });
+
+            container.appendTo('body');
+        },
+
+        destroy: function () {
+            return this.each(function () {
+                // TODO: look for other things to remove
+                $(this).removeData('monthpicker');
+            });
+        }
+
+    };
+
+    $.fn.monthpicker = function (method) {
+        if (methods[method]) {
+            return methods[method].apply(this, Array.prototype.slice.call( arguments, 1 ));
+        } else if (typeof method === 'object' || ! method) {
+            return methods.init.apply(this, arguments);
+        } else {
+            $.error('Method ' + method + ' does not exist on jQuery.mtz.monthpicker');
+        }    
+    };
+
+})(jQuery);”ò¿Ÿ{   {          n-	      methods    íu`      init    :yã      options     Kı±      $this      6ó(Å      data   Ú_Tê      monthpicker    %k‚5      getFullYear    —ôKö      settings   ªl‡Ù      extend	     _é;      mm/yyyy
+    Ïp…–      selectedMonth      ﬂÆÖ      selectedMonthName      ±¬!l      selectedYear   ’e	      startYear      ™$C	      finalYear      ‡∞ëã
+      monthNames     È®cÑ      Jan    Ì∆ló      Feb    ¨keÆ      Mar    ¶EkS      Apr    Pó      May    #˙Ç      Jun    áiø      Jul    ∂I—‚      Aug    )$>‘      Sep    ò˘ÕÈ      Oct    ≤}      Nov    2’¢L      Dec    eº	e      monthpicker_   '∂Ä≈      random     Æı`m      openOnFocus    F˚ñô      disabledMonths      ]ËÊ      dateSeparator!      AG      (mmm|mm|m|yyyy|yy|y)"   ‡Õ      bind#   KÃÌ      focus$      HáíK      show%   ≈â»      mountWidget&    ∏K˜”      monthpicker-click-month'    ≠«uô      setValue(   üvÙ}      hide)   Bå|      addClass*   áøò≥      mtz-monthpicker-widgetcontainer+    ∏OÄ      document,   ı˛«Æ      unbind-     #tΩ      mousedown.mtzmonthpicker.   6CY>	      className/      ⁄Eú¡      indexOf0    -€æw      mtz-monthpicker1    B»H∫       .mtz-monthpicker-widgetcontainer2   ÷Áì      widget3     A¢Ωê      attr4   "µO      :eq(0)5     >ü      css6    $√Á      top7    k]2      outerHeight8    ı]á      left9   1<Î      select:     ˘!p¬      trigger;    ®b∂’      monthpicker-show<   SZK#      :visible=   Çmë¸      monthpicker-hide>   YümB      mmm?    ¢Ía      yyyy@   6ôfÿ      substrA     &⁄õ      valB    Bì<W      disableMonthsC      -‚
+Ë	      containerD      ú*≥      .mtz-monthpicker-monthE     ∞≠ÿG      inArrayF    Ü÷®C      ui-state-disabledG      ˆ+      removeClassH    l‡åÔ	      <div id="I      Øu†ΩW      " class="ui-datepicker ui-widget ui-widget-content ui-helper-clearfix ui-corner-all" />J    kàˇ      headerK     ~^·Àf      <div class="ui-datepicker-header ui-widget-header ui-helper-clearfix ui-corner-all mtz-monthpicker" />L     Vxc      comboM      ‹ºﬂ 7      <select class="mtz-monthpicker mtz-monthpicker-year" />N    ∂dî      tableO      `X/•!      <table class="mtz-monthpicker" />P      ßèâv      tbodyQ      ˛I∞!      <tbody class="mtz-monthpicker" />R      ØÙh      <tr class="mtz-monthpicker" />S     ⁄|`õ      optionT     »Åí      positionU   H<*ê      absoluteV   f˜      zIndexW     aÿ˙à
+      whiteSpaceX     ó πE      nowrapY     ÎƒJ˚      widthZ      lùË      250px[      Ñ€ËW      hidden\     ì˙@	      textAlign]      rLtö      center^     e}ü      display_    ,Ω      none`   πªÃw"      <option class="mtz-monthpicker" />a     ‹B-      appendb     ≈.»œ      selectedc   †Á„V      appendTod   Q,©i      <td class="ui-state-default mtz-monthpicker mtz-monthpicker-month" style="padding:5px;cursor:default;" />e      Í8jB
+      data-monthf     ü™‚X      clickg      à3¿µ      texth   5Øª      .mtz-monthpicker-yeari      Á˛¡      changej     nO.      monthpicker-change-yeark    òh;      bodyl   ŒÛ˝      destroym    ƒB≤é
+      removeDatan     Ωpwm      methodo     ÿÖ Ã      slicep      ˛tuW      errorq      Ñ(N$      Method r    û–ªí)       does not exist on jQuery.mtz.monthpickers      >Â/      jQueryt     –“M∆      init/<u     äFÉu      init/</<v    +™c
+      init/</</<w     ≠ﬂ∑=      disableMonths/<x    ∑€˜≥      mountWidget/<y      îóLË	      destroy/<z      V¶      $.fn.monthpicker      ¯ Ô%,â                                                                                                                                                                       	                 
+                                                                                                                                            ≥Oåc                         $ `   P              Pã                   P  k    Pã                                e  t  k               e                ã               n  2    ã                 2  ã                 t  k  ã               w `  C  ã                 m  ã      
+           P  PC  J  L  N  P  [ M i  S  ã                 m  ã                 ã                 ã                 ã               n     ã   Ø¬0∞!     IÙ$KEÆ˙ö   #        $  (  '  B  %  l  
+   2   ≤  
+            ç        
+        	   -    T  V  W  Y  ¨  \  ^  6  8  á&’™ç!´!   D      ∫äajD                             m    ª   w ﬂ•@5`FÄ  ˝ˇˇˇˇP	Pº   òe\~º   p   	                     Ω  Œ   ﬂ9   m   <   m   <   m   <   m   <	   m
+   <   m   <   m   <   Œ   ﬂ¡   J   m   L   ﬂ•I`%	J<	JF	JN	Jd	Ju	JÄ  µ	ê@Ä  æ`ï0Ä  »PÄT   ÌÿzT   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PC7	QÃ  ˜)T(Ã  Á               G        ﬁÕ  ﬂ¡   æ  s Œ   ﬂ¡   ·J   ‰   s Õ   ﬂ¡  ú   ó   ﬂ¡  J   ó   ö   ó   ¡  J   ô!   ó   ª   Ä„  Å  ·J   ‰s  ó   Õ  ﬂ¡  ·J   ‰9      <	   <
+      <   æ  <   æ  
+'<   æ  
+&<   h      i       i      i      i      i      i      i      i      i      i	      i
+      i   <      ª   ·J   ‰s  ª   ·J   ‰s  *·J    ‰s  ·J!   ‰"      s &<#   <$   h    <%   ¡  s Œ   ﬂ¡   ¡   J	   ·J!   ‰l&      s L'   ﬂæ   õ   ó-   ¡   æ  s ·J   ‰   9(   ¡   <)   ¡   <*   w ﬂ¡   J$   ö$   ó6   ¡   ·J+   ‰,   m-   w ﬂó9   ¡   ·J   ‰.   ¡   w ﬂ¡   ·J+   ‰/   m0   w ﬂ¡   ·J1   ‰2   w ﬂ¡   ª3   s ·J4   ‰5   s ·J+   ‰5   m6   w ﬂóG   • `ˇˇˇˇP)`ë P(`« +P
+P- `	%*&*),,ˇ#PP
+Pî P)&*E"PI`ñ 2
+ˇˇˇ¯PI`.`ˇˇˇˇP%*JPD`ñ `ë ˇˇˇÚPI!`ë !ˇˇˇÂPD#`ë &ˇˇˇ‡PD)`ë P$`ˇˇˇˇPPDˇˇˇﬂPI5PÄÄÄD   ‰ü¨D                             ¡   ·J   ‰   w ﬂ• `ë P$PÄÄÄh   «áŸh   0                         ¡   ·J   ‰   ¡   w ﬂ¡   ·J   ‰   w ﬂ• `ë ˇˇˇËP$`ë P$PÄ¥   f‘B9¥   t                         º  J   J   ù3   ó   ﬂº  J   J   ·J   ‰s  ·J   ‰   s ó   ö(   ó   ¡      s ·J   ‰m   w ﬂó   • `≠ *PPî `P
+*ˇˇˇ˚PIPÄÄò   oP‘€ò   V                	        ﬁÕ   ﬂ¡   æ   s ·J   ‰   s    ö'   ó   ¡   æ   s ·J   ‰   w ﬂó	   •&%`	ˇˇˇ˛PPî %`ˇˇˇˇPPIPú  ˘\©ú          	       #       ﬁÕ  ﬂ¡       æ  ·J   ‰   s J   J   &s Õ   ﬂ¡       æ  ·J   ‰   s J   ·J   ‰   s &   &s Õ  ﬂæ   ·J	   ‰
+   æ  ·J   ‰s  J
+   æ  ·J   ‰s  &w ﬂæ   ·J	   ‰   æ  ·J   ‰s  J   w ﬂæ   ·J   ‰w  ﬂæ   ·J   ‰   s ·J   ‰w  ﬂæ  ·J   ‰   w ﬂ•&`ê PˇˇˇÙP(`ê Pî P
+ˇˇˇŸP(`ê PPˇˇˇÕP$`ê PˇˇˇËP$`P$`ê P
+P$`ê P$	PÄ»   ≥c»   }                        ﬁÕ  ﬂ¡       æ  ·J   ‰   s J   J   &s Õ   ﬂæ   ·J   ‰   s ö-   ó	   æ   ·J   ‰w  ﬂæ  ·J	   ‰
+   w ﬂó   •&`ê PˇˇˇÙP(`ê P-`P$`ê PI	PÄ  ÓJ”•  á               .       ﬁÕ  ﬂº  J   Õ   ﬂº  J   Õ  ﬂº  J   ·J   ‰   s  ö   ó   º  J   Õ   ﬂô[   ó   º  J   ·J   ‰   s  ú   ó   ﬂº  J   
+ó   ö   ó      º  J   &Õ   ﬂó   º  J   ·J   ‰	   s ö+   ó   æ  ·J
+   ‰s  ·J   ‰s Õ  ﬂó   º  J   ·J   ‰   s º  J   ·J   ‰º  J   s ö0   ó$   æ  ·J   ‰æ   º  J   &æ  &w ﬂô+   ó)   æ  ·J   ‰æ  º  J   &æ   &w ﬂó.   • `-`M`î P/`ó `î P™ `ì@`î P/`PPM`î Pˇˇˇ¯P.`		ˇˇˇ€P `		ˇˇˇ‹PI	PÄÃ   >¡Ã   |                       Ω  Œ   ﬂﬁÕ  ﬂæ  ·J   ‰   s J   Õ   ﬂ¡      æ   J   &s Õ  ﬂæ   ¡   L   ﬂæ  ·J   ‰   s ·J	   ‰m
+   w ﬂ• `ê P-`
+ˇˇˇ˘PH`O`ê 
+P
+$ˇˇˇ˚PD	PÄÄ  j?@  û                        ﬁÕ  ﬂª    ¡   æ  s ·J   ‰   s s Õ   ﬂ¡  ·J   ‰æ   ¡   s  ö,   ó	   ¡   æ  s ·J   ‰   w ﬂô'   ó   ¡   æ  s ·J   ‰   w ﬂó   •&`	ˇˇˇ˛PPˇˇˇ˜P(`
+ˇˇˇıP/`ˇˇˇˇPP `ˇˇˇˇPPIPÄ  úπ ÚË  à     
+          [      Ω  Œ   ﬂﬁÕ	  ﬂæ	  Œ   ﬂ¡      ¡   J   &   &s Õ   ﬂ¡      s Õ  ﬂ¡      s Õ  ﬂ¡      s Õ  ﬂ¡      s Õ  ﬂ¡      s Õ  ﬂ	   Õ  ﬂ∑
+   ¡   J
+    
+   ﬂÕ  ﬂæ   ·J   ‰9      <   	?B<      <      <      <      <      <   ¡   ·J   ‰s  J   ¡   ·J   ‰s  &<   ¡   ·J   ‰s  J   <   w ﬂ¡   J   Õ  ﬂò"   æ  ¡   J   öò   ó%   ¡       s ·J!   ‰"   æ  s ·J#   ‰æ  s Õ  ﬂ¡   J
+   æ  ö#   ó-   æ  ·J!   ‰$   $   w ﬂó/   æ  ·J#   ‰æ  w ﬂæ  0(Õ  ﬂôXˇˇˇó3   æ  ·J#   ‰æ  s ·J%   ‰æ   w ﬂÕ  ﬂò7   æ  ö¨   ó9   ¡   &   s ·J!   ‰'   æ  s Õ  ﬂæ  ·J#   ‰¡   J(   æ  'Kw ﬂæ  ·J#   ‰æ  s ·J%   ‰æ  w ﬂæ  ,ö   óH   ¡      s Õ  ﬂóI   æ  0(Õ  ﬂôLˇˇˇóK   æ  ·J#   ‰æ  s ·J%   ‰æ   w ﬂæ   ·J)   ‰*   s ·J+   ‰,   m-   w ﬂæ   ·J)   ‰.   s ·J+   ‰/   m0   w ﬂæ   ·J%   ‰1   w ﬂ• `*`ë ˇˇˇÚP(`P(`P(`P(`P(`P(`*`ï F`%*)*****PP)PMPD `fï `P5ˇˇˇÚP
+ˇˇˇ˘P(`
+/`ï PI`ˇˇˇ˘PDG`ï@!`ˇˇˇ˘P
+ˇˇˇ˜PD$ `fë `PÄ  ÅˇˇˇÓP(`
+ë ˇˇˇ˘P$`
+ˇˇˇ˘P
+ˇˇˇ˜P$`ì `PM$"`ï@-`ˇˇˇ˘P
+ˇˇˇ˜PD/`ê 
+P-ˇˇˇÚPD8`ê 
+P-ˇˇˇÒPD=`ê 
+P$	P         k  ≠          D  π   T  ã¿5–T  Ÿ                        ﬁÕ  ﬂª    ¡   æ  s ·J   ‰   s s Õ   ﬂ¡  ·J   ‰æ   ¡   J   s öÑ   ó
+   ¡   ¡   æ  s ·J   ‰   s L   ﬂ¡   ¡   æ  s ·J   ‰s  L   ﬂ¡   ·J	   ‰
+   ¡   æ  s ·J   ‰   s w ﬂó   •&`	ˇˇˇ˛PPˇˇˇ˜P(`
+
+ˇˇˇıP/`ˇˇˇ˛PP)`ˇˇˇ˛P
+P)`ë /ˇˇˇ˛PPˇˇˇ’PIP†   éï#U†   U                	        ﬁÕ   ﬂ¡   ¡   æ   s ·J   ‰s  L   ﬂ¡   ·J   ‰   ¡   æ   s ·J   ‰s  w ﬂ•&`ˇˇˇ˛P
+P)`ë /ˇˇˇ˛P
+Pˇˇˇ’P$PÄÄL   ?é‡L                           ﬁÕ   ﬂæ   ·J   ‰m   s ¢•&`ˇˇˇ˚PC	QÄX   ØöX   $                        ﬁÕ   ﬂ¡    æ   s ·J   ‰   w ﬂ•F`ˇˇˇˇPP$PÄ<  .∫kÇ<  Œ         	              ‹Õ   ﬂﬁÕ  ﬂ¡   º  KöE   ó   ¡   º  K·J   ‰æ  ª   J   J   ·J   ‰æ   s s ¢ôs   ó
+   º  ù   ó   ﬂº  ó   ö,   ó   ¡   J   ·J   ‰æ  æ   s ¢ô)   ó   ¡   ·J   ‰   º  &	   &w ﬂó   •,`ì `ê ñ ˇˇˇ˙PˇˇˇﬁPCK`ê ì `ë ˇˇˇÙPC; `
+ˇˇˇÓPIPÄÄÄ3ıÿ  `  $    `  '  (    `    t  (    `  .  "  /  0  1  å     p  `    k  É        @	  ≤  
+  ê                                       Ñ    "  ⁄  .  ç        P     @    "  #    p%  &    p)  *  +  ,  -    p  `å     p  `#        ç   3  4  5  6  •  7  8  $  ∞   9  #  :  ;  	  `#        ç ú <  (  :  =  
+  `
+    ≤  /  >    ñ 0  ?  "  @  y     A    `±    t  E  )  F  G    `      #  ç   ∞   D  å     p  `±    t  E    
+  g    :  &    `A    :  j    `H  ç I  K  M  O  Q  R  ê     5    @U  T  V  X  W  Z  Y  [  ¨  ]  \  _  ^  •  6  7  8      `  3  P  a  b  c  d  e    ∞   D  "  f    ph  i    pk    `m      `å     p  `   Ä  √  o  6     p  q  r    `   @  p    p$  	  p(  
+  p'    pB    p%    pl  ◊   p     `  ps  ˇXÑı                 ‚                L                 7   t               u              u           	   u              v        O      $        c      (        n      '        Ö      B        }      w        †   2   %        ê      x        õ      x        ’      l        “      y        ÿ   
+   z        ùH©¿      f(      f(                Ä!  \(    \(  6             ÇT  e  K  e  9             Çá  Y  ~  Y  :   '             œ  $  ∆  $  V   6             ¬  ^  π  ^  ]   D           \  6  S  6  d   n           %        f   Q              9  v  9  r              S  1  J  1  |               O  e  F  e  Ñ             Çà  ≥    ≥  ö   !           á  ß  ~  ß  °   D           Ç‘  Ê%  À  Ê%  ´              J#  …$  A#  …$  ⁄   M            %  ±%  %  ±%  „   M           &  ∏&  ˙%  ∏&  Î               .&  ¨&  %&  ¨&  Ï   '            ‚&  X(  Ÿ&  X(  Ù   !          5°›c29k∆∑{…      g¯ﬁ¸g¯ﬁ¸Hıg¯Âx   ^    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/jquery.mtz.monthpicker.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:08:02 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|f375ac78-75be-fe06-001f-25c6c13b9766|
+Accept-Ranges: bytes
+ETag: W/"10342-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 10342
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:08:02 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|f375ac78-75be-fe06-001f-25c6c13b9766|
+Accept-Ranges: bytes
+ETag: W/"10342-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 10342
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=85
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 469 net-response-time-onstop 469 alt-data 1;10342,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1   Ç—

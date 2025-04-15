@@ -1,0 +1,3527 @@
+/*!
+ * jQuery contextMenu - Plugin for simple contextMenu handling
+ *
+ * Version: 1.5.22
+ *
+ * Authors: Rodney Rehm, Addy Osmani (patches for FF)
+ * Web: http://medialize.github.com/jQuery-contextMenu/
+ *
+ * Licensed under
+ *   MIT License http://www.opensource.org/licenses/mit-license
+ *   GPL v3 http://opensource.org/licenses/GPL-3.0
+ *
+ */
+
+(function($, undefined){
+    
+    // TODO: -
+        // ARIA stuff: menuitem, menuitemcheckbox und menuitemradio
+        // create <menu> structure if $.support[htmlCommand || htmlMenuitem] and !opt.disableNative
+
+// determine html5 compatibility
+$.support.htmlMenuitem = ('HTMLMenuItemElement' in window);
+$.support.htmlCommand = ('HTMLCommandElement' in window);
+$.support.eventSelectstart = ("onselectstart" in document.documentElement);
+/* // should the need arise, test for css user-select
+$.support.cssUserSelect = (function(){
+    var t = false,
+        e = document.createElement('div');
+    
+    $.each('Moz|Webkit|Khtml|O|ms|Icab|'.split('|'), function(i, prefix) {
+        var propCC = prefix + (prefix ? 'U' : 'u') + 'serSelect',
+            prop = (prefix ? ('-' + prefix.toLowerCase() + '-') : '') + 'user-select';
+            
+        e.style.cssText = prop + ': text;';
+        if (e.style[propCC] == 'text') {
+            t = true;
+            return false;
+        }
+        
+        return true;
+    });
+    
+    return t;
+})();
+*/
+
+var // currently active contextMenu trigger
+    $currentTrigger = null,
+    // is contextMenu initialized with at least one menu?
+    initialized = false,
+    // window handle
+    $win = $(window),
+    // number of registered menus
+    counter = 0,
+    // mapping selector to namespace
+    namespaces = {},
+    // mapping namespace to options
+    menus = {},
+    // custom command type handlers
+    types = {},
+    // default values
+    defaults = {
+        // selector of contextMenu trigger
+        selector: null,
+        // where to append the menu to
+        appendTo: null,
+        // method to trigger context menu ["right", "left", "hover"]
+        trigger: "right",
+        // hide menu when mouse leaves trigger / menu elements
+        autoHide: false,
+        // ms to wait before showing a hover-triggered context menu
+        delay: 200,
+        // determine position to show menu at
+        determinePosition: function($menu) {
+            // position to the lower middle of the trigger element
+            if ($.ui && $.ui.position) {
+                // .position() is provided as a jQuery UI utility
+                // (...and it won't work on hidden elements)
+                $menu.css('display', 'block').position({
+                    my: "center top",
+                    at: "center bottom",
+                    of: this,
+                    offset: "0 5",
+                    collision: "fit"
+                }).css('display', 'none');
+            } else {
+                // determine contextMenu position
+                var offset = this.offset();
+                offset.top += this.outerHeight();
+                offset.left += this.outerWidth() / 2 - $menu.outerWidth() / 2;
+                $menu.css(offset);
+            }
+        },
+        // position menu
+        position: function(opt, x, y) {
+            var $this = this,
+                offset;
+            // determine contextMenu position
+            if (!x && !y) {
+                opt.determinePosition.call(this, opt.$menu);
+                return;
+            } else if (x === "maintain" && y === "maintain") {
+                // x and y must not be changed (after re-show on command click)
+                offset = opt.$menu.position();
+            } else {
+                // x and y are given (by mouse event)
+                var triggerIsFixed = opt.$trigger.parents().andSelf()
+                    .filter(function() {
+                        return $(this).css('position') == "fixed";
+                    }).length;
+
+                if (triggerIsFixed) {
+                    y -= $win.scrollTop();
+                    x -= $win.scrollLeft();
+                }
+                offset = {top: y, left: x};
+            }
+            
+            // correct offset if viewport demands it
+            var bottom = $win.scrollTop() + $win.height(),
+                right = $win.scrollLeft() + $win.width(),
+                height = opt.$menu.height(),
+                width = opt.$menu.width();
+            
+            if (offset.top + height > bottom) {
+                offset.top -= height;
+            }
+            
+            if (offset.left + width > right) {
+                offset.left -= width;
+            }
+            
+            opt.$menu.css(offset);
+        },
+        // position the sub-menu
+        positionSubmenu: function($menu) {
+            if ($.ui && $.ui.position) {
+                // .position() is provided as a jQuery UI utility
+                // (...and it won't work on hidden elements)
+                $menu.css('display', 'block').position({
+                    my: "left top",
+                    at: "right top",
+                    of: this,
+                    collision: "fit"
+                }).css('display', '');
+            } else {
+                // determine contextMenu position
+                var offset = {
+                    top: 0,
+                    left: this.outerWidth()
+                };
+                $menu.css(offset);
+            }
+        },
+        // offset to add to zIndex
+        zIndex: 1,
+        // show hide animation settings
+        animation: {
+            duration: 50,
+            show: 'slideDown',
+            hide: 'slideUp'
+        },
+        // events
+        events: {
+            show: $.noop,
+            hide: $.noop
+        },
+        // default callback
+        callback: null,
+        // list of contextMenu items
+        items: {}
+    },
+    // mouse position for hover activation
+    hoveract = {
+        timer: null,
+        pageX: null,
+        pageY: null
+    },
+    // determine zIndex
+    zindex = function($t) {
+        var zin = 0,
+            $tt = $t;
+
+        while (true) {
+            zin = Math.max(zin, parseInt($tt.css('z-index'), 10) || 0);
+            $tt = $tt.parent();
+            if (!$tt || !$tt.length || "html body".indexOf($tt.prop('nodeName').toLowerCase()) > -1 ) {
+                break;
+            }
+        }
+        
+        return zin;
+    },
+    // event handlers
+    handle = {
+        // abort anything
+        abortevent: function(e){
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        },
+        
+        // contextmenu show dispatcher
+        contextmenu: function(e) {
+            var $this = $(this);
+            
+            // disable actual context-menu
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            
+            // abort native-triggered events unless we're triggering on right click
+            if (e.data.trigger != 'right' && e.originalEvent) {
+                return;
+            }
+            
+            if (!$this.hasClass('context-menu-disabled')) {
+                // theoretically need to fire a show event at <menu>
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/interactive-elements.html#context-menus
+                // var evt = jQuery.Event("show", { data: data, pageX: e.pageX, pageY: e.pageY, relatedTarget: this });
+                // e.data.$menu.trigger(evt);
+                
+                $currentTrigger = $this;
+                if (e.data.build) {
+                    var built = e.data.build($currentTrigger, e);
+                    // abort if build() returned false
+                    if (built === false) {
+                        return;
+                    }
+                    
+                    // dynamically build menu on invocation
+                    e.data = $.extend(true, {}, defaults, e.data, built || {});
+
+                    // abort if there are no items to display
+                    if (!e.data.items || $.isEmptyObject(e.data.items)) {
+                        // Note: jQuery captures and ignores errors from event handlers
+                        if (window.console) {
+                            (console.error || console.log)("No items specified to show in contextMenu");
+                        }
+                        
+                        throw new Error('No Items sepcified');
+                    }
+                    
+                    // backreference for custom command type creation
+                    e.data.$trigger = $currentTrigger;
+                    
+                    op.create(e.data);
+                }
+                // show menu
+                op.show.call($this, e.data, e.pageX, e.pageY);
+            }
+        },
+        // contextMenu left-click trigger
+        click: function(e) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            $(this).trigger(jQuery.Event("contextmenu", { data: e.data, pageX: e.pageX, pageY: e.pageY }));
+        },
+        // contextMenu right-click trigger
+        mousedown: function(e) {
+            // register mouse down
+            var $this = $(this);
+            
+            // hide any previous menus
+            if ($currentTrigger && $currentTrigger.length && !$currentTrigger.is($this)) {
+                $currentTrigger.data('contextMenu').$menu.trigger('contextmenu:hide');
+            }
+            
+            // activate on right click
+            if (e.button == 2) {
+                $currentTrigger = $this.data('contextMenuActive', true);
+            }
+        },
+        // contextMenu right-click trigger
+        mouseup: function(e) {
+            // show menu
+            var $this = $(this);
+            if ($this.data('contextMenuActive') && $currentTrigger && $currentTrigger.length && $currentTrigger.is($this) && !$this.hasClass('context-menu-disabled')) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                $currentTrigger = $this;
+                $this.trigger(jQuery.Event("contextmenu", { data: e.data, pageX: e.pageX, pageY: e.pageY }));
+            }
+            
+            $this.removeData('contextMenuActive');
+        },
+        // contextMenu hover trigger
+        mouseenter: function(e) {
+            var $this = $(this),
+                $related = $(e.relatedTarget),
+                $document = $(document);
+            
+            // abort if we're coming from a menu
+            if ($related.is('.context-menu-list') || $related.closest('.context-menu-list').length) {
+                return;
+            }
+            
+            // abort if a menu is shown
+            if ($currentTrigger && $currentTrigger.length) {
+                return;
+            }
+            
+            hoveract.pageX = e.pageX;
+            hoveract.pageY = e.pageY;
+            hoveract.data = e.data;
+            $document.on('mousemove.contextMenuShow', handle.mousemove);
+            hoveract.timer = setTimeout(function() {
+                hoveract.timer = null;
+                $document.off('mousemove.contextMenuShow');
+                $currentTrigger = $this;
+                $this.trigger(jQuery.Event("contextmenu", { data: hoveract.data, pageX: hoveract.pageX, pageY: hoveract.pageY }));
+            }, e.data.delay );
+        },
+        // contextMenu hover trigger
+        mousemove: function(e) {
+            hoveract.pageX = e.pageX;
+            hoveract.pageY = e.pageY;
+        },
+        // contextMenu hover trigger
+        mouseleave: function(e) {
+            // abort if we're leaving for a menu
+            var $related = $(e.relatedTarget);
+            if ($related.is('.context-menu-list') || $related.closest('.context-menu-list').length) {
+                return;
+            }
+            
+            try {
+                clearTimeout(hoveract.timer);
+            } catch(e) {}
+            
+            hoveract.timer = null;
+        },
+        
+        // click on layer to hide contextMenu
+        layerClick: function(e) {
+            var $this = $(this),
+                root = $this.data('contextMenuRoot'),
+                mouseup = false,
+                button = e.button,
+                x = e.pageX,
+                y = e.pageY,
+                target, 
+                offset,
+                selectors;
+                
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            
+            // This hack looks about as ugly as it is
+            // Firefox 12 (at least) fires the contextmenu event directly "after" mousedown
+            // for some reason `root.$layer.hide(); document.elementFromPoint()` causes this
+            // contextmenu event to be triggered on the uncovered element instead of on the
+            // layer (where every other sane browser, including Firefox nightly at the time)
+            // triggers the event. This workaround might be obsolete by September 2012.
+            $this.on('mouseup', function() {
+                mouseup = true;
+            });
+            setTimeout(function() {
+                var $window, hideshow;
+                
+                // test if we need to reposition the menu
+                if ((root.trigger == 'left' && button == 0) || (root.trigger == 'right' && button == 2)) {
+                    if (document.elementFromPoint) {
+                        root.$layer.hide();
+                        target = document.elementFromPoint(x, y);
+                        root.$layer.show();
+
+                        selectors = [];
+                        for (var s in namespaces) {
+                            selectors.push(s);
+                        }
+
+                        target = $(target).closest(selectors.join(', '));
+
+                        if (target.length) {
+                            if (target.is(root.$trigger[0])) {
+                                root.position.call(root.$trigger, root, x, y);
+                                return;
+                            }
+                        }
+                    } else {
+                        offset = root.$trigger.offset();
+                        $window = $(window);
+                        // while this looks kinda awful, it's the best way to avoid
+                        // unnecessarily calculating any positions
+                        offset.top += $window.scrollTop();
+                        if (offset.top <= e.pageY) {
+                            offset.left += $window.scrollLeft();
+                            if (offset.left <= e.pageX) {
+                                offset.bottom = offset.top + root.$trigger.outerHeight();
+                                if (offset.bottom >= e.pageY) {
+                                    offset.right = offset.left + root.$trigger.outerWidth();
+                                    if (offset.right >= e.pageX) {
+                                        // reposition
+                                        root.position.call(root.$trigger, root, x, y);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                hideshow = function(e) {
+                    if (e) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                    }
+
+                    root.$menu.trigger('contextmenu:hide');
+                    if (target && target.length) {
+                        setTimeout(function() {
+                            target.contextMenu({x: x, y: y});
+                        }, 50);
+                    }
+                };
+            
+                if (mouseup) {
+                    // mouseup has already happened
+                    hideshow();
+                } else {
+                    // remove only after mouseup has completed
+                    $this.on('mouseup', hideshow);
+                }
+            }, 50);
+        },
+        // key handled :hover
+        keyStop: function(e, opt) {
+            if (!opt.isInput) {
+                e.preventDefault();
+            }
+            
+            e.stopPropagation();
+        },
+        key: function(e) {
+            var opt = $currentTrigger.data('contextMenu') || {},
+                $children = opt.$menu.children(),
+                $round;
+
+            switch (e.keyCode) {
+                case 9:
+                case 38: // up
+                    handle.keyStop(e, opt);
+                    // if keyCode is [38 (up)] or [9 (tab) with shift]
+                    if (opt.isInput) {
+                        if (e.keyCode == 9 && e.shiftKey) {
+                            e.preventDefault();
+                            opt.$selected && opt.$selected.find('input, textarea, select').blur();
+                            opt.$menu.trigger('prevcommand');
+                            return;
+                        } else if (e.keyCode == 38 && opt.$selected.find('input, textarea, select').prop('type') == 'checkbox') {
+                            // checkboxes don't capture this key
+                            e.preventDefault();
+                            return;
+                        }
+                    } else if (e.keyCode != 9 || e.shiftKey) {
+                        opt.$menu.trigger('prevcommand');
+                        return;
+                    }
+                    
+                case 9: // tab
+                case 40: // down
+                    handle.keyStop(e, opt);
+                    if (opt.isInput) {
+                        if (e.keyCode == 9) {
+                            e.preventDefault();
+                            opt.$selected && opt.$selected.find('input, textarea, select').blur();
+                            opt.$menu.trigger('nextcommand');
+                            return;
+                        } else if (e.keyCode == 40 && opt.$selected.find('input, textarea, select').prop('type') == 'checkbox') {
+                            // checkboxes don't capture this key
+                            e.preventDefault();
+                            return;
+                        }
+                    } else {
+                        opt.$menu.trigger('nextcommand');
+                        return;
+                    }
+                    break;
+                
+                case 37: // left
+                    handle.keyStop(e, opt);
+                    if (opt.isInput || !opt.$selected || !opt.$selected.length) {
+                        break;
+                    }
+                
+                    if (!opt.$selected.parent().hasClass('context-menu-root')) {
+                        var $parent = opt.$selected.parent().parent();
+                        opt.$selected.trigger('contextmenu:blur');
+                        opt.$selected = $parent;
+                        return;
+                    }
+                    break;
+                    
+                case 39: // right
+                    handle.keyStop(e, opt);
+                    if (opt.isInput || !opt.$selected || !opt.$selected.length) {
+                        break;
+                    }
+                    
+                    var itemdata = opt.$selected.data('contextMenu') || {};
+                    if (itemdata.$menu && opt.$selected.hasClass('context-menu-submenu')) {
+                        opt.$selected = null;
+                        itemdata.$selected = null;
+                        itemdata.$menu.trigger('nextcommand');
+                        return;
+                    }
+                    break;
+                
+                case 35: // end
+                case 36: // home
+                    if (opt.$selected && opt.$selected.find('input, textarea, select').length) {
+                        return;
+                    } else {
+                        (opt.$selected && opt.$selected.parent() || opt.$menu)
+                            .children(':not(.disabled, .not-selectable)')[e.keyCode == 36 ? 'first' : 'last']()
+                            .trigger('contextmenu:focus');
+                        e.preventDefault();
+                        return;
+                    }
+                    break;
+                    
+                case 13: // enter
+                    handle.keyStop(e, opt);
+                    if (opt.isInput) {
+                        if (opt.$selected && !opt.$selected.is('textarea, select')) {
+                            e.preventDefault();
+                            return;
+                        }
+                        break;
+                    }
+                    opt.$selected && opt.$selected.trigger('mouseup');
+                    return;
+                    
+                case 32: // space
+                case 33: // page up
+                case 34: // page down
+                    // prevent browser from scrolling down while menu is visible
+                    handle.keyStop(e, opt);
+                    return;
+                    
+                case 27: // esc
+                    handle.keyStop(e, opt);
+                    opt.$menu.trigger('contextmenu:hide');
+                    return;
+                    
+                default: // 0-9, a-z
+                    var k = (String.fromCharCode(e.keyCode)).toUpperCase();
+                    if (opt.accesskeys[k]) {
+                        // according to the specs accesskeys must be invoked immediately
+                        opt.accesskeys[k].$node.trigger(opt.accesskeys[k].$menu
+                            ? 'contextmenu:focus'
+                            : 'mouseup'
+                        );
+                        return;
+                    }
+                    break;
+            }
+            // pass event to selected item, 
+            // stop propagation to avoid endless recursion
+            e.stopPropagation();
+            opt.$selected && opt.$selected.trigger(e);
+        },
+
+        // select previous possible command in menu
+        prevItem: function(e) {
+            e.stopPropagation();
+            var opt = $(this).data('contextMenu') || {};
+
+            // obtain currently selected menu
+            if (opt.$selected) {
+                var $s = opt.$selected;
+                opt = opt.$selected.parent().data('contextMenu') || {};
+                opt.$selected = $s;
+            }
+            
+            var $children = opt.$menu.children(),
+                $prev = !opt.$selected || !opt.$selected.prev().length ? $children.last() : opt.$selected.prev(),
+                $round = $prev;
+            
+            // skip disabled
+            while ($prev.hasClass('disabled') || $prev.hasClass('not-selectable')) {
+                if ($prev.prev().length) {
+                    $prev = $prev.prev();
+                } else {
+                    $prev = $children.last();
+                }
+                if ($prev.is($round)) {
+                    // break endless loop
+                    return;
+                }
+            }
+            
+            // leave current
+            if (opt.$selected) {
+                handle.itemMouseleave.call(opt.$selected.get(0), e);
+            }
+            
+            // activate next
+            handle.itemMouseenter.call($prev.get(0), e);
+            
+            // focus input
+            var $input = $prev.find('input, textarea, select');
+            if ($input.length) {
+                $input.focus();
+            }
+        },
+        // select next possible command in menu
+        nextItem: function(e) {
+            e.stopPropagation();
+            var opt = $(this).data('contextMenu') || {};
+
+            // obtain currently selected menu
+            if (opt.$selected) {
+                var $s = opt.$selected;
+                opt = opt.$selected.parent().data('contextMenu') || {};
+                opt.$selected = $s;
+            }
+
+            var $children = opt.$menu.children(),
+                $next = !opt.$selected || !opt.$selected.next().length ? $children.first() : opt.$selected.next(),
+                $round = $next;
+
+            // skip disabled
+            while ($next.hasClass('disabled') || $next.hasClass('not-selectable')) {
+                if ($next.next().length) {
+                    $next = $next.next();
+                } else {
+                    $next = $children.first();
+                }
+                if ($next.is($round)) {
+                    // break endless loop
+                    return;
+                }
+            }
+            
+            // leave current
+            if (opt.$selected) {
+                handle.itemMouseleave.call(opt.$selected.get(0), e);
+            }
+            
+            // activate next
+            handle.itemMouseenter.call($next.get(0), e);
+            
+            // focus input
+            var $input = $next.find('input, textarea, select');
+            if ($input.length) {
+                $input.focus();
+            }
+        },
+        
+        // flag that we're inside an input so the key handler can act accordingly
+        focusInput: function(e) {
+            var $this = $(this).closest('.context-menu-item'),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+
+            root.$selected = opt.$selected = $this;
+            root.isInput = opt.isInput = true;
+        },
+        // flag that we're inside an input so the key handler can act accordingly
+        blurInput: function(e) {
+            var $this = $(this).closest('.context-menu-item'),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+
+            root.isInput = opt.isInput = false;
+        },
+        
+        // :hover on menu
+        menuMouseenter: function(e) {
+            var root = $(this).data().contextMenuRoot;
+            root.hovering = true;
+        },
+        // :hover on menu
+        menuMouseleave: function(e) {
+            var root = $(this).data().contextMenuRoot;
+            if (root.$layer && root.$layer.is(e.relatedTarget)) {
+                root.hovering = false;
+            }
+        },
+        
+        // :hover done manually so key handling is possible
+        itemMouseenter: function(e) {
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+            
+            root.hovering = true;
+
+            // abort if we're re-entering
+            if (e && root.$layer && root.$layer.is(e.relatedTarget)) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+            }
+
+            // make sure only one item is selected
+            (opt.$menu ? opt : root).$menu
+                .children('.hover').trigger('contextmenu:blur');
+
+            if ($this.hasClass('disabled') || $this.hasClass('not-selectable')) {
+                opt.$selected = null;
+                return;
+            }
+            
+            $this.trigger('contextmenu:focus');
+        },
+        // :hover done manually so key handling is possible
+        itemMouseleave: function(e) {
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+
+            if (root !== opt && root.$layer && root.$layer.is(e.relatedTarget)) {
+                root.$selected && root.$selected.trigger('contextmenu:blur');
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                root.$selected = opt.$selected = opt.$node;
+                return;
+            }
+            
+            $this.trigger('contextmenu:blur');
+        },
+        // contextMenu item click
+        itemClick: function(e) {
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot,
+                key = data.contextMenuKey,
+                callback;
+
+            // abort if the key is unknown or disabled or is a menu
+            if (!opt.items[key] || $this.hasClass('disabled') || $this.hasClass('context-menu-submenu')) {
+                return;
+            }
+
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            if ($.isFunction(root.callbacks[key])) {
+                // item-specific callback
+                callback = root.callbacks[key];
+            } else if ($.isFunction(root.callback)) {
+                // default callback
+                callback = root.callback;                
+            } else {
+                // no callback, no action
+                return;
+            }
+
+            // hide menu if callback doesn't stop that
+            if (callback.call(root.$trigger, key, root) !== false) {
+                root.$menu.trigger('contextmenu:hide');
+            } else if (root.$menu.parent().length) {
+                op.update.call(root.$trigger, root);
+            }
+        },
+        // ignore click events on input elements
+        inputClick: function(e) {
+            e.stopImmediatePropagation();
+        },
+        
+        // hide <menu>
+        hideMenu: function(e, data) {
+            var root = $(this).data('contextMenuRoot');
+            op.hide.call(root.$trigger, root, data && data.force);
+        },
+        // focus <command>
+        focusItem: function(e) {
+            e.stopPropagation();
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+
+            $this.addClass('hover')
+                .siblings('.hover').trigger('contextmenu:blur');
+            
+            // remember selected
+            opt.$selected = root.$selected = $this;
+            
+            // position sub-menu - do after show so dumb $.ui.position can keep up
+            if (opt.$node) {
+                root.positionSubmenu.call(opt.$node, opt.$menu);
+            }
+        },
+        // blur <command>
+        blurItem: function(e) {
+            e.stopPropagation();
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+            
+            $this.removeClass('hover');
+            opt.$selected = null;
+        }
+    },
+    // operations
+    op = {
+        show: function(opt, x, y) {
+            var $this = $(this),
+                offset,
+                css = {};
+
+            // hide any open menus
+            $('#context-menu-layer').trigger('mousedown');
+
+            // backreference for callbacks
+            opt.$trigger = $this;
+
+            // show event
+            if (opt.events.show.call($this, opt) === false) {
+                $currentTrigger = null;
+                return;
+            }
+
+            // create or update context menu
+            op.update.call($this, opt);
+            
+            // position menu
+            opt.position.call($this, opt, x, y);
+
+            // make sure we're in front
+            if (opt.zIndex) {
+                css.zIndex = zindex($this) + opt.zIndex;
+            }
+            
+            // add layer
+            op.layer.call(opt.$menu, opt, css.zIndex);
+            
+            // adjust sub-menu zIndexes
+            opt.$menu.find('ul').css('zIndex', css.zIndex + 1);
+            
+            // position and show context menu
+            opt.$menu.css( css )[opt.animation.show](opt.animation.duration);
+            // make options available
+            $this.data('contextMenu', opt);
+            // register key handler
+            $(document).off('keydown.contextMenu').on('keydown.contextMenu', handle.key);
+            // register autoHide handler
+            if (opt.autoHide) {
+                // trigger element coordinates
+                var pos = $this.position();
+                pos.right = pos.left + $this.outerWidth();
+                pos.bottom = pos.top + this.outerHeight();
+                // mouse position handler
+                $(document).on('mousemove.contextMenuAutoHide', function(e) {
+                    if (opt.$layer && !opt.hovering && (!(e.pageX >= pos.left && e.pageX <= pos.right) || !(e.pageY >= pos.top && e.pageY <= pos.bottom))) {
+                        // if mouse in menu...
+                        opt.$menu.trigger('contextmenu:hide');
+                    }
+                });
+            }
+        },
+        hide: function(opt, force) {
+            var $this = $(this);
+            if (!opt) {
+                opt = $this.data('contextMenu') || {};
+            }
+            
+            // hide event
+            if (!force && opt.events && opt.events.hide.call($this, opt) === false) {
+                return;
+            }
+            
+            if (opt.$layer) {
+                // keep layer for a bit so the contextmenu event can be aborted properly by opera
+                setTimeout((function($layer){ return function(){
+                        $layer.remove();
+                    };
+                })(opt.$layer), 10);
+                
+                try {
+                    delete opt.$layer;
+                } catch(e) {
+                    opt.$layer = null;
+                }
+            }
+            
+            // remove handle
+            $currentTrigger = null;
+            // remove selected
+            opt.$menu.find('.hover').trigger('contextmenu:blur');
+            opt.$selected = null;
+            // unregister key and mouse handlers
+            //$(document).off('.contextMenuAutoHide keydown.contextMenu'); // http://bugs.jquery.com/ticket/10705
+            $(document).off('.contextMenuAutoHide').off('keydown.contextMenu');
+            // hide menu
+            opt.$menu && opt.$menu[opt.animation.hide](opt.animation.duration, function (){
+                // tear down dynamically built menu after animation is completed.
+                if (opt.build) {
+                    opt.$menu.remove();
+                    $.each(opt, function(key, value) {
+                        switch (key) {
+                            case 'ns':
+                            case 'selector':
+                            case 'build':
+                            case 'trigger':
+                                return true;
+
+                            default:
+                                opt[key] = undefined;
+                                try {
+                                    delete opt[key];
+                                } catch (e) {}
+                                return true;
+                        }
+                    });
+                }
+            });
+        },
+        create: function(opt, root) {
+            if (root === undefined) {
+                root = opt;
+            }
+            // create contextMenu
+            opt.$menu = $('<ul class="context-menu-list ' + (opt.className || "") + '"></ul>').data({
+                'contextMenu': opt,
+                'contextMenuRoot': root
+            });
+            
+            $.each(['callbacks', 'commands', 'inputs'], function(i,k){
+                opt[k] = {};
+                if (!root[k]) {
+                    root[k] = {};
+                }
+            });
+            
+            root.accesskeys || (root.accesskeys = {});
+            
+            // create contextMenu items
+            $.each(opt.items, function(key, item){
+                var $t = $('<li class="context-menu-item ' + (item.className || "") +'"></li>'),
+                    $label = null,
+                    $input = null;
+                
+                item.$node = $t.data({
+                    'contextMenu': opt,
+                    'contextMenuRoot': root,
+                    'contextMenuKey': key
+                });
+                
+                // register accesskey
+                // NOTE: the accesskey attribute should be applicable to any element, but Safari5 and Chrome13 still can't do that
+                if (item.accesskey) {
+                    var aks = splitAccesskey(item.accesskey);
+                    for (var i=0, ak; ak = aks[i]; i++) {
+                        if (!root.accesskeys[ak]) {
+                            root.accesskeys[ak] = item;
+                            item._name = item.name.replace(new RegExp('(' + ak + ')', 'i'), '<span class="context-menu-accesskey">$1</span>');
+                            break;
+                        }
+                    }
+                }
+                
+                if (typeof item == "string") {
+                    $t.addClass('context-menu-separator not-selectable');
+                } else if (item.type && types[item.type]) {
+                    // run custom type handler
+                    types[item.type].call($t, item, opt, root);
+                    // register commands
+                    $.each([opt, root], function(i,k){
+                        k.commands[key] = item;
+                        if ($.isFunction(item.callback)) {
+                            k.callbacks[key] = item.callback;
+                        }
+                    });
+                } else {
+                    // add label for input
+                    if (item.type == 'html') {
+                        $t.addClass('context-menu-html not-selectable');
+                    } else if (item.type) {
+                        $label = $('<label></label>').appendTo($t);
+                        $('<span></span>').html(item._name || item.name).appendTo($label);
+                        $t.addClass('context-menu-input');
+                        opt.hasTypes = true;
+                        $.each([opt, root], function(i,k){
+                            k.commands[key] = item;
+                            k.inputs[key] = item;
+                        });
+                    } else if (item.items) {
+                        item.type = 'sub';
+                    }
+                
+                    switch (item.type) {
+                        case 'text':
+                            $input = $('<input type="text" value="1" name="context-menu-input-'+ key +'" value="">')
+                                .val(item.value || "").appendTo($label);
+                            break;
+                    
+                        case 'textarea':
+                            $input = $('<textarea name="context-menu-input-'+ key +'"></textarea>')
+                                .val(item.value || "").appendTo($label);
+
+                            if (item.height) {
+                                $input.height(item.height);
+                            }
+                            break;
+
+                        case 'checkbox':
+                            $input = $('<input type="checkbox" value="1" name="context-menu-input-'+ key +'" value="">')
+                                .val(item.value || "").prop("checked", !!item.selected).prependTo($label);
+                            break;
+
+                        case 'radio':
+                            $input = $('<input type="radio" value="1" name="context-menu-input-'+ item.radio +'" value="">')
+                                .val(item.value || "").prop("checked", !!item.selected).prependTo($label);
+                            break;
+                    
+                        case 'select':
+                            $input = $('<select name="context-menu-input-'+ key +'">').appendTo($label);
+                            if (item.options) {
+                                $.each(item.options, function(value, text) {
+                                    $('<option></option>').val(value).text(text).appendTo($input);
+                                });
+                                $input.val(item.selected);
+                            }
+                            break;
+                        
+                        case 'sub':
+                            $('<span></span>').html(item._name || item.name).appendTo($t);
+                            item.appendTo = item.$node;
+                            op.create(item, root);
+                            $t.data('contextMenu', item).addClass('context-menu-submenu');
+                            item.callback = null;
+                            break;
+                        
+                        case 'html':
+                            $(item.html).appendTo($t);
+                            break;
+                        
+                        default:
+                            $.each([opt, root], function(i,k){
+                                k.commands[key] = item;
+                                if ($.isFunction(item.callback)) {
+                                    k.callbacks[key] = item.callback;
+                                }
+                            });
+                            
+                            $('<span></span>').html(item._name || item.name || "").appendTo($t);
+                            break;
+                    }
+                    
+                    // disable key listener in <input>
+                    if (item.type && item.type != 'sub' && item.type != 'html') {
+                        $input
+                            .on('focus', handle.focusInput)
+                            .on('blur', handle.blurInput);
+                        
+                        if (item.events) {
+                            $input.on(item.events);
+                        }
+                    }
+                
+                    // add icons
+                    if (item.icon) {
+                        $t.addClass("icon icon-" + item.icon);
+                    }
+                }
+                
+                // cache contained elements
+                item.$input = $input;
+                item.$label = $label;
+
+                // attach item to menu
+                $t.appendTo(opt.$menu);
+                
+                // Disable text selection
+                if (!opt.hasTypes && $.support.eventSelectstart) {
+                    // browsers support user-select: none, 
+                    // IE has a special event for text-selection
+                    // browsers supporting neither will not be preventing text-selection
+                    $t.on('selectstart.disableTextSelect', handle.abortevent);
+                }
+            });
+            // attach contextMenu to <body> (to bypass any possible overflow:hidden issues on parents of the trigger element)
+            if (!opt.$node) {
+                opt.$menu.css('display', 'none').addClass('context-menu-root');
+            }
+            opt.$menu.appendTo(opt.appendTo || document.body);
+        },
+        update: function(opt, root) {
+            var $this = this;
+            if (root === undefined) {
+                root = opt;
+                // determine widths of submenus, as CSS won't grow them automatically
+                // position:absolute > position:absolute; min-width:100; max-width:200; results in width: 100;
+                // kinda sucks hard...
+                opt.$menu.find('ul').andSelf().css({position: 'static', display: 'block'}).each(function(){
+                    var $this = $(this);
+                    $this.width($this.css('position', 'absolute').width())
+                        .css('position', 'static');
+                }).css({position: '', display: ''});
+            }
+            // re-check disabled for each item
+            opt.$menu.children().each(function(){
+                var $item = $(this),
+                    key = $item.data('contextMenuKey'),
+                    item = opt.items[key],
+                    disabled = ($.isFunction(item.disabled) && item.disabled.call($this, key, root)) || item.disabled === true;
+
+                // dis- / enable item
+                $item[disabled ? 'addClass' : 'removeClass']('disabled');
+                
+                if (item.type) {
+                    // dis- / enable input elements
+                    $item.find('input, select, textarea').prop('disabled', disabled);
+                    
+                    // update input states
+                    switch (item.type) {
+                        case 'text':
+                        case 'textarea':
+                            item.$input.val(item.value || "");
+                            break;
+                            
+                        case 'checkbox':
+                        case 'radio':
+                            item.$input.val(item.value || "").prop('checked', !!item.selected);
+                            break;
+                            
+                        case 'select':
+                            item.$input.val(item.selected || "");
+                            break;
+                    }
+                }
+                
+                if (item.$menu) {
+                    // update sub-menu
+                    op.update.call($this, item, root);
+                }
+            });
+        },
+        layer: function(opt, zIndex) {
+            // add transparent layer for click area
+            // filter and background for Internet Explorer, Issue #23
+            var $layer = opt.$layer = $('<div id="context-menu-layer" style="position:fixed; z-index:' + zIndex + '; top:0; left:0; opacity: 0; filter: alpha(opacity=0); background-color: #000;"></div>')
+                .css({height: $win.height(), width: $win.width(), display: 'block'})
+                .data('contextMenuRoot', opt)
+                .insertBefore(this)
+                .on('contextmenu', handle.abortevent)
+                .on('mousedown', handle.layerClick);
+            
+            // IE6 doesn't know position:fixed;
+            if (!$.support.fixedPosition) {
+                $layer.css({
+                    'position' : 'absolute',
+                    'height' : $(document).height()
+                });
+            }
+            
+            return $layer;
+        }
+    };
+
+// split accesskey according to http://www.whatwg.org/specs/web-apps/current-work/multipage/editing.html#assigned-access-key
+function splitAccesskey(val) {
+    var t = val.split(/\s+/),
+        keys = [];
+        
+    for (var i=0, k; k = t[i]; i++) {
+        k = k[0].toUpperCase(); // first character only
+        // theoretically non-accessible characters should be ignored, but different systems, different keyboard layouts, ... screw it.
+        // a map to look up already used access keys would be nice
+        keys.push(k);
+    }
+    
+    return keys;
+}
+
+// handle contextMenu triggers
+$.fn.contextMenu = function(operation) {
+    if (operation === undefined) {
+        this.first().trigger('contextmenu');
+    } else if (operation.x && operation.y) {
+        this.first().trigger(jQuery.Event("contextmenu", {pageX: operation.x, pageY: operation.y}));
+    } else if (operation === "hide") {
+        var $menu = this.data('contextMenu').$menu;
+        $menu && $menu.trigger('contextmenu:hide');
+    } else if (operation) {
+        this.removeClass('context-menu-disabled');
+    } else if (!operation) {
+        this.addClass('context-menu-disabled');
+    }
+    
+    return this;
+};
+
+// manage contextMenu instances
+$.contextMenu = function(operation, options) {
+    if (typeof operation != 'string') {
+        options = operation;
+        operation = 'create';
+    }
+    
+    if (typeof options == 'string') {
+        options = {selector: options};
+    } else if (options === undefined) {
+        options = {};
+    }
+    
+    // merge with default options
+    var o = $.extend(true, {}, defaults, options || {}),
+        $document = $(document);
+    
+    switch (operation) {
+        case 'create':
+            // no selector no joy
+            if (!o.selector) {
+                throw new Error('No selector specified');
+            }
+            // make sure internal classes are not bound to
+            if (o.selector.match(/.context-menu-(list|item|input)($|\s)/)) {
+                throw new Error('Cannot bind to selector "' + o.selector + '" as it contains a reserved className');
+            }
+            if (!o.build && (!o.items || $.isEmptyObject(o.items))) {
+                throw new Error('No Items sepcified');
+            }
+            counter ++;
+            o.ns = '.contextMenu' + counter;
+            namespaces[o.selector] = o.ns;
+            menus[o.ns] = o;
+            
+            // default to right click
+            if (!o.trigger) {
+                o.trigger = 'right';
+            }
+            
+            if (!initialized) {
+                // make sure item click is registered first
+                $document
+                    .on({
+                        'contextmenu:hide.contextMenu': handle.hideMenu,
+                        'prevcommand.contextMenu': handle.prevItem,
+                        'nextcommand.contextMenu': handle.nextItem,
+                        'contextmenu.contextMenu': handle.abortevent,
+                        'mouseenter.contextMenu': handle.menuMouseenter,
+                        'mouseleave.contextMenu': handle.menuMouseleave
+                    }, '.context-menu-list')
+                    .on('mouseup.contextMenu', '.context-menu-input', handle.inputClick)
+                    .on({
+                        'mouseup.contextMenu': handle.itemClick,
+                        'contextmenu:focus.contextMenu': handle.focusItem,
+                        'contextmenu:blur.contextMenu': handle.blurItem,
+                        'contextmenu.contextMenu': handle.abortevent,
+                        'mouseenter.contextMenu': handle.itemMouseenter,
+                        'mouseleave.contextMenu': handle.itemMouseleave
+                    }, '.context-menu-item');
+
+                initialized = true;
+            }
+            
+            // engage native contextmenu event
+            $document
+                .on('contextmenu' + o.ns, o.selector, o, handle.contextmenu);
+            
+            switch (o.trigger) {
+                case 'hover':
+                        $document
+                            .on('mouseenter' + o.ns, o.selector, o, handle.mouseenter)
+                            .on('mouseleave' + o.ns, o.selector, o, handle.mouseleave);                    
+                    break;
+                    
+                case 'left':
+                        $document.on('click' + o.ns, o.selector, o, handle.click);
+                    break;
+                /*
+                default:
+                    // http://www.quirksmode.org/dom/events/contextmenu.html
+                    $document
+                        .on('mousedown' + o.ns, o.selector, o, handle.mousedown)
+                        .on('mouseup' + o.ns, o.selector, o, handle.mouseup);
+                    break;
+                */
+            }
+            
+            // create menu
+            if (!o.build) {
+                op.create(o);
+            }
+            break;
+        
+        case 'destroy':
+            if (!o.selector) {
+                $document.off('.contextMenu .contextMenuAutoHide');
+                $.each(namespaces, function(key, value) {
+                    $document.off(value);
+                });
+                
+                namespaces = {};
+                menus = {};
+                counter = 0;
+                initialized = false;
+                
+                $('#context-menu-layer, .context-menu-list').remove();
+            } else if (namespaces[o.selector]) {
+                var $visibleMenu = $('.context-menu-list').filter(':visible');
+                if ($visibleMenu.length && $visibleMenu.data().contextMenuRoot.$trigger.is(o.selector)) {
+                    $visibleMenu.trigger('contextmenu:hide', {force: true});
+                }
+                
+                try {
+                    if (menus[namespaces[o.selector]].$menu) {
+                        menus[namespaces[o.selector]].$menu.remove();
+                    }
+                    
+                    delete menus[namespaces[o.selector]];
+                } catch(e) {
+                    menus[namespaces[o.selector]] = null;
+                }
+                
+                $document.off(namespaces[o.selector]);
+            }
+            break;
+        
+        case 'html5':
+            // if <command> or <menuitem> are not handled by the browser,
+            // or options was a bool true,
+            // initialize $.contextMenu for them
+            if ((!$.support.htmlCommand && !$.support.htmlMenuitem) || (typeof options == "boolean" && options)) {
+                $('menu[type="context"]').each(function() {
+                    if (this.id) {
+                        $.contextMenu({
+                            selector: '[contextmenu=' + this.id +']',
+                            items: $.contextMenu.fromMenu(this)
+                        });
+                    }
+                }).css('display', 'none');
+            }
+            break;
+        
+        default:
+            throw new Error('Unknown operation "' + operation + '"');
+    }
+    
+    return this;
+};
+
+// import values into <input> commands
+$.contextMenu.setInputValues = function(opt, data) {
+    if (data === undefined) {
+        data = {};
+    }
+    
+    $.each(opt.inputs, function(key, item) {
+        switch (item.type) {
+            case 'text':
+            case 'textarea':
+                item.value = data[key] || "";
+                break;
+
+            case 'checkbox':
+                item.selected = data[key] ? true : false;
+                break;
+                
+            case 'radio':
+                item.selected = (data[item.radio] || "") == item.value ? true : false;
+                break;
+            
+            case 'select':
+                item.selected = data[key] || "";
+                break;
+        }
+    });
+};
+
+// export values from <input> commands
+$.contextMenu.getInputValues = function(opt, data) {
+    if (data === undefined) {
+        data = {};
+    }
+    
+    $.each(opt.inputs, function(key, item) {
+        switch (item.type) {
+            case 'text':
+            case 'textarea':
+            case 'select':
+                data[key] = item.$input.val();
+                break;
+
+            case 'checkbox':
+                data[key] = item.$input.prop('checked');
+                break;
+                
+            case 'radio':
+                if (item.$input.prop('checked')) {
+                    data[item.radio] = item.value;
+                }
+                break;
+        }
+    });
+    
+    return data;
+};
+
+// find <label for="xyz">
+function inputLabel(node) {
+    return (node.id && $('label[for="'+ node.id +'"]').val()) || node.name;
+}
+
+// convert <menu> to items object
+function menuChildren(items, $children, counter) {
+    if (!counter) {
+        counter = 0;
+    }
+    
+    $children.each(function() {
+        var $node = $(this),
+            node = this,
+            nodeName = this.nodeName.toLowerCase(),
+            label,
+            item;
+        
+        // extract <label><input>
+        if (nodeName == 'label' && $node.find('input, textarea, select').length) {
+            label = $node.text();
+            $node = $node.children().first();
+            node = $node.get(0);
+            nodeName = node.nodeName.toLowerCase();
+        }
+        
+        /*
+         * <menu> accepts flow-content as children. that means <embed>, <canvas> and such are valid menu items.
+         * Not being the sadistic kind, $.contextMenu only accepts:
+         * <command>, <menuitem>, <hr>, <span>, <p> <input [text, radio, checkbox]>, <textarea>, <select> and of course <menu>.
+         * Everything else will be imported as an html node, which is not interfaced with contextMenu.
+         */
+        
+        // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#concept-command
+        switch (nodeName) {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/interactive-elements.html#the-menu-element
+            case 'menu':
+                item = {name: $node.attr('label'), items: {}};
+                counter = menuChildren(item.items, $node.children(), counter);
+                break;
+            
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-a-element-to-define-a-command
+            case 'a':
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-button-element-to-define-a-command
+            case 'button':
+                item = {
+                    name: $node.text(),
+                    disabled: !!$node.attr('disabled'),
+                    callback: (function(){ return function(){ $node.click(); }; })()
+                };
+                break;
+            
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-command-element-to-define-a-command
+
+            case 'menuitem':
+            case 'command':
+                switch ($node.attr('type')) {
+                    case undefined:
+                    case 'command':
+                    case 'menuitem':
+                        item = {
+                            name: $node.attr('label'),
+                            disabled: !!$node.attr('disabled'),
+                            callback: (function(){ return function(){ $node.click(); }; })()
+                        };
+                        break;
+                        
+                    case 'checkbox':
+                        item = {
+                            type: 'checkbox',
+                            disabled: !!$node.attr('disabled'),
+                            name: $node.attr('label'),
+                            selected: !!$node.attr('checked')
+                        };
+                        break;
+                        
+                    case 'radio':
+                        item = {
+                            type: 'radio',
+                            disabled: !!$node.attr('disabled'),
+                            name: $node.attr('label'),
+                            radio: $node.attr('radiogroup'),
+                            value: $node.attr('id'),
+                            selected: !!$node.attr('checked')
+                        };
+                        break;
+                        
+                    default:
+                        item = undefined;
+                }
+                break;
+ 
+            case 'hr':
+                item = '-------';
+                break;
+                
+            case 'input':
+                switch ($node.attr('type')) {
+                    case 'text':
+                        item = {
+                            type: 'text',
+                            name: label || inputLabel(node),
+                            disabled: !!$node.attr('disabled'),
+                            value: $node.val()
+                        };
+                        break;
+                        
+                    case 'checkbox':
+                        item = {
+                            type: 'checkbox',
+                            name: label || inputLabel(node),
+                            disabled: !!$node.attr('disabled'),
+                            selected: !!$node.attr('checked')
+                        };
+                        break;
+                        
+                    case 'radio':
+                        item = {
+                            type: 'radio',
+                            name: label || inputLabel(node),
+                            disabled: !!$node.attr('disabled'),
+                            radio: !!$node.attr('name'),
+                            value: $node.val(),
+                            selected: !!$node.attr('checked')
+                        };
+                        break;
+                    
+                    default:
+                        item = undefined;
+                        break;
+                }
+                break;
+                
+            case 'select':
+                item = {
+                    type: 'select',
+                    name: label || inputLabel(node),
+                    disabled: !!$node.attr('disabled'),
+                    selected: $node.val(),
+                    options: {}
+                };
+                $node.children().each(function(){
+                    item.options[this.value] = $(this).text();
+                });
+                break;
+                
+            case 'textarea':
+                item = {
+                    type: 'textarea',
+                    name: label || inputLabel(node),
+                    disabled: !!$node.attr('disabled'),
+                    value: $node.val()
+                };
+                break;
+            
+            case 'label':
+                break;
+            
+            default:
+                item = {type: 'html', html: $node.clone(true)};
+                break;
+        }
+        
+        if (item) {
+            counter++;
+            items['key' + counter] = item;
+        }
+    });
+    
+    return counter;
+}
+
+// convert html5 menu
+$.contextMenu.fromMenu = function(element) {
+    var $this = $(element),
+        items = {};
+        
+    menuChildren(items, $this.children());
+    
+    return items;
+};
+
+// make defaults accessible
+$.contextMenu.defaults = defaults;
+$.contextMenu.types = types;
+
+})(jQuery);
+        ÿœ x ˇˇ     20250331133932-8lªœ ¢¶^0   https://erp.cmrit.ac.in/js/jquery.contextMenu.js      5ı  /*!
+ * jQuery contextMenu - Plugin for simple contextMenu handling
+ *
+ * Version: 1.5.22
+ *
+ * Authors: Rodney Rehm, Addy Osmani (patches for FF)
+ * Web: http://medialize.github.com/jQuery-contextMenu/
+ *
+ * Licensed under
+ *   MIT License http://www.opensource.org/licenses/mit-license
+ *   GPL v3 http://opensource.org/licenses/GPL-3.0
+ *
+ */
+
+(function($, undefined){
+    
+    // TODO: -
+        // ARIA stuff: menuitem, menuitemcheckbox und menuitemradio
+        // create <menu> structure if $.support[htmlCommand || htmlMenuitem] and !opt.disableNative
+
+// determine html5 compatibility
+$.support.htmlMenuitem = ('HTMLMenuItemElement' in window);
+$.support.htmlCommand = ('HTMLCommandElement' in window);
+$.support.eventSelectstart = ("onselectstart" in document.documentElement);
+/* // should the need arise, test for css user-select
+$.support.cssUserSelect = (function(){
+    var t = false,
+        e = document.createElement('div');
+    
+    $.each('Moz|Webkit|Khtml|O|ms|Icab|'.split('|'), function(i, prefix) {
+        var propCC = prefix + (prefix ? 'U' : 'u') + 'serSelect',
+            prop = (prefix ? ('-' + prefix.toLowerCase() + '-') : '') + 'user-select';
+            
+        e.style.cssText = prop + ': text;';
+        if (e.style[propCC] == 'text') {
+            t = true;
+            return false;
+        }
+        
+        return true;
+    });
+    
+    return t;
+})();
+*/
+
+var // currently active contextMenu trigger
+    $currentTrigger = null,
+    // is contextMenu initialized with at least one menu?
+    initialized = false,
+    // window handle
+    $win = $(window),
+    // number of registered menus
+    counter = 0,
+    // mapping selector to namespace
+    namespaces = {},
+    // mapping namespace to options
+    menus = {},
+    // custom command type handlers
+    types = {},
+    // default values
+    defaults = {
+        // selector of contextMenu trigger
+        selector: null,
+        // where to append the menu to
+        appendTo: null,
+        // method to trigger context menu ["right", "left", "hover"]
+        trigger: "right",
+        // hide menu when mouse leaves trigger / menu elements
+        autoHide: false,
+        // ms to wait before showing a hover-triggered context menu
+        delay: 200,
+        // determine position to show menu at
+        determinePosition: function($menu) {
+            // position to the lower middle of the trigger element
+            if ($.ui && $.ui.position) {
+                // .position() is provided as a jQuery UI utility
+                // (...and it won't work on hidden elements)
+                $menu.css('display', 'block').position({
+                    my: "center top",
+                    at: "center bottom",
+                    of: this,
+                    offset: "0 5",
+                    collision: "fit"
+                }).css('display', 'none');
+            } else {
+                // determine contextMenu position
+                var offset = this.offset();
+                offset.top += this.outerHeight();
+                offset.left += this.outerWidth() / 2 - $menu.outerWidth() / 2;
+                $menu.css(offset);
+            }
+        },
+        // position menu
+        position: function(opt, x, y) {
+            var $this = this,
+                offset;
+            // determine contextMenu position
+            if (!x && !y) {
+                opt.determinePosition.call(this, opt.$menu);
+                return;
+            } else if (x === "maintain" && y === "maintain") {
+                // x and y must not be changed (after re-show on command click)
+                offset = opt.$menu.position();
+            } else {
+                // x and y are given (by mouse event)
+                var triggerIsFixed = opt.$trigger.parents().andSelf()
+                    .filter(function() {
+                        return $(this).css('position') == "fixed";
+                    }).length;
+
+                if (triggerIsFixed) {
+                    y -= $win.scrollTop();
+                    x -= $win.scrollLeft();
+                }
+                offset = {top: y, left: x};
+            }
+            
+            // correct offset if viewport demands it
+            var bottom = $win.scrollTop() + $win.height(),
+                right = $win.scrollLeft() + $win.width(),
+                height = opt.$menu.height(),
+                width = opt.$menu.width();
+            
+            if (offset.top + height > bottom) {
+                offset.top -= height;
+            }
+            
+            if (offset.left + width > right) {
+                offset.left -= width;
+            }
+            
+            opt.$menu.css(offset);
+        },
+        // position the sub-menu
+        positionSubmenu: function($menu) {
+            if ($.ui && $.ui.position) {
+                // .position() is provided as a jQuery UI utility
+                // (...and it won't work on hidden elements)
+                $menu.css('display', 'block').position({
+                    my: "left top",
+                    at: "right top",
+                    of: this,
+                    collision: "fit"
+                }).css('display', '');
+            } else {
+                // determine contextMenu position
+                var offset = {
+                    top: 0,
+                    left: this.outerWidth()
+                };
+                $menu.css(offset);
+            }
+        },
+        // offset to add to zIndex
+        zIndex: 1,
+        // show hide animation settings
+        animation: {
+            duration: 50,
+            show: 'slideDown',
+            hide: 'slideUp'
+        },
+        // events
+        events: {
+            show: $.noop,
+            hide: $.noop
+        },
+        // default callback
+        callback: null,
+        // list of contextMenu items
+        items: {}
+    },
+    // mouse position for hover activation
+    hoveract = {
+        timer: null,
+        pageX: null,
+        pageY: null
+    },
+    // determine zIndex
+    zindex = function($t) {
+        var zin = 0,
+            $tt = $t;
+
+        while (true) {
+            zin = Math.max(zin, parseInt($tt.css('z-index'), 10) || 0);
+            $tt = $tt.parent();
+            if (!$tt || !$tt.length || "html body".indexOf($tt.prop('nodeName').toLowerCase()) > -1 ) {
+                break;
+            }
+        }
+        
+        return zin;
+    },
+    // event handlers
+    handle = {
+        // abort anything
+        abortevent: function(e){
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        },
+        
+        // contextmenu show dispatcher
+        contextmenu: function(e) {
+            var $this = $(this);
+            
+            // disable actual context-menu
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            
+            // abort native-triggered events unless we're triggering on right click
+            if (e.data.trigger != 'right' && e.originalEvent) {
+                return;
+            }
+            
+            if (!$this.hasClass('context-menu-disabled')) {
+                // theoretically need to fire a show event at <menu>
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/interactive-elements.html#context-menus
+                // var evt = jQuery.Event("show", { data: data, pageX: e.pageX, pageY: e.pageY, relatedTarget: this });
+                // e.data.$menu.trigger(evt);
+                
+                $currentTrigger = $this;
+                if (e.data.build) {
+                    var built = e.data.build($currentTrigger, e);
+                    // abort if build() returned false
+                    if (built === false) {
+                        return;
+                    }
+                    
+                    // dynamically build menu on invocation
+                    e.data = $.extend(true, {}, defaults, e.data, built || {});
+
+                    // abort if there are no items to display
+                    if (!e.data.items || $.isEmptyObject(e.data.items)) {
+                        // Note: jQuery captures and ignores errors from event handlers
+                        if (window.console) {
+                            (console.error || console.log)("No items specified to show in contextMenu");
+                        }
+                        
+                        throw new Error('No Items sepcified');
+                    }
+                    
+                    // backreference for custom command type creation
+                    e.data.$trigger = $currentTrigger;
+                    
+                    op.create(e.data);
+                }
+                // show menu
+                op.show.call($this, e.data, e.pageX, e.pageY);
+            }
+        },
+        // contextMenu left-click trigger
+        click: function(e) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            $(this).trigger(jQuery.Event("contextmenu", { data: e.data, pageX: e.pageX, pageY: e.pageY }));
+        },
+        // contextMenu right-click trigger
+        mousedown: function(e) {
+            // register mouse down
+            var $this = $(this);
+            
+            // hide any previous menus
+            if ($currentTrigger && $currentTrigger.length && !$currentTrigger.is($this)) {
+                $currentTrigger.data('contextMenu').$menu.trigger('contextmenu:hide');
+            }
+            
+            // activate on right click
+            if (e.button == 2) {
+                $currentTrigger = $this.data('contextMenuActive', true);
+            }
+        },
+        // contextMenu right-click trigger
+        mouseup: function(e) {
+            // show menu
+            var $this = $(this);
+            if ($this.data('contextMenuActive') && $currentTrigger && $currentTrigger.length && $currentTrigger.is($this) && !$this.hasClass('context-menu-disabled')) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                $currentTrigger = $this;
+                $this.trigger(jQuery.Event("contextmenu", { data: e.data, pageX: e.pageX, pageY: e.pageY }));
+            }
+            
+            $this.removeData('contextMenuActive');
+        },
+        // contextMenu hover trigger
+        mouseenter: function(e) {
+            var $this = $(this),
+                $related = $(e.relatedTarget),
+                $document = $(document);
+            
+            // abort if we're coming from a menu
+            if ($related.is('.context-menu-list') || $related.closest('.context-menu-list').length) {
+                return;
+            }
+            
+            // abort if a menu is shown
+            if ($currentTrigger && $currentTrigger.length) {
+                return;
+            }
+            
+            hoveract.pageX = e.pageX;
+            hoveract.pageY = e.pageY;
+            hoveract.data = e.data;
+            $document.on('mousemove.contextMenuShow', handle.mousemove);
+            hoveract.timer = setTimeout(function() {
+                hoveract.timer = null;
+                $document.off('mousemove.contextMenuShow');
+                $currentTrigger = $this;
+                $this.trigger(jQuery.Event("contextmenu", { data: hoveract.data, pageX: hoveract.pageX, pageY: hoveract.pageY }));
+            }, e.data.delay );
+        },
+        // contextMenu hover trigger
+        mousemove: function(e) {
+            hoveract.pageX = e.pageX;
+            hoveract.pageY = e.pageY;
+        },
+        // contextMenu hover trigger
+        mouseleave: function(e) {
+            // abort if we're leaving for a menu
+            var $related = $(e.relatedTarget);
+            if ($related.is('.context-menu-list') || $related.closest('.context-menu-list').length) {
+                return;
+            }
+            
+            try {
+                clearTimeout(hoveract.timer);
+            } catch(e) {}
+            
+            hoveract.timer = null;
+        },
+        
+        // click on layer to hide contextMenu
+        layerClick: function(e) {
+            var $this = $(this),
+                root = $this.data('contextMenuRoot'),
+                mouseup = false,
+                button = e.button,
+                x = e.pageX,
+                y = e.pageY,
+                target, 
+                offset,
+                selectors;
+                
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            
+            // This hack looks about as ugly as it is
+            // Firefox 12 (at least) fires the contextmenu event directly "after" mousedown
+            // for some reason `root.$layer.hide(); document.elementFromPoint()` causes this
+            // contextmenu event to be triggered on the uncovered element instead of on the
+            // layer (where every other sane browser, including Firefox nightly at the time)
+            // triggers the event. This workaround might be obsolete by September 2012.
+            $this.on('mouseup', function() {
+                mouseup = true;
+            });
+            setTimeout(function() {
+                var $window, hideshow;
+                
+                // test if we need to reposition the menu
+                if ((root.trigger == 'left' && button == 0) || (root.trigger == 'right' && button == 2)) {
+                    if (document.elementFromPoint) {
+                        root.$layer.hide();
+                        target = document.elementFromPoint(x, y);
+                        root.$layer.show();
+
+                        selectors = [];
+                        for (var s in namespaces) {
+                            selectors.push(s);
+                        }
+
+                        target = $(target).closest(selectors.join(', '));
+
+                        if (target.length) {
+                            if (target.is(root.$trigger[0])) {
+                                root.position.call(root.$trigger, root, x, y);
+                                return;
+                            }
+                        }
+                    } else {
+                        offset = root.$trigger.offset();
+                        $window = $(window);
+                        // while this looks kinda awful, it's the best way to avoid
+                        // unnecessarily calculating any positions
+                        offset.top += $window.scrollTop();
+                        if (offset.top <= e.pageY) {
+                            offset.left += $window.scrollLeft();
+                            if (offset.left <= e.pageX) {
+                                offset.bottom = offset.top + root.$trigger.outerHeight();
+                                if (offset.bottom >= e.pageY) {
+                                    offset.right = offset.left + root.$trigger.outerWidth();
+                                    if (offset.right >= e.pageX) {
+                                        // reposition
+                                        root.position.call(root.$trigger, root, x, y);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                hideshow = function(e) {
+                    if (e) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                    }
+
+                    root.$menu.trigger('contextmenu:hide');
+                    if (target && target.length) {
+                        setTimeout(function() {
+                            target.contextMenu({x: x, y: y});
+                        }, 50);
+                    }
+                };
+            
+                if (mouseup) {
+                    // mouseup has already happened
+                    hideshow();
+                } else {
+                    // remove only after mouseup has completed
+                    $this.on('mouseup', hideshow);
+                }
+            }, 50);
+        },
+        // key handled :hover
+        keyStop: function(e, opt) {
+            if (!opt.isInput) {
+                e.preventDefault();
+            }
+            
+            e.stopPropagation();
+        },
+        key: function(e) {
+            var opt = $currentTrigger.data('contextMenu') || {},
+                $children = opt.$menu.children(),
+                $round;
+
+            switch (e.keyCode) {
+                case 9:
+                case 38: // up
+                    handle.keyStop(e, opt);
+                    // if keyCode is [38 (up)] or [9 (tab) with shift]
+                    if (opt.isInput) {
+                        if (e.keyCode == 9 && e.shiftKey) {
+                            e.preventDefault();
+                            opt.$selected && opt.$selected.find('input, textarea, select').blur();
+                            opt.$menu.trigger('prevcommand');
+                            return;
+                        } else if (e.keyCode == 38 && opt.$selected.find('input, textarea, select').prop('type') == 'checkbox') {
+                            // checkboxes don't capture this key
+                            e.preventDefault();
+                            return;
+                        }
+                    } else if (e.keyCode != 9 || e.shiftKey) {
+                        opt.$menu.trigger('prevcommand');
+                        return;
+                    }
+                    
+                case 9: // tab
+                case 40: // down
+                    handle.keyStop(e, opt);
+                    if (opt.isInput) {
+                        if (e.keyCode == 9) {
+                            e.preventDefault();
+                            opt.$selected && opt.$selected.find('input, textarea, select').blur();
+                            opt.$menu.trigger('nextcommand');
+                            return;
+                        } else if (e.keyCode == 40 && opt.$selected.find('input, textarea, select').prop('type') == 'checkbox') {
+                            // checkboxes don't capture this key
+                            e.preventDefault();
+                            return;
+                        }
+                    } else {
+                        opt.$menu.trigger('nextcommand');
+                        return;
+                    }
+                    break;
+                
+                case 37: // left
+                    handle.keyStop(e, opt);
+                    if (opt.isInput || !opt.$selected || !opt.$selected.length) {
+                        break;
+                    }
+                
+                    if (!opt.$selected.parent().hasClass('context-menu-root')) {
+                        var $parent = opt.$selected.parent().parent();
+                        opt.$selected.trigger('contextmenu:blur');
+                        opt.$selected = $parent;
+                        return;
+                    }
+                    break;
+                    
+                case 39: // right
+                    handle.keyStop(e, opt);
+                    if (opt.isInput || !opt.$selected || !opt.$selected.length) {
+                        break;
+                    }
+                    
+                    var itemdata = opt.$selected.data('contextMenu') || {};
+                    if (itemdata.$menu && opt.$selected.hasClass('context-menu-submenu')) {
+                        opt.$selected = null;
+                        itemdata.$selected = null;
+                        itemdata.$menu.trigger('nextcommand');
+                        return;
+                    }
+                    break;
+                
+                case 35: // end
+                case 36: // home
+                    if (opt.$selected && opt.$selected.find('input, textarea, select').length) {
+                        return;
+                    } else {
+                        (opt.$selected && opt.$selected.parent() || opt.$menu)
+                            .children(':not(.disabled, .not-selectable)')[e.keyCode == 36 ? 'first' : 'last']()
+                            .trigger('contextmenu:focus');
+                        e.preventDefault();
+                        return;
+                    }
+                    break;
+                    
+                case 13: // enter
+                    handle.keyStop(e, opt);
+                    if (opt.isInput) {
+                        if (opt.$selected && !opt.$selected.is('textarea, select')) {
+                            e.preventDefault();
+                            return;
+                        }
+                        break;
+                    }
+                    opt.$selected && opt.$selected.trigger('mouseup');
+                    return;
+                    
+                case 32: // space
+                case 33: // page up
+                case 34: // page down
+                    // prevent browser from scrolling down while menu is visible
+                    handle.keyStop(e, opt);
+                    return;
+                    
+                case 27: // esc
+                    handle.keyStop(e, opt);
+                    opt.$menu.trigger('contextmenu:hide');
+                    return;
+                    
+                default: // 0-9, a-z
+                    var k = (String.fromCharCode(e.keyCode)).toUpperCase();
+                    if (opt.accesskeys[k]) {
+                        // according to the specs accesskeys must be invoked immediately
+                        opt.accesskeys[k].$node.trigger(opt.accesskeys[k].$menu
+                            ? 'contextmenu:focus'
+                            : 'mouseup'
+                        );
+                        return;
+                    }
+                    break;
+            }
+            // pass event to selected item, 
+            // stop propagation to avoid endless recursion
+            e.stopPropagation();
+            opt.$selected && opt.$selected.trigger(e);
+        },
+
+        // select previous possible command in menu
+        prevItem: function(e) {
+            e.stopPropagation();
+            var opt = $(this).data('contextMenu') || {};
+
+            // obtain currently selected menu
+            if (opt.$selected) {
+                var $s = opt.$selected;
+                opt = opt.$selected.parent().data('contextMenu') || {};
+                opt.$selected = $s;
+            }
+            
+            var $children = opt.$menu.children(),
+                $prev = !opt.$selected || !opt.$selected.prev().length ? $children.last() : opt.$selected.prev(),
+                $round = $prev;
+            
+            // skip disabled
+            while ($prev.hasClass('disabled') || $prev.hasClass('not-selectable')) {
+                if ($prev.prev().length) {
+                    $prev = $prev.prev();
+                } else {
+                    $prev = $children.last();
+                }
+                if ($prev.is($round)) {
+                    // break endless loop
+                    return;
+                }
+            }
+            
+            // leave current
+            if (opt.$selected) {
+                handle.itemMouseleave.call(opt.$selected.get(0), e);
+            }
+            
+            // activate next
+            handle.itemMouseenter.call($prev.get(0), e);
+            
+            // focus input
+            var $input = $prev.find('input, textarea, select');
+            if ($input.length) {
+                $input.focus();
+            }
+        },
+        // select next possible command in menu
+        nextItem: function(e) {
+            e.stopPropagation();
+            var opt = $(this).data('contextMenu') || {};
+
+            // obtain currently selected menu
+            if (opt.$selected) {
+                var $s = opt.$selected;
+                opt = opt.$selected.parent().data('contextMenu') || {};
+                opt.$selected = $s;
+            }
+
+            var $children = opt.$menu.children(),
+                $next = !opt.$selected || !opt.$selected.next().length ? $children.first() : opt.$selected.next(),
+                $round = $next;
+
+            // skip disabled
+            while ($next.hasClass('disabled') || $next.hasClass('not-selectable')) {
+                if ($next.next().length) {
+                    $next = $next.next();
+                } else {
+                    $next = $children.first();
+                }
+                if ($next.is($round)) {
+                    // break endless loop
+                    return;
+                }
+            }
+            
+            // leave current
+            if (opt.$selected) {
+                handle.itemMouseleave.call(opt.$selected.get(0), e);
+            }
+            
+            // activate next
+            handle.itemMouseenter.call($next.get(0), e);
+            
+            // focus input
+            var $input = $next.find('input, textarea, select');
+            if ($input.length) {
+                $input.focus();
+            }
+        },
+        
+        // flag that we're inside an input so the key handler can act accordingly
+        focusInput: function(e) {
+            var $this = $(this).closest('.context-menu-item'),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+
+            root.$selected = opt.$selected = $this;
+            root.isInput = opt.isInput = true;
+        },
+        // flag that we're inside an input so the key handler can act accordingly
+        blurInput: function(e) {
+            var $this = $(this).closest('.context-menu-item'),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+
+            root.isInput = opt.isInput = false;
+        },
+        
+        // :hover on menu
+        menuMouseenter: function(e) {
+            var root = $(this).data().contextMenuRoot;
+            root.hovering = true;
+        },
+        // :hover on menu
+        menuMouseleave: function(e) {
+            var root = $(this).data().contextMenuRoot;
+            if (root.$layer && root.$layer.is(e.relatedTarget)) {
+                root.hovering = false;
+            }
+        },
+        
+        // :hover done manually so key handling is possible
+        itemMouseenter: function(e) {
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+            
+            root.hovering = true;
+
+            // abort if we're re-entering
+            if (e && root.$layer && root.$layer.is(e.relatedTarget)) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+            }
+
+            // make sure only one item is selected
+            (opt.$menu ? opt : root).$menu
+                .children('.hover').trigger('contextmenu:blur');
+
+            if ($this.hasClass('disabled') || $this.hasClass('not-selectable')) {
+                opt.$selected = null;
+                return;
+            }
+            
+            $this.trigger('contextmenu:focus');
+        },
+        // :hover done manually so key handling is possible
+        itemMouseleave: function(e) {
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+
+            if (root !== opt && root.$layer && root.$layer.is(e.relatedTarget)) {
+                root.$selected && root.$selected.trigger('contextmenu:blur');
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                root.$selected = opt.$selected = opt.$node;
+                return;
+            }
+            
+            $this.trigger('contextmenu:blur');
+        },
+        // contextMenu item click
+        itemClick: function(e) {
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot,
+                key = data.contextMenuKey,
+                callback;
+
+            // abort if the key is unknown or disabled or is a menu
+            if (!opt.items[key] || $this.hasClass('disabled') || $this.hasClass('context-menu-submenu')) {
+                return;
+            }
+
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            if ($.isFunction(root.callbacks[key])) {
+                // item-specific callback
+                callback = root.callbacks[key];
+            } else if ($.isFunction(root.callback)) {
+                // default callback
+                callback = root.callback;                
+            } else {
+                // no callback, no action
+                return;
+            }
+
+            // hide menu if callback doesn't stop that
+            if (callback.call(root.$trigger, key, root) !== false) {
+                root.$menu.trigger('contextmenu:hide');
+            } else if (root.$menu.parent().length) {
+                op.update.call(root.$trigger, root);
+            }
+        },
+        // ignore click events on input elements
+        inputClick: function(e) {
+            e.stopImmediatePropagation();
+        },
+        
+        // hide <menu>
+        hideMenu: function(e, data) {
+            var root = $(this).data('contextMenuRoot');
+            op.hide.call(root.$trigger, root, data && data.force);
+        },
+        // focus <command>
+        focusItem: function(e) {
+            e.stopPropagation();
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+
+            $this.addClass('hover')
+                .siblings('.hover').trigger('contextmenu:blur');
+            
+            // remember selected
+            opt.$selected = root.$selected = $this;
+            
+            // position sub-menu - do after show so dumb $.ui.position can keep up
+            if (opt.$node) {
+                root.positionSubmenu.call(opt.$node, opt.$menu);
+            }
+        },
+        // blur <command>
+        blurItem: function(e) {
+            e.stopPropagation();
+            var $this = $(this),
+                data = $this.data(),
+                opt = data.contextMenu,
+                root = data.contextMenuRoot;
+            
+            $this.removeClass('hover');
+            opt.$selected = null;
+        }
+    },
+    // operations
+    op = {
+        show: function(opt, x, y) {
+            var $this = $(this),
+                offset,
+                css = {};
+
+            // hide any open menus
+            $('#context-menu-layer').trigger('mousedown');
+
+            // backreference for callbacks
+            opt.$trigger = $this;
+
+            // show event
+            if (opt.events.show.call($this, opt) === false) {
+                $currentTrigger = null;
+                return;
+            }
+
+            // create or update context menu
+            op.update.call($this, opt);
+            
+            // position menu
+            opt.position.call($this, opt, x, y);
+
+            // make sure we're in front
+            if (opt.zIndex) {
+                css.zIndex = zindex($this) + opt.zIndex;
+            }
+            
+            // add layer
+            op.layer.call(opt.$menu, opt, css.zIndex);
+            
+            // adjust sub-menu zIndexes
+            opt.$menu.find('ul').css('zIndex', css.zIndex + 1);
+            
+            // position and show context menu
+            opt.$menu.css( css )[opt.animation.show](opt.animation.duration);
+            // make options available
+            $this.data('contextMenu', opt);
+            // register key handler
+            $(document).off('keydown.contextMenu').on('keydown.contextMenu', handle.key);
+            // register autoHide handler
+            if (opt.autoHide) {
+                // trigger element coordinates
+                var pos = $this.position();
+                pos.right = pos.left + $this.outerWidth();
+                pos.bottom = pos.top + this.outerHeight();
+                // mouse position handler
+                $(document).on('mousemove.contextMenuAutoHide', function(e) {
+                    if (opt.$layer && !opt.hovering && (!(e.pageX >= pos.left && e.pageX <= pos.right) || !(e.pageY >= pos.top && e.pageY <= pos.bottom))) {
+                        // if mouse in menu...
+                        opt.$menu.trigger('contextmenu:hide');
+                    }
+                });
+            }
+        },
+        hide: function(opt, force) {
+            var $this = $(this);
+            if (!opt) {
+                opt = $this.data('contextMenu') || {};
+            }
+            
+            // hide event
+            if (!force && opt.events && opt.events.hide.call($this, opt) === false) {
+                return;
+            }
+            
+            if (opt.$layer) {
+                // keep layer for a bit so the contextmenu event can be aborted properly by opera
+                setTimeout((function($layer){ return function(){
+                        $layer.remove();
+                    };
+                })(opt.$layer), 10);
+                
+                try {
+                    delete opt.$layer;
+                } catch(e) {
+                    opt.$layer = null;
+                }
+            }
+            
+            // remove handle
+            $currentTrigger = null;
+            // remove selected
+            opt.$menu.find('.hover').trigger('contextmenu:blur');
+            opt.$selected = null;
+            // unregister key and mouse handlers
+            //$(document).off('.contextMenuAutoHide keydown.contextMenu'); // http://bugs.jquery.com/ticket/10705
+            $(document).off('.contextMenuAutoHide').off('keydown.contextMenu');
+            // hide menu
+            opt.$menu && opt.$menu[opt.animation.hide](opt.animation.duration, function (){
+                // tear down dynamically built menu after animation is completed.
+                if (opt.build) {
+                    opt.$menu.remove();
+                    $.each(opt, function(key, value) {
+                        switch (key) {
+                            case 'ns':
+                            case 'selector':
+                            case 'build':
+                            case 'trigger':
+                                return true;
+
+                            default:
+                                opt[key] = undefined;
+                                try {
+                                    delete opt[key];
+                                } catch (e) {}
+                                return true;
+                        }
+                    });
+                }
+            });
+        },
+        create: function(opt, root) {
+            if (root === undefined) {
+                root = opt;
+            }
+            // create contextMenu
+            opt.$menu = $('<ul class="context-menu-list ' + (opt.className || "") + '"></ul>').data({
+                'contextMenu': opt,
+                'contextMenuRoot': root
+            });
+            
+            $.each(['callbacks', 'commands', 'inputs'], function(i,k){
+                opt[k] = {};
+                if (!root[k]) {
+                    root[k] = {};
+                }
+            });
+            
+            root.accesskeys || (root.accesskeys = {});
+            
+            // create contextMenu items
+            $.each(opt.items, function(key, item){
+                var $t = $('<li class="context-menu-item ' + (item.className || "") +'"></li>'),
+                    $label = null,
+                    $input = null;
+                
+                item.$node = $t.data({
+                    'contextMenu': opt,
+                    'contextMenuRoot': root,
+                    'contextMenuKey': key
+                });
+                
+                // register accesskey
+                // NOTE: the accesskey attribute should be applicable to any element, but Safari5 and Chrome13 still can't do that
+                if (item.accesskey) {
+                    var aks = splitAccesskey(item.accesskey);
+                    for (var i=0, ak; ak = aks[i]; i++) {
+                        if (!root.accesskeys[ak]) {
+                            root.accesskeys[ak] = item;
+                            item._name = item.name.replace(new RegExp('(' + ak + ')', 'i'), '<span class="context-menu-accesskey">$1</span>');
+                            break;
+                        }
+                    }
+                }
+                
+                if (typeof item == "string") {
+                    $t.addClass('context-menu-separator not-selectable');
+                } else if (item.type && types[item.type]) {
+                    // run custom type handler
+                    types[item.type].call($t, item, opt, root);
+                    // register commands
+                    $.each([opt, root], function(i,k){
+                        k.commands[key] = item;
+                        if ($.isFunction(item.callback)) {
+                            k.callbacks[key] = item.callback;
+                        }
+                    });
+                } else {
+                    // add label for input
+                    if (item.type == 'html') {
+                        $t.addClass('context-menu-html not-selectable');
+                    } else if (item.type) {
+                        $label = $('<label></label>').appendTo($t);
+                        $('<span></span>').html(item._name || item.name).appendTo($label);
+                        $t.addClass('context-menu-input');
+                        opt.hasTypes = true;
+                        $.each([opt, root], function(i,k){
+                            k.commands[key] = item;
+                            k.inputs[key] = item;
+                        });
+                    } else if (item.items) {
+                        item.type = 'sub';
+                    }
+                
+                    switch (item.type) {
+                        case 'text':
+                            $input = $('<input type="text" value="1" name="context-menu-input-'+ key +'" value="">')
+                                .val(item.value || "").appendTo($label);
+                            break;
+                    
+                        case 'textarea':
+                            $input = $('<textarea name="context-menu-input-'+ key +'"></textarea>')
+                                .val(item.value || "").appendTo($label);
+
+                            if (item.height) {
+                                $input.height(item.height);
+                            }
+                            break;
+
+                        case 'checkbox':
+                            $input = $('<input type="checkbox" value="1" name="context-menu-input-'+ key +'" value="">')
+                                .val(item.value || "").prop("checked", !!item.selected).prependTo($label);
+                            break;
+
+                        case 'radio':
+                            $input = $('<input type="radio" value="1" name="context-menu-input-'+ item.radio +'" value="">')
+                                .val(item.value || "").prop("checked", !!item.selected).prependTo($label);
+                            break;
+                    
+                        case 'select':
+                            $input = $('<select name="context-menu-input-'+ key +'">').appendTo($label);
+                            if (item.options) {
+                                $.each(item.options, function(value, text) {
+                                    $('<option></option>').val(value).text(text).appendTo($input);
+                                });
+                                $input.val(item.selected);
+                            }
+                            break;
+                        
+                        case 'sub':
+                            $('<span></span>').html(item._name || item.name).appendTo($t);
+                            item.appendTo = item.$node;
+                            op.create(item, root);
+                            $t.data('contextMenu', item).addClass('context-menu-submenu');
+                            item.callback = null;
+                            break;
+                        
+                        case 'html':
+                            $(item.html).appendTo($t);
+                            break;
+                        
+                        default:
+                            $.each([opt, root], function(i,k){
+                                k.commands[key] = item;
+                                if ($.isFunction(item.callback)) {
+                                    k.callbacks[key] = item.callback;
+                                }
+                            });
+                            
+                            $('<span></span>').html(item._name || item.name || "").appendTo($t);
+                            break;
+                    }
+                    
+                    // disable key listener in <input>
+                    if (item.type && item.type != 'sub' && item.type != 'html') {
+                        $input
+                            .on('focus', handle.focusInput)
+                            .on('blur', handle.blurInput);
+                        
+                        if (item.events) {
+                            $input.on(item.events);
+                        }
+                    }
+                
+                    // add icons
+                    if (item.icon) {
+                        $t.addClass("icon icon-" + item.icon);
+                    }
+                }
+                
+                // cache contained elements
+                item.$input = $input;
+                item.$label = $label;
+
+                // attach item to menu
+                $t.appendTo(opt.$menu);
+                
+                // Disable text selection
+                if (!opt.hasTypes && $.support.eventSelectstart) {
+                    // browsers support user-select: none, 
+                    // IE has a special event for text-selection
+                    // browsers supporting neither will not be preventing text-selection
+                    $t.on('selectstart.disableTextSelect', handle.abortevent);
+                }
+            });
+            // attach contextMenu to <body> (to bypass any possible overflow:hidden issues on parents of the trigger element)
+            if (!opt.$node) {
+                opt.$menu.css('display', 'none').addClass('context-menu-root');
+            }
+            opt.$menu.appendTo(opt.appendTo || document.body);
+        },
+        update: function(opt, root) {
+            var $this = this;
+            if (root === undefined) {
+                root = opt;
+                // determine widths of submenus, as CSS won't grow them automatically
+                // position:absolute > position:absolute; min-width:100; max-width:200; results in width: 100;
+                // kinda sucks hard...
+                opt.$menu.find('ul').andSelf().css({position: 'static', display: 'block'}).each(function(){
+                    var $this = $(this);
+                    $this.width($this.css('position', 'absolute').width())
+                        .css('position', 'static');
+                }).css({position: '', display: ''});
+            }
+            // re-check disabled for each item
+            opt.$menu.children().each(function(){
+                var $item = $(this),
+                    key = $item.data('contextMenuKey'),
+                    item = opt.items[key],
+                    disabled = ($.isFunction(item.disabled) && item.disabled.call($this, key, root)) || item.disabled === true;
+
+                // dis- / enable item
+                $item[disabled ? 'addClass' : 'removeClass']('disabled');
+                
+                if (item.type) {
+                    // dis- / enable input elements
+                    $item.find('input, select, textarea').prop('disabled', disabled);
+                    
+                    // update input states
+                    switch (item.type) {
+                        case 'text':
+                        case 'textarea':
+                            item.$input.val(item.value || "");
+                            break;
+                            
+                        case 'checkbox':
+                        case 'radio':
+                            item.$input.val(item.value || "").prop('checked', !!item.selected);
+                            break;
+                            
+                        case 'select':
+                            item.$input.val(item.selected || "");
+                            break;
+                    }
+                }
+                
+                if (item.$menu) {
+                    // update sub-menu
+                    op.update.call($this, item, root);
+                }
+            });
+        },
+        layer: function(opt, zIndex) {
+            // add transparent layer for click area
+            // filter and background for Internet Explorer, Issue #23
+            var $layer = opt.$layer = $('<div id="context-menu-layer" style="position:fixed; z-index:' + zIndex + '; top:0; left:0; opacity: 0; filter: alpha(opacity=0); background-color: #000;"></div>')
+                .css({height: $win.height(), width: $win.width(), display: 'block'})
+                .data('contextMenuRoot', opt)
+                .insertBefore(this)
+                .on('contextmenu', handle.abortevent)
+                .on('mousedown', handle.layerClick);
+            
+            // IE6 doesn't know position:fixed;
+            if (!$.support.fixedPosition) {
+                $layer.css({
+                    'position' : 'absolute',
+                    'height' : $(document).height()
+                });
+            }
+            
+            return $layer;
+        }
+    };
+
+// split accesskey according to http://www.whatwg.org/specs/web-apps/current-work/multipage/editing.html#assigned-access-key
+function splitAccesskey(val) {
+    var t = val.split(/\s+/),
+        keys = [];
+        
+    for (var i=0, k; k = t[i]; i++) {
+        k = k[0].toUpperCase(); // first character only
+        // theoretically non-accessible characters should be ignored, but different systems, different keyboard layouts, ... screw it.
+        // a map to look up already used access keys would be nice
+        keys.push(k);
+    }
+    
+    return keys;
+}
+
+// handle contextMenu triggers
+$.fn.contextMenu = function(operation) {
+    if (operation === undefined) {
+        this.first().trigger('contextmenu');
+    } else if (operation.x && operation.y) {
+        this.first().trigger(jQuery.Event("contextmenu", {pageX: operation.x, pageY: operation.y}));
+    } else if (operation === "hide") {
+        var $menu = this.data('contextMenu').$menu;
+        $menu && $menu.trigger('contextmenu:hide');
+    } else if (operation) {
+        this.removeClass('context-menu-disabled');
+    } else if (!operation) {
+        this.addClass('context-menu-disabled');
+    }
+    
+    return this;
+};
+
+// manage contextMenu instances
+$.contextMenu = function(operation, options) {
+    if (typeof operation != 'string') {
+        options = operation;
+        operation = 'create';
+    }
+    
+    if (typeof options == 'string') {
+        options = {selector: options};
+    } else if (options === undefined) {
+        options = {};
+    }
+    
+    // merge with default options
+    var o = $.extend(true, {}, defaults, options || {}),
+        $document = $(document);
+    
+    switch (operation) {
+        case 'create':
+            // no selector no joy
+            if (!o.selector) {
+                throw new Error('No selector specified');
+            }
+            // make sure internal classes are not bound to
+            if (o.selector.match(/.context-menu-(list|item|input)($|\s)/)) {
+                throw new Error('Cannot bind to selector "' + o.selector + '" as it contains a reserved className');
+            }
+            if (!o.build && (!o.items || $.isEmptyObject(o.items))) {
+                throw new Error('No Items sepcified');
+            }
+            counter ++;
+            o.ns = '.contextMenu' + counter;
+            namespaces[o.selector] = o.ns;
+            menus[o.ns] = o;
+            
+            // default to right click
+            if (!o.trigger) {
+                o.trigger = 'right';
+            }
+            
+            if (!initialized) {
+                // make sure item click is registered first
+                $document
+                    .on({
+                        'contextmenu:hide.contextMenu': handle.hideMenu,
+                        'prevcommand.contextMenu': handle.prevItem,
+                        'nextcommand.contextMenu': handle.nextItem,
+                        'contextmenu.contextMenu': handle.abortevent,
+                        'mouseenter.contextMenu': handle.menuMouseenter,
+                        'mouseleave.contextMenu': handle.menuMouseleave
+                    }, '.context-menu-list')
+                    .on('mouseup.contextMenu', '.context-menu-input', handle.inputClick)
+                    .on({
+                        'mouseup.contextMenu': handle.itemClick,
+                        'contextmenu:focus.contextMenu': handle.focusItem,
+                        'contextmenu:blur.contextMenu': handle.blurItem,
+                        'contextmenu.contextMenu': handle.abortevent,
+                        'mouseenter.contextMenu': handle.itemMouseenter,
+                        'mouseleave.contextMenu': handle.itemMouseleave
+                    }, '.context-menu-item');
+
+                initialized = true;
+            }
+            
+            // engage native contextmenu event
+            $document
+                .on('contextmenu' + o.ns, o.selector, o, handle.contextmenu);
+            
+            switch (o.trigger) {
+                case 'hover':
+                        $document
+                            .on('mouseenter' + o.ns, o.selector, o, handle.mouseenter)
+                            .on('mouseleave' + o.ns, o.selector, o, handle.mouseleave);                    
+                    break;
+                    
+                case 'left':
+                        $document.on('click' + o.ns, o.selector, o, handle.click);
+                    break;
+                /*
+                default:
+                    // http://www.quirksmode.org/dom/events/contextmenu.html
+                    $document
+                        .on('mousedown' + o.ns, o.selector, o, handle.mousedown)
+                        .on('mouseup' + o.ns, o.selector, o, handle.mouseup);
+                    break;
+                */
+            }
+            
+            // create menu
+            if (!o.build) {
+                op.create(o);
+            }
+            break;
+        
+        case 'destroy':
+            if (!o.selector) {
+                $document.off('.contextMenu .contextMenuAutoHide');
+                $.each(namespaces, function(key, value) {
+                    $document.off(value);
+                });
+                
+                namespaces = {};
+                menus = {};
+                counter = 0;
+                initialized = false;
+                
+                $('#context-menu-layer, .context-menu-list').remove();
+            } else if (namespaces[o.selector]) {
+                var $visibleMenu = $('.context-menu-list').filter(':visible');
+                if ($visibleMenu.length && $visibleMenu.data().contextMenuRoot.$trigger.is(o.selector)) {
+                    $visibleMenu.trigger('contextmenu:hide', {force: true});
+                }
+                
+                try {
+                    if (menus[namespaces[o.selector]].$menu) {
+                        menus[namespaces[o.selector]].$menu.remove();
+                    }
+                    
+                    delete menus[namespaces[o.selector]];
+                } catch(e) {
+                    menus[namespaces[o.selector]] = null;
+                }
+                
+                $document.off(namespaces[o.selector]);
+            }
+            break;
+        
+        case 'html5':
+            // if <command> or <menuitem> are not handled by the browser,
+            // or options was a bool true,
+            // initialize $.contextMenu for them
+            if ((!$.support.htmlCommand && !$.support.htmlMenuitem) || (typeof options == "boolean" && options)) {
+                $('menu[type="context"]').each(function() {
+                    if (this.id) {
+                        $.contextMenu({
+                            selector: '[contextmenu=' + this.id +']',
+                            items: $.contextMenu.fromMenu(this)
+                        });
+                    }
+                }).css('display', 'none');
+            }
+            break;
+        
+        default:
+            throw new Error('Unknown operation "' + operation + '"');
+    }
+    
+    return this;
+};
+
+// import values into <input> commands
+$.contextMenu.setInputValues = function(opt, data) {
+    if (data === undefined) {
+        data = {};
+    }
+    
+    $.each(opt.inputs, function(key, item) {
+        switch (item.type) {
+            case 'text':
+            case 'textarea':
+                item.value = data[key] || "";
+                break;
+
+            case 'checkbox':
+                item.selected = data[key] ? true : false;
+                break;
+                
+            case 'radio':
+                item.selected = (data[item.radio] || "") == item.value ? true : false;
+                break;
+            
+            case 'select':
+                item.selected = data[key] || "";
+                break;
+        }
+    });
+};
+
+// export values from <input> commands
+$.contextMenu.getInputValues = function(opt, data) {
+    if (data === undefined) {
+        data = {};
+    }
+    
+    $.each(opt.inputs, function(key, item) {
+        switch (item.type) {
+            case 'text':
+            case 'textarea':
+            case 'select':
+                data[key] = item.$input.val();
+                break;
+
+            case 'checkbox':
+                data[key] = item.$input.prop('checked');
+                break;
+                
+            case 'radio':
+                if (item.$input.prop('checked')) {
+                    data[item.radio] = item.value;
+                }
+                break;
+        }
+    });
+    
+    return data;
+};
+
+// find <label for="xyz">
+function inputLabel(node) {
+    return (node.id && $('label[for="'+ node.id +'"]').val()) || node.name;
+}
+
+// convert <menu> to items object
+function menuChildren(items, $children, counter) {
+    if (!counter) {
+        counter = 0;
+    }
+    
+    $children.each(function() {
+        var $node = $(this),
+            node = this,
+            nodeName = this.nodeName.toLowerCase(),
+            label,
+            item;
+        
+        // extract <label><input>
+        if (nodeName == 'label' && $node.find('input, textarea, select').length) {
+            label = $node.text();
+            $node = $node.children().first();
+            node = $node.get(0);
+            nodeName = node.nodeName.toLowerCase();
+        }
+        
+        /*
+         * <menu> accepts flow-content as children. that means <embed>, <canvas> and such are valid menu items.
+         * Not being the sadistic kind, $.contextMenu only accepts:
+         * <command>, <menuitem>, <hr>, <span>, <p> <input [text, radio, checkbox]>, <textarea>, <select> and of course <menu>.
+         * Everything else will be imported as an html node, which is not interfaced with contextMenu.
+         */
+        
+        // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#concept-command
+        switch (nodeName) {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/interactive-elements.html#the-menu-element
+            case 'menu':
+                item = {name: $node.attr('label'), items: {}};
+                counter = menuChildren(item.items, $node.children(), counter);
+                break;
+            
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-a-element-to-define-a-command
+            case 'a':
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-button-element-to-define-a-command
+            case 'button':
+                item = {
+                    name: $node.text(),
+                    disabled: !!$node.attr('disabled'),
+                    callback: (function(){ return function(){ $node.click(); }; })()
+                };
+                break;
+            
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/commands.html#using-the-command-element-to-define-a-command
+
+            case 'menuitem':
+            case 'command':
+                switch ($node.attr('type')) {
+                    case undefined:
+                    case 'command':
+                    case 'menuitem':
+                        item = {
+                            name: $node.attr('label'),
+                            disabled: !!$node.attr('disabled'),
+                            callback: (function(){ return function(){ $node.click(); }; })()
+                        };
+                        break;
+                        
+                    case 'checkbox':
+                        item = {
+                            type: 'checkbox',
+                            disabled: !!$node.attr('disabled'),
+                            name: $node.attr('label'),
+                            selected: !!$node.attr('checked')
+                        };
+                        break;
+                        
+                    case 'radio':
+                        item = {
+                            type: 'radio',
+                            disabled: !!$node.attr('disabled'),
+                            name: $node.attr('label'),
+                            radio: $node.attr('radiogroup'),
+                            value: $node.attr('id'),
+                            selected: !!$node.attr('checked')
+                        };
+                        break;
+                        
+                    default:
+                        item = undefined;
+                }
+                break;
+ 
+            case 'hr':
+                item = '-------';
+                break;
+                
+            case 'input':
+                switch ($node.attr('type')) {
+                    case 'text':
+                        item = {
+                            type: 'text',
+                            name: label || inputLabel(node),
+                            disabled: !!$node.attr('disabled'),
+                            value: $node.val()
+                        };
+                        break;
+                        
+                    case 'checkbox':
+                        item = {
+                            type: 'checkbox',
+                            name: label || inputLabel(node),
+                            disabled: !!$node.attr('disabled'),
+                            selected: !!$node.attr('checked')
+                        };
+                        break;
+                        
+                    case 'radio':
+                        item = {
+                            type: 'radio',
+                            name: label || inputLabel(node),
+                            disabled: !!$node.attr('disabled'),
+                            radio: !!$node.attr('name'),
+                            value: $node.val(),
+                            selected: !!$node.attr('checked')
+                        };
+                        break;
+                    
+                    default:
+                        item = undefined;
+                        break;
+                }
+                break;
+                
+            case 'select':
+                item = {
+                    type: 'select',
+                    name: label || inputLabel(node),
+                    disabled: !!$node.attr('disabled'),
+                    selected: $node.val(),
+                    options: {}
+                };
+                $node.children().each(function(){
+                    item.options[this.value] = $(this).text();
+                });
+                break;
+                
+            case 'textarea':
+                item = {
+                    type: 'textarea',
+                    name: label || inputLabel(node),
+                    disabled: !!$node.attr('disabled'),
+                    value: $node.val()
+                };
+                break;
+            
+            case 'label':
+                break;
+            
+            default:
+                item = {type: 'html', html: $node.clone(true)};
+                break;
+        }
+        
+        if (item) {
+            counter++;
+            items['key' + counter] = item;
+        }
+    });
+    
+    return counter;
+}
+
+// convert html5 menu
+$.contextMenu.fromMenu = function(element) {
+    var $this = $(element),
+        items = {};
+        
+    menuChildren(items, $this.children());
+    
+    return items;
+};
+
+// make defaults accessible
+$.contextMenu.defaults = defaults;
+$.contextMenu.types = types;
+
+})(jQuery);
+”ò¿Ÿ<  ;      7÷È6      support    K)ÕP      htmlMenuitem   ¥€ä∏      HTMLMenuItemElement    ¯2áâ      window     ∏o≤      htmlCommand    Gq«      HTMLCommandElement     –ı      eventSelectstart   ”ÍØœ      onselectstart      ∏OÄ      document	   ï,Øp      documentElement
+    ¯π=√      $currentTrigger    ˜Ã      initialized    ó3∂t      $win   JDè®      counter    <É0Ä
+      namespaces     Óóù      menus      â;°      types       _l$      selector   †Á„V      appendTo   ˘!p¬      trigger     ë∏.      right      ú4÷ß      autoHide   ãC±¿      delay      ?høæ      determinePosition      ˝„q      $menu      »Åí      position   >ü      css    e}ü      display    ü‡˚Å      block      ∞‡∆˝
+      center top     ¢µÔA      center bottom      s∏–H      0 5     c$9±	      collision!      ˇŸ≠í      fit"    ,Ω      none#   $√Á      top$    k]2      outerHeight%    ı]á      left&   QÒ=i
+      outerWidth'     <]FO      opt(     Kı±      $this)      Õ©Öh      maintain*   BzN      triggerIsFixed+     h™IY      $trigger,   Õv=      parents-    ê¶¬Q      andSelf.    >	≈      filter/     å≤ÜX      fixed0      ìGÎ	      scrollTop1      |c…r
+      scrollLeft2     @»ˇ~      bottom3     ∑…≈      height4     ÎƒJ˚      width5      °-∆Ú      positionSubmenu6    wiV¯      left top7   «Él	      right top8      f˜      zIndex9     kÔÂ^	      animation:      ¿
+7      duration;   HáíK      show<   #+≈ò	      slideDown=      üvÙ}      hide>   ¡Ÿ™W      slideUp?    QÚ(ì      events@     1§Œ7      noopA   Ë€˘      callbackB   §#`      itemsC      W+§      hoveractD   ≈“Ó      timerE      ˆøÕ™      pageXF      Ø9I      pageYG      •fa°      zindexH     C@ø	      zinI    ª÷K      $ttJ    Kk.      maxK    å/Í      z-indexL    ˛Ë˘2      parentM     }˙Zî	      html bodyN      ⁄Eú¡      indexOfO    “P…ù      propP   U5_      nodeNameQ   RâDo      toLowerCaseR    v˛%      handleS     ›;º–
+      aborteventT     B9∫¿      preventDefaultU     ˛e      stopImmediatePropagationV   ;M+      contextmenuW    6ó(Å      dataX   Ÿ‹Ô      originalEventY      7ÑÉz      hasClassZ   OTs5      context-menu-disabled[      ë: ‚      build\      üRˇ      built]      ªl‡Ù      extend^     [¡E}      isEmptyObject_      ˛Q1      console`    ˛tuW      errora      =X˚      logb    ∞D£T)      No items specified to show in contextMenuc      ‚7º      No Items sepcifiedd     :	∂#      createe     ü™‚X      clickf      >Â/  Ÿœ&0    jQueryg     tÇ3       Eventh      ◊Dô	      mousedowni      ·ùêx      contextMenuj    ´w      contextmenu:hidek   ˙U~      buttonl     po
+Õ      contextMenuActivem      =0V      mouseupn    ƒB≤é
+      removeDatao     ôF 
+      mouseenterp     då}ï      $relatedq   &$˜0      relatedTargetr      [PÇ	      $documents      ¶P‘¯      .context-menu-listt     /ﬂ‰ï      closestu    8uöO      mousemove.contextMenuShowv      ºcyÙ	      mousemovew      3AtŸ
+      setTimeoutx     ˙¯Öﬂ      offy    fNæ
+      mouseleavez     QÔ8u      clearTimeout{   ƒ˙Ô
+      layerClick|     Rª‚Ú      root}   c9Çœ      contextMenuRoot~    ˇX•	      selectors      ≈ê      $windowÄ    _+@Î      hideshowÅ   ¡è‰a      elementFromPointÇ   6£‹      $layerÉ     Ñu2      pushÑ   ˆ^v      , Ö     f_“‹      keyStopÜ    •?∞ì      isInputá    ı/F/      stopPropagationà    B¸ø;      keyâ    õ¡˘	      $childrenä      
+}N      childrenã   âu7      $roundå     ≠5      keyCodeç    ô,Åÿ      shiftKeyé   ôK*Ë	      $selectedè      ﬁ÷¢8      input, textarea, selectê    ƒ∫·%      blurë   SX˘µ      prevcommandí    ÿy*      checkboxì   \◊Ÿ˙      nextcommandî    1é®˘      context-menu-rootï      L¨.1      $parentñ    h}„`      contextmenu:bluró   ¸éo      itemdataò   08˜X      context-menu-submenuô   ﬁ‚Á“       :not(.disabled, .not-selectable)ö   `~ﬂ      firstõ      æ’      lastú   Ù_ñ⁄      contextmenu:focusù      E®üã      textarea, selectû   >¬≈      fromCharCodeü   ¨‚s◊      toUpperCase†    n-ìC
+      accesskeys°     ≠E      $node¢      Õ¶◊V      prevItem£   ^L      $prev§      >∆ß"      prev•   ûzÉw      disabled¶   ƒPI˚      not-selectableß     œú0      itemMouseleave®     ⁄íZΩ      itemMouseenter©     x÷Ö      $input™     KÃÌ      focus´      ≥“dx      nextItem¨   	˜f      $next≠      
+›ˇi
+      focusInputÆ     C…£<      .context-menu-itemØ     Ö|x¢	      blurInput∞      Çä      menuMouseenter±     X+-ê      hovering≤   ≤∏+s      menuMouseleave≥     Zîœ≥      .hover¥     Ÿïç&	      itemClickµ      WıÑÇ      contextMenuKey∂     ãè@i
+      isFunction∑     Ø®	      callbacks∏      üˇc9      updateπ     Ωf,
+      inputClick∫     f™€ò      hideMenuª   ôE‰Ê      forceº      å°d	      focusItemΩ      Bå|      addClassæ   d®§˙      hoverø      Ã–òs      siblings¿   0÷‡Ì      blurItem¡   ˆ+      removeClass¬    8‰      #context-menu-layer√    @+W      layerƒ      1„≥      keydown.contextMenu≈    U,2ñ      pos∆    l>|·      mousemove.contextMenuAutoHide«      *N∑∆      remove»     bÀ‚5      .contextMenuAutoHide…   J°a      <ul class="context-menu-list        6CY>	      classNameÀ      1¬ãF      "></ul>Ã    æ»9      commandsÕ   4Ûº’      inputsŒ     ˝ÑÃ∫      itemœ   äí√7      <li class="context-menu-item –      ñS¶ê      "></li>—    úÎÆV      $label“     Ω@ûj	      accesskey”      ¿Oõ      aks‘    ïzÆﬂ      splitAccesskey’     ï…0      _name÷      9˙`æ.      <span class="context-menu-accesskey">$1</span>◊     )Wƒ.%      context-menu-separator not-selectableÿ      ‘„X      htmlŸ   (€¥"       context-menu-html not-selectable⁄   *√Xì      <label></label>€    ◊`«      <span></span>‹      ì3Ω\      context-menu-input›     -\T      hasTypesﬁ   sc      subﬂ    à3¿µ      text‡   Ï˝Òà6      <input type="text" value="1" name="context-menu-input-·     ˝Ñcg      " value="">‚    &⁄õ      val„    ÷ŸÓ      textarea‰   Óå9#      <textarea name="context-menu-input-Â    „˜A™      "></textarea>Ê      b˜Ö:      <input type="checkbox" value="1" name="context-menu-input-Á     »:0ó      checkedË    ≈.»œ      selectedÈ   ©8GR	      prependToÍ      6zgÚ      radioÎ      ö‹˘w7      <input type="radio" value="1" name="context-menu-input-Ï    1<Î      selectÌ     2qÀ!      <select name="context-menu-input-Ó      +®¢      ">Ô      :yã      options    ÏÜÍ      <option></option>Ò      VXﬂJ      iconÚ   1„Áˆ
+      icon icon-Û     U&«.      selectstart.disableTextSelectÙ      òh;      bodyı   H<*ê      absoluteˆ   ﬂ;Ë0      $item˜      ¸√Âk      input, select, textarea¯    `ÉcØ<      <div id="context-menu-layer" style="position:fixed; z-index:˘   ã’1ÒV      ; top:0; left:0; opacity: 0; filter: alpha(opacity=0); background-color: #000;"></div>˙     ÂL…2      insertBefore˚   ≥(§      fixedPosition¸      _Ù      \s+˝    ô™Gë	      operation˛      +òé      No selector specifiedˇ      †.€ñ%      .context-menu-(list|item|input)($|\s)      Äº≥£      Cannot bind to selector "     0gGë%      " as it contains a reserved className     Ã’·~      .contextMenu  ó‰†R      contextmenu:hide.contextMenu  wpÈ
+      prevcommand.contextMenu   pÃ‘;      nextcommand.contextMenu   :Ì«      contextmenu.contextMenu   “Æ\*      mouseenter.contextMenu    ºA∂>      mouseleave.contextMenu	    67Ç˜      mouseup.contextMenu
+   ^`ßì      .context-menu-input   Çﬂ¶÷      contextmenu:focus.contextMenu     $Æˆœ      contextmenu:blur.contextMenu  ŒÛ˝      destroy   p]êΩ!      .contextMenu .contextMenuAutoHide     HÌãß'      #context-menu-layer, .context-menu-list   àÀ      $visibleMenu  SZK#      :visible  NÅ*x      html5     ”$ ü      menu[type="context"]  )F±      [contextmenu=     „      fromMenu  ›'GI      Unknown operation "   InR      setInputValues    6_’      getInputValues    ΩÇW
+      inputLabel    &`°›      node  ã√Œ      label[for="   ı£Ø      "]    sÏ]Ñ      menuChildren  ™€q      menu  A¢Ωê      attr   ⁄Ã3      menuitem!  ”•Éß      command"   ƒ&ÒØ
+      radiogroup#    (\g·      -------$   ±4çÆ      clone%     ©Ω»A      position/triggerIsFixed<&  ı∫]7      mouseenter/hoveract.timer<'    *Êïv      layerClick/<)  È¨’5      layerClick/</hideshow/<*   p{÷`      show/<+    ÍãÊÊ      hide/<,    Ï≠
+ï      hide/</<-  ™ö      create/<.  HÓn
+      create/</</    "ovF      update/<0  uÙ       $.fn.contextMenu1  Ÿ>€Æ      $.contextMenu2     D}      $.contextMenu/<3    +ﬂ≤      $.contextMenu.setInputValues4  eDI›      $.contextMenu.setInputValues/<5    Úßà      $.contextMenu.getInputValues6  åóÔ$      $.contextMenu.getInputValues/<7    ]?[      menuChildren/<8    …≈m      menuChildren/</item.callback<9     \öB      menuChildren/</item.callback:  èHy      menuChildren/</<;  ¨{„†      $.contextMenu.fromMenu     H   J  L   H          @   Ô%,â                                               6                 ?                @                A                 B                 C                 D                 E                 F                                                                                                                                        	                 
+                                                                                                                                                                                                                                                                                                                                                                                                                      !                 "                 #                $      .           %                &      0          '      1           (      0                0           )      4           *      5                           +      7           ,      7          -      9           .      9           /      9           0      9           1                2      >           3      >           4                 5                 7                8      C           9      C                C           :                ;      G           <                =      I           >                 G      ≥Oåc                         $ `t `
+  P  P  P  P  P  P  Pn  `C  PG  PR  P`‘  P P P            ‚  t  C  i  k                             B  Pâ    P              °  P P  D  Œ  Pã                                                                                 ã                 •  ã               '  x  y  (  •  *  2    3  4  ã                 ã                 •  ã               ù H  I               e              e  (  \  ã               e  ã               e  (  ã               e  (  ã               e  (  Pp  r  Pã                                e              e  p           e              e `(  P|  Pm  Pk  Px `y ` `• `~  Pã                                   Ä  s               e                               e  '              e  '  â  ã  ï  ó  k              e  '  ú â  £  ã  ©  ã               e  '  ú â  ¨  ã  ©  ã               e  (  W  '  |  ã               e  (  W  '  |  ã               e  |  ã               e  |  ã               e  (  W  '  |  ã               e  (  W  '  |  ã               e  (  W  '  |  à  A  ã                e              e  W  |  ã               e  (  W  '  |  ã               e  (  W  '  |  ã               '  Px  y  (  •    ≈  Pã                e              '  Pª  (  ã                Ç  P                         e                               à  P           e               '  P|  P             i  k              à  PŒ  Pù —  ©  P”  i  î              i  k               i  k               P  ﬂ               i  k              '  P|  P(  Pã                 (  ã                 ˆ  à  Œ  •  ã               '  8  Ç  ã               ˝    ã               ˝  Ô  o  r  P ã                à  P           e                ã                '  W  P             à  Œ               '  W  P             à  Œ              ç   (  B  Ø¬0∞¸      ˇ      IÙ$KEÆ˙ö   
+      {  B                {  •  A        {  •  A        0  •  {  Ë           0  •  {  Í  P  Ë         0  {  •  P           0  {  •  Ë           0  {  •  Í  P  Ë         0  {  •  Ë  Ô                 0  {  •  P     
+      0  ÿ                             A                   5  8  9  ?  A  B          ¢ ù  •        
+     #  %         ¢ ù        
+      #  %         :  ;  =     
+   ;  =                D  E  F     x   S  V  e  h  m  o  v  y  {  Ö  à  ¢  ´  ≠  Ø  ∞  ≤  ®  ß  ¥  π  ∫  º  ¿                         W  E  F        W  E  F        W  E  F     
+   x  y                                                           ;  =  d  ∏  √                     
+   i  }                                  i  }  µ     
+          
+               3  4       
+     3     
+    E  F                                                         	                               ª     
+       B                          á&’™ç!´!H   D      (cªD                             m    ª   w ﬂ•@`FÄ 0ˇˇˇˇPPÄ¸  ∫Õ ó¸  r                É       Ω  Œ   ﬂΩ Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂ¡   J      ª   "L   ﬂ¡   J      ª   "L	   ﬂ¡   J   
+   ª   J   "L   ﬂŒ   ﬂŒ   ﬂ¡    ª   s Œ   ﬂŒ   ﬂ9   Œ   ﬂ9   Œ 	  ﬂ9   Œ 
+  ﬂ9   <   <      <   <   » <   m   <   m   <   m   <   <   9   2<    !   <"   #   <$   <%   9&   ¡   J'   <"   ¡   J'   <$   <(   <)   9*   <+   Œ   ﬂ9,   <-   <.   </   Œ   ﬂm0   Œ   ﬂ91   m2   <3   m4   <5   m6   <7   m8   <9   m:   <;   m<   <=   m>   <?   m@   <A   mB   <C   mD   <E   mF   <G   mH   <I   mJ   <K   mL   <M   mN   <O   mP   <Q   mR   <S   mT   <U   mV   <W   mX   <Y   mZ   <[   m\   <]   m^   <_   m`   <a   Œ   ﬂ9b   mc   <"   md   <$   me   <f   mg   <h   mi   <j   Œ   ﬂ¡   Jk   ml   Lm   ﬂ¡   mn   Lm   ﬂ¡   Jm   mo   Lp   ﬂ¡   Jm   mq   Lr   ﬂ¡   Jm   ms   Lt   ﬂ¡   Jm   ¡   Lu   ﬂ¡   Jm   ¡ 
+  Lv   ﬂ•≥0`3`1`1ë0  `G#`G%`ˇˇˇˇPI'`G)`K+`K-`K/`E1	F3	F5	J7	F9	H;	JP	Jy	JÄ  ç	 	%'* 	%/î 	 	ê `%	&	&	 `KÄ  ¥` 	JÄ  º	JÄ  Ì	JÄ  Û	JÄ 	JÄ 	JÄ *	JÄ /	JÄ >	JÄ õ	JÄ ¢	JÄ %	JÄ P	JÄ |	JÄ Ü	JÄ ê	JÄ ï	JÄ ù	JÄ ∑	JÄ »	JÄ Î	JÄ 	JÄ ı	JÄ 	ê@Ä 
+`%	JÄ L	JÄ Ö	JÄ /	JÄ b	ê0Ä à`ï0Ä ö`ê0Ä 0`ï0Ä L`ï0Ä `ï0Ä `ï`ïPÄÄú  ÈàÛú  .               $       ﬁÕ  ﬂ¡   J   ú   ó   ﬂ¡   J   J   ó   ö{   ó   º  ·J   ‰      s ·J   ‰9      <   	   <
+   æ  <      <      <   s ·J   ‰      w ﬂôÉ   ó   æ  ·J   ‰s  Õ   ﬂæ   ·J   æ  ·J   ‰s  &.L   ﬂæ   ·J   æ  ·J   ‰s  +º  ·J   ‰s  +'&.L   ﬂº  ·J   ‰æ   w ﬂó$   •F`≥@`î P
+!%**)*J/PJZ@`P(`ï P+`ï P
+P/`
+
+ˇˇˇ¸PI	PÄÄ   πãîõ   >               C       ﬁÕ  ﬂæ  Õ   ﬂº ú   ó   ﬂº ó   ö0   ó   º  J   ·J   ‰æ  º  J   w ﬂ ¢ôÈ   ó   º    ú   ó
+   ﬂº    ó   ö&   ó   º  J   ·J   ‰s  Õ  ﬂôú   ó   º  J   ·J   ‰s  ·J   ‰s  ·J	   ‰m
+   s J   Õ  ﬂæ  ö:   ó   º ¡   ·J   ‰s  '.Ã ﬂº ¡   ·J   ‰s  '.Ã ﬂó   9   º <   º <   Õ  ﬂó"   ¡   ·J   ‰s  ¡   ·J   ‰s  &Õ  ﬂ¡   ·J   ‰s  ¡   ·J   ‰s  &Õ  ﬂº  J   ·J   ‰s  Õ  ﬂº  J   ·J   ‰s  Õ  ﬂæ  J   æ  &æ  ö    ó6   æ  ·J   æ  '.L   ﬂó9   æ  J   æ  &æ  ö    ó=   æ  ·J   æ  '.L   ﬂó@   º  J   ·J   ‰æ  w ﬂ•&`I`ì `ˇˇˇıP$`A'	K`¨@	`Pí@&`P
+
+P*ˇˇˇ˘PM`.`
+P)`
+PN`
+í@`PP)`PP)`
+P(`
+PH`		/`õ@"`	/`õ@&`ˇˇˇ¸P$	PÄ\   È„yÜ\   *                        ﬁÕ   ﬂ¡    æ   s ·J   ‰   s    ¢•&`	ˇˇˇ˛PP)Q<  Öa-<  ‡                       ﬁÕ  ﬂ¡   J   ú   ó   ﬂ¡   J   J   ó   öq   ó   º  ·J   ‰      s ·J   ‰9      <   	   <
+   æ  <      <   s ·J   ‰      w ﬂô?   ó   9   <   æ  ·J   ‰s  <   Õ   ﬂº  ·J   ‰æ   w ﬂó   •&`≥@`î P
+!%**)J/PJ	Z@`%&PM`
+
+ˇˇˇ¸PI	PÄx  ∞Ÿ&h  ˆ          
+             Õ   ﬂº  Õ  ﬂò    ö÷   ó   ª   ·J   ‰æ   ª    æ  ·J   ‰   s 
+s ù   ó   ﬂó   s Õ   ﬂæ  ·J   ‰s  Õ  ﬂæ  ùO   ó   ﬂæ  J   ù:   ó   ﬂ   ·J	   ‰æ  ·J
+   ‰   s ·J   ‰s  s ˇó   ö   ó   ô   ó   ô(ˇˇˇó   æ   ¢• `&`Hf+`	ê PˇˇˇÛPî ˇˇˇ˜P(`
+P(`ê ° #ê P
+Pˇˇˇ„Pï `î@	`$QÄx            ›   P   &»ïPP                            º  ·J   ‰w  ﬂº  ·J   ‰w  ﬂ• `
+P$`
+P$	PÄÄÄ¸  r¢ü¸  2               <       ﬁÕ  ﬂ¡    æ  s Õ   ﬂº  ·J   ‰w  ﬂº  ·J   ‰w  ﬂº  J   J      ú   ó	   ﬂº  J   ó
+   ö   ó    ¢ó   æ   ·J   ‰   s õ©  ó   æ   Œ   ﬂº  J   J	   öR  ó   º  J   ·J	   ‰¡   º  s Õ  ﬂæ  ö   ó    ¢ó   º  ¡   ·J
+   ‰9   ¡   º  J   æ  ù   ó   ﬂ9   ó   s L   ﬂº  J   J   ù'   ó!   ﬂ¡   ·J   ‰º  J   J   s ó%   öd   ó&   ª   J   ö8   ó)   ª   J   ù   ó,   ﬂª   J   ó.       w ﬂó/   ª   Ä   „  Å ßó1   º  J   ¡   L   ﬂ¡   ·J   ‰º  J   w ﬂó6   ¡   J   ·J   ‰æ   º  J   º  J   º  J   w ﬂó<   •&`ˇˇˇˇPH`
+P$`
+PD`µ `A/	F`ê PM`*`ó !`ˇˇˇÈPH`ê `A/	F`ê 
+ô ˇˇˇ›PI`• !ˇˇˇÚPí@ `î `™ PI$`PI(`ì@*`
+ˇˇˇ˘PI-`ë 	ˇˇˇ„PI/	PÄ–   ¶˜]>–   {                       ﬁÕ   ﬂº  ·J   ‰w  ﬂº  ·J   ‰w  ﬂ¡    æ   s ·J   ‰ª   ·J   ‰   9   º  J   <   º  J	   <	   º  J
+   <
+   s w ﬂ•&`
+P$`
+P$`ˇˇˇˇP
+ë ˇˇˇÀPˇˇˇÒP$	PÄÄÄ  à«ÀÇ  √                       ﬁÕ  ﬂ¡    æ  s Õ   ﬂ¡   ú4   ó   ﬂ¡   J   ú   ó   ﬂ¡   ·J   ‰æ   s ó   ö3   ó   ¡   ·J   ‰   s J   ·J   ‰   w ﬂó   º  J   ö$   ó   æ   ·J   ‰	   s Œ   ﬂó   •F`ˇˇˇˇPH`• -ˇˇˇ˝Pì `ë Pî PI
+`ï `ë PN	PÄ§  vX[h§  +        	               ﬁÕ  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰   s úb   ó   ﬂ¡   úR   ó   ﬂ¡   J   ú=   ó   ﬂ¡   ·J   ‰æ   s ú   ó
+   ﬂæ   ·J   ‰   s ó   ö   ó   º  ·J   ‰w  ﬂº  ·J   ‰w  ﬂæ   Œ   ﬂæ   ·J	   ‰ª
+   ·J   ‰   9   º  J   <   º  J   <   º  J   <   s w ﬂó   æ   ·J   ‰   w ﬂ•F`ˇˇˇˇP(`ê Pø ]ˇˇˇ˝Pê Pì `
+P$`
+P$`*`ë ˇˇˇÀPˇˇˇÒPI
+`ê P$	PÄ»  Eı[»  >                      ﬁÕ  ﬂ¡   æ  s Œ   ﬂ¡   º  J   s Õ   ﬂ¡   ª   s Œ   ﬂæ   ·J   ‰   s ù#   ó   ﬂæ   ·J   ‰   s J   ó   ö   ó    ¢ó   ¡  ú   ó   ﬂ¡  J   ó   ö   ó    ¢ó   ¡  º  J   L   ﬂ¡  º  J   L   ﬂ¡  º  J	   L	   ﬂ¡   ·J
+   ‰   ¡  J   w ﬂ¡  ª    m   º  J	   J   s L   ﬂ•&`ˇˇˇˇP)`ˇˇˇˇP(`ˇˇˇˇPI`ê 	Pû %Pó `A	F`© `A	F`ì `ì `ì `ë *
+ˇˇˇ‡P$`EMPI	PÄ–   ◊Ω
+ä–   É                          ¡  L   ﬂ¡   ·J   ‰   w ﬂ¡   Œ  ﬂ¡   ·J   ‰ª   ·J   ‰   9   ¡  J	   <	   ¡  J
+   <
+   ¡  J   <   s w ﬂ• `,`ë 
+P$`+`ë ˇˇˇΩPˇˇˇÒP$PÄÄT   –O¨ÉT   '                         ¡   º  J   L   ﬂ¡   º  J   L   ﬂ• `ì `ì 	PÄ$  ºÆ%g  ¢                       $¡    º  J   s Õ   ﬂæ   ·J   ‰   s ù#   ó   ﬂæ   ·J   ‰   s J   ó   ö   ó	    ¢ó	   ´ª    ¡   J   w ﬂô   ó    §≠∞±  ﬂ±  ﬂ“ó   ¡   L   ﬂ•@`ˇˇˇˇP(`ê 	Pû %Pó `A	6!`
+ˇˇˇˇPë ë@`,	PÄÄÄ$       Ñ      ˇˇˇˇ        c      ,  W9òt,  ø                       Ω  Œ   ﬂﬁÕ   ﬂ¡   æ   s Œ   ﬂ¡   ·J   ‰   s Œ   ﬂŒ   ﬂ¡   J   Œ   ﬂ¡   J   Œ   ﬂ¡   J   Œ   ﬂ¡   ·J   ‰w  ﬂ¡   ·J   ‰w  ﬂ¡   ·J   ‰	   m
+   w ﬂª    m   2w ﬂ•/`ˇˇˇˇP)`ë P)`'`ê `ê `ê@`P$`PD`ë ˇˇˇÚPD`5ZBPD[	PÄ0   ¢Î“ù0                              Œ   ﬂ• `'PÄ¨  g≠gú  q         	       _       ¡   J      ú   ó   ﬂ¡   ó   ù.   ó   ﬂ¡   J      ú   ó   ﬂ¡   ó	   ö«  ó
+   ª   J   ö?  ó   ¡   J   ·J   ‰w  ﬂª   ·J   ‰¡   ¡   s Œ 	  ﬂ¡   J   ·J   ‰w  ﬂh    Œ   ﬂ¡  ^ò   _`õ(   ó   Õ  ¡   ·J	   ‰æ  w ﬂﬂô’ˇˇˇó   a¡   ¡ 	  s ·J
+   ‰¡   ·J   ‰   s s Œ 	  ﬂ¡ 	  J   ö_   ó"   ¡ 	  ·J   ‰¡   J   Ks ö:   ó'   ¡   J   ·J   ‰¡   J   ¡   ¡   ¡   w ﬂ ¢ó+   ôy  ó+   ¡   J   ·J   ‰s  Œ 
+  ﬂ¡   ª   s Õ   ﬂ¡ 
+  ·J   æ   ·J   ‰s  &.L   ﬂ¡ 
+  J   ¡   J   ö  ó9   ¡ 
+  ·J   æ   ·J   ‰s  &.L   ﬂ¡ 
+  J   ¡   J   öÃ   óB   ¡ 
+  ¡ 
+  J   ¡   J   ·J   ‰s  &L   ﬂ¡ 
+  J   ¡   J    öÉ   óL   ¡ 
+  ¡ 
+  J   ¡   J   ·J   ‰s  &L   ﬂ¡ 
+  J   ¡   J    ö:   óV   ¡   J   ·J   ‰¡   J   ¡   ¡   ¡   w ﬂ ¢óZ   m   Õ  ﬂ¡   ö   ó\   æ   w  ﬂô#   ó]   ¡   ·J   ‰   æ  w ﬂó_   •@`‰ `î `ë P$`#ˇˇˇÏP)`ë PD
+`+'`ò ˇˇˇ˜$`ˇˇˇ˚PDL`ˇˇˇ˛P
+ë 
+PˇˇˇÓPI`î !`
+ˇˇˇ˝P-!`ë 
+ˇˇˇ„P$!`ACê0 `ë P)`ˇˇˇ˛PH`ñ P+`
+ï `ñ P+!`
+ï !`ë P*%`
+ï %`ë P*)`
+ï@%)`ë 
+ˇˇˇ„P$)`ACF.`J<`O>`ì@A`ë ˇˇˇÚPICP¨        “   0   ‘   „/¸‘   à                         º  ö&   ó   º  ·J   ‰w  ﬂº  ·J   ‰w  ﬂó   ¡   J   ·J   ‰   w ﬂ¡ 	  ú   ó	   ﬂ¡ 	  J   ó
+   ö   ó   ª    m   2w ﬂó   • `-`
+P$`
+PI`ñ P$`© `5
+B#PIPÄ`   wË¸`   *                          ¡ 	  ·J   ‰9   ¡   <   ¡   <   w ﬂ• `
+
+ˇˇˇÌP$PÄÄÄl   ¸¡l=l   4                         º J   õ   ó   º  ·J   ‰w  ﬂó   º  ·J   ‰w  ﬂ• `í `
+PI`
+P$	PÄÄÄp  Ö∑o=p  ÷         
+       ‡       ¡   ·J   ‰   s ù   ó   ﬂ9   ó   Õ   ﬂæ   J   ·J   ‰s  Õ  ﬂº  J   ·	ü∑   ó	   ·&ü©   ó
+   ·	ü  ó   ·(ü  ó   ·%üL  ó   ·'ü,  ó   ·#ü3  ó   ·$ü%  ó   ·ü  ó   · ü   ó   ·!üº  ó   ·"üÆ  ó   ·üæ  ó   †Î  ó   ¡   ·J   ‰º  æ   w ﬂæ   J   ö  ó   º  J   	ú   ó   ﬂº  J	   ó   öt   ó   º  ·J
+   ‰w  ﬂæ   J   ú-   ó"   ﬂæ   J   ·J   ‰   s ·J   ‰w  ó'   ﬂæ   J   ·J   ‰   w ﬂ ¢ôl   ó*   º  J   &ú8   ó-   ﬂæ   J   ·J   ‰   s ·J   ‰   s    ó3   ö   ó4   º  ·J
+   ‰w  ﬂ ¢ó6   ôR   ó6   º  J   	ù   ó9   ﬂº  J	   ó:   ö%   ó;   æ   J   ·J   ‰   w ﬂ ¢ó>   ¡   ·J   ‰º  æ   w ﬂæ   J   ö˙   óB   º  J   	öt   óE   º  ·J
+   ‰w  ﬂæ   J   ú-   óI   ﬂæ   J   ·J   ‰   s ·J   ‰w  óN   ﬂæ   J   ·J   ‰   w ﬂ ¢ôl   óQ   º  J   (ú8   óT   ﬂæ   J   ·J   ‰   s ·J   ‰   s    óZ   ö   ó[   º  ·J
+   ‰w  ﬂ ¢ó]   ô%   ó]   æ   J   ·J   ‰   w ﬂ ¢ó`   ô¡  ó`   ¡   ·J   ‰º  æ   w ﬂæ   J   ù/   ód   ﬂæ   J   ù   óg   ﬂæ   J   J   ój   ö   ók   ôY  ók   æ   J   ·J   ‰s  ·J   ‰   s õU   óq   æ   J   ·J   ‰s  ·J   ‰s  Õ  ﬂæ   J   ·J   ‰   w ﬂæ   æ  L   ﬂ ¢óz   ô”  óz   ¡   ·J   ‰º  æ   w ﬂæ   J   ù/   ó~   ﬂæ   J   ù   óÅ   ﬂæ   J   J   óÑ   ö   óÖ   ôk  óÖ   æ   J   ·J   ‰   s ù   óâ   ﬂ9   óä   Õ  ﬂæ  J   ú#   óå   ﬂæ   J   ·J   ‰   s óè   ö;   óê   æ   L   ﬂæ  L   ﬂæ  J   ·J   ‰   w ﬂ ¢óï   ôæ  óï   æ   J   ú(   óó   ﬂæ   J   ·J   ‰   s J   óõ   ö   óú    ¢ô≤   óú   æ   J   ú   óû   ﬂæ   J   ·J   ‰s  ó°   ù   ó¢   ﬂæ   J   ó£   ·J   ‰   s ·º  J   $ö   ó®      ô   ó®      ó®   K‰s  ·J   ‰   w ﬂº  ·J
+   ‰w  ﬂ ¢óÆ   ôª  óÆ   ¡   ·J   ‰º  æ   w ﬂæ   J   ö`   ó≤   æ   J   ú$   ó¥   ﬂæ   J   ·J    ‰!   s ó∏   ö   óπ   º  ·J
+   ‰w  ﬂ ¢óª   ô6  óª   æ   J   ú#   óΩ   ﬂæ   J   ·J   ‰"   w ó¿   ﬂ ¢ó¿   ¡   ·J   ‰º  æ   w ﬂ ¢ó¬   ¡   ·J   ‰º  æ   w ﬂæ   J   ·J   ‰#   w ﬂ ¢ó«   ª$   ·J%   ‰º  J   s ·J&   ‰s  Õ  ﬂæ   J'   æ  Kö`   ó–   æ   J'   æ  KJ(   ·J   ‰æ   J'   æ  KJ   ö   óÿ      ô   óÿ   "   óÿ   w ﬂ ¢óŸ   ô   óŸ   º  ·J)   ‰w  ﬂæ   J   ú!   ó›   ﬂæ   J   ·J   ‰º  w ó‡   ﬂ• `ë Pù `ê 
+PH`ˇ… `ˇˇˇıPD
+`ì `≠ `
+P$`© P
+ P)`ï 
+P$`AÄ  Ä	K$`´ !P Pò@`
+P$`AÄ  Ä	ê@ `≠ `ï 
+P$`AÄ  Ä	6 `ˇˇˇıP$`ì `ï `
+P$`© P
+ P)`ï 
+P$`AÄ  Ä	K#$`´ !P Pò@%`
+P$`AÄ  Ä	ê0( `ï 
+P$`AÄ  Ä	F,`:. `ˇˇˇıP$`î ï û `J4`ê P	P-'`ê P
+	P(`ï P$`.`AÄ  Ä	F:`:< `ˇˇˇıP$`î ï û `JB$`ï Pù `©  Pí `+`+`ï P$`AÄ  Ä	FI`:K `© Pó `AÄ  Ä	;O `§ P® U¥ PP*U$`
+P$`AÄ  Ä	FV`:X `ˇˇˇıP$`ì `î ï Pì `
+P$`AÄ  Ä	F_`Ja`© P)`AÄ  Ä	6d@h`ˇˇˇıP$`AÄ  Ä	6k `ˇˇˇıP$`ï 
+P$`AÄ  Ä	6p `ˇˇˇÛP
+P(`ò@t`ö  ùJt1PDx`AÄ  Ä	Fz`J~`
+P$`§ 'ˇˇˇ¯P)	PÄÄÄ∞  ≥¬<†  Ω               G      ﬁÕ  ﬂº  ·J   ‰w  ﬂ¡    æ  s ·J   ‰   s ù   ó   ﬂ9   ó   Õ   ﬂæ   J   öb   ó	   æ   J   Õ  ﬂæ   J   ·J   ‰s  ·J   ‰   s ù   ó   ﬂ9   ó   Õ   ﬂæ   æ  L   ﬂó   æ   J   ·J	   ‰s  Õ  ﬂæ   J   ù$   ó   ﬂæ   J   ·J
+   ‰s  J   ó   ö   ó   æ  ·J   ‰s  ô   ó    æ   J   ·J
+   ‰s  ó#   Õ  ﬂæ  Õ  ﬂò#   æ  ·J   ‰   s ù   ó&   ﬂæ  ·J   ‰   s ó(   öÑ   ó)   æ  ·J
+   ‰s  J   ö"   ó-   æ  ·J
+   ‰s  Õ  ﬂô   ó/   æ  ·J   ‰s  Õ  ﬂó1   æ  ·J   ‰æ  s ö   ó4    ¢ó4   ôEˇˇˇó4   æ   J   ö6   ó6   ¡   J   ·J   ‰æ   J   ·J   ‰s º  w ﬂó<   ¡   J   ·J   ‰æ  ·J   ‰s º  w ﬂæ  ·J   ‰   s Õ  ﬂæ  J   ö   óE   æ  ·J   ‰w  ﬂóG   •&`
+P$`ˇˇˇˇPPù@`ì `.`ê P	Pù `ì@`ê 
+P(`ï ê P£ Pù P-`Ifê Pû Pí `Pí `Pí `PM`	ˇˇˇ˝PM`A)	ê@`ì `ë ë PˇˇˇÂPI"`ë PˇˇˇÌPD%`ê P(`ì `PI)	P∞         M  ¿   ∞  ìíÒµ†  Ω               G      ﬁÕ  ﬂº  ·J   ‰w  ﬂ¡    æ  s ·J   ‰   s ù   ó   ﬂ9   ó   Õ   ﬂæ   J   öb   ó	   æ   J   Õ  ﬂæ   J   ·J   ‰s  ·J   ‰   s ù   ó   ﬂ9   ó   Õ   ﬂæ   æ  L   ﬂó   æ   J   ·J	   ‰s  Õ  ﬂæ   J   ù$   ó   ﬂæ   J   ·J
+   ‰s  J   ó   ö   ó   æ  ·J   ‰s  ô   ó    æ   J   ·J
+   ‰s  ó#   Õ  ﬂæ  Õ  ﬂò#   æ  ·J   ‰   s ù   ó&   ﬂæ  ·J   ‰   s ó(   öÑ   ó)   æ  ·J
+   ‰s  J   ö"   ó-   æ  ·J
+   ‰s  Õ  ﬂô   ó/   æ  ·J   ‰s  Õ  ﬂó1   æ  ·J   ‰æ  s ö   ó4    ¢ó4   ôEˇˇˇó4   æ   J   ö6   ó6   ¡   J   ·J   ‰æ   J   ·J   ‰s º  w ﬂó<   ¡   J   ·J   ‰æ  ·J   ‰s º  w ﬂæ  ·J   ‰   s Õ  ﬂæ  J   ö   óE   æ  ·J   ‰w  ﬂóG   •&`
+P$`ˇˇˇˇPPù@`ì `.`ê P	Pù `ì@`ê 
+P(`ï ê P£ Pù P-`Ifê Pû Pí `Pí `Pí `PM`	ˇˇˇ˝PM`A)	ê@`ì `ë ë PˇˇˇÂPI"`ë PˇˇˇÌPD%`ê P(`ì `PI)	P∞         M  ¿   Ã   Ô{‰Ã   Ç                       ﬁÕ  ﬂ¡    æ  s ·J   ‰   s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  æ  æ   L   L   ﬂæ  æ  L   L   ﬂ•&`ˇˇˇˇPP(`P(`.`N`ó `î 	PÄÄÄ∞   ø∫æ∞   k                	       ﬁÕ  ﬂ¡    æ  s ·J   ‰   s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  æ  L   L   ﬂ•&`ˇˇˇˇPP(`P(`.`N`î 	PÄÄh   èÒ7Îh   3                       ﬁÕ  ﬂ¡    æ  s ·J   ‰s  J   Õ   ﬂæ   L   ﬂ•&`ˇˇˇˇP
+P-`+	Pº   ®ù◊–º   v                       ﬁÕ  ﬂ¡    æ  s ·J   ‰s  J   Õ   ﬂæ   J   ú&   ó   ﬂæ   J   ·J   ‰º  J   s ó
+   ö   ó   æ   L   ﬂó   •&`ˇˇˇˇP
+P-`§ ˇˇˇ˝Pí `ê@	PÄÄ¯  Q>¯  t               "       ﬁÕ  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  L   ﬂº  ú:   ó   ﬂæ  J   ú&   ó	   ﬂæ  J   ·J   ‰º  J   s ó   ö&   ó   º  ·J   ‰w  ﬂº  ·J	   ‰w  ﬂó   æ  J
+   ö   ó   æ  ô   ó   æ  ó   J
+   ·J   ‰   s ·J   ‰   w ﬂæ   ·J   ‰   s ù   ó   ﬂæ   ·J   ‰   s ó   ö   ó   æ  L   ﬂ ¢ó    æ   ·J   ‰   w ﬂ•&`ˇˇˇˇP(`P(`.`N`K	`≤ #ˇˇˇ˝Pí `
+P$`
+PI`∂ UPD`ê Pû Pí `+`A	F`ê P$	PÄÄê  ü€Îê                        ﬁÕ  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  æ  ú:   ó   ﬂæ  J   ú&   ó	   ﬂæ  J   ·J   ‰º  J   s ó   öv   ó   æ  J   ú#   ó   ﬂæ  J   ·J   ‰	   w ó   ﬂº  ·J
+   ‰w  ﬂº  ·J   ‰w  ﬂæ  æ  æ  J   L   L   ﬂ ¢ó   æ   ·J   ‰	   w ﬂ•&`ˇˇˇˇP(`P(`.`N`	¥ %ˇˇˇ˝Pí `© !P)`
+P$`
+P$`ú `A	F`ê P$	PÄ§  y|l‹§  Ô               1       ﬁÕ  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  J   æ  Kù<   ó
+   ﬂæ   ·J   ‰   s ù   ó   ﬂæ   ·J   ‰   s ó   ö   ó    ¢ó   º  ·J	   ‰w  ﬂº  ·J
+   ‰w  ﬂ¡   ·J   ‰æ  J   æ  Ks ö"   ó   æ  J   æ  KÕ  ﬂôF   ó   ¡   ·J   ‰æ  J   s ö   ó   æ  J   Õ  ﬂô   ó     ¢ó    æ  ·J   ‰æ  J   æ  æ  s ö(   ó%   æ  J   ·J   ‰   w ﬂôN   ó(   æ  J   ·J   ‰s  J   ö,   ó-   ¡   J   ·J   ‰æ  J   æ  w ﬂó1   •&`ˇˇˇˇP(`P(`.`.`N	`™ Pû Pí `A!	F`
+P$`
+PD`ˇˇˇıPM`ù `	ˇˇˇıPM`ò@`A!	F`	ˇˇˇÁP/`ï P.`ê Pí `ë 	ˇˇˇÏPI!	P<   nè;h<                            º  ·J   ‰w  ﬂ• `
+P$	PÄÄÄ®   PCû®   e                	       ﬁÕ  ﬂ¡    æ  s ·J   ‰   s Õ   ﬂ¡   J   ·J   ‰æ   J   æ   º ú   ó   ﬂº J   ó   w ﬂ•&`ˇˇˇˇPP(`ë 	õ ˇˇˇÊP$	PH  πs˝H  ›         	              ﬁÕ  ﬂº  ·J   ‰w  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ   ·J   ‰   s ·J   ‰   s ·J	   ‰
+   w ﬂæ  æ  æ   L   L   ﬂæ  J   ö0   ó   æ  J   ·J   ‰æ  J   æ  J   w ﬂó   •&`
+P$`ˇˇˇˇP(`P(`.`N`ê P*UPD`ó@`ì `ê 		ˇˇˇPI	PÄÄÄƒ   æP9”ƒ   u                
+       ﬁÕ  ﬂº  ·J   ‰w  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ   ·J   ‰   w ﬂæ  L   ﬂ•&`
+P$`ˇˇˇˇP(`P(`.`N`ê P$`+	PÄÄÄ¥  A’œª¥  ò        
+       I       Ω  Œ   ﬂﬁÕ  ﬂ¡   æ  s Õ   ﬂ9   Õ  ﬂ¡      s ·J   ‰   w ﬂ¡   æ   L   ﬂ¡   J   J   ·J   ‰æ   ¡   s ö   ó   Œ  ﬂ ¢ó   ¡  J	   ·J   ‰æ   ¡   w ﬂ¡   J
+   ·J   ‰æ   ¡   º º w ﬂ¡   J   ö,   ó   æ  ¡   æ   s ¡   J   &L   ﬂó   ¡  J   ·J   ‰¡   J   ¡   æ  J   w ﬂ¡   J   ·J   ‰   s ·J   ‰   æ  J   &w ﬂ¡   J   ·J   ‰æ  s ·¡   J   J   K‰¡   J   J   w ﬂæ   ·J   ‰   ¡   w ﬂ¡   ª   s ·J   ‰   s ·J   ‰   ¡  J   w ﬂ¡   J   öâ   ó8   æ   ·J
+   ‰s  Œ   ﬂ¡   ¡   J   æ   ·J   ‰s  &L   ﬂ¡   ¡   J   æ  ·J   ‰s  &L    ﬂ¡   ª   s ·J   ‰!   m"   w ﬂóI   •/`ˇˇˇˇPH`J`PPD	`O`ñ ˇˇˇÙP/`'`A6	F`ë ˇˇˇÙPD`ë ˇˇˇÏPD`î `
+ˇˇˇ˘Pñ@`ë 
+	ˇˇˇÎPD `ñ 
+PˇˇˇÚPD#`ë ˇˇˇ˚Pï ˇˇˇˇPD%`ê ˇˇˇÏPD'`ˇˇˇˇPP5
+ˇˇˇÊPD)`î@+`P)`P*`PJ/`ˇˇˇˇP/ˇˇˇ‹PI6	PÄÄ  æìæª  ”                         ¡   J   úö   ó   ﬂ¡   J   úÑ   ó   ﬂº  J   ¡   J    ú   ó	   ﬂº  J   ¡   J   ó   ùB   ó   ﬂº  J   ¡   J    ú   ó   ﬂº  J   ¡   J   ó   ó   ö$   ó   ¡   J	   ·J
+   ‰   w ﬂó   • `ï ñ û ú û †@`ñ 
+PIPÄ¥  ç˜î  ‚               .      $Ω  Œ   ﬂﬁÕ  ﬂ¡   æ  s Õ   ﬂ¡   õ8   ó   æ   ·J   ‰   s ù   ó   ﬂ9   ó   Œ   ﬂó   º úD   ó   ﬂ¡   J   ú/   ó
+   ﬂ¡   J   J   ·J   ‰æ   ¡   s ó   ö   ó    ¢ó   ¡   J   öZ   ó   ª    m	    ¡   J   s 
+w ﬂ´¡   P   ﬂô%   ó    §≠∞±  ﬂ±  ﬂ¡   L   ﬂ“ó   Œ  ﬂ¡   J   ·J   ‰   s ·J   ‰   w ﬂ¡   L   ﬂ¡   ª   s ·J   ‰   s ·J   ‰   w ﬂ¡   J   ú>   ó&   ﬂ¡   J   ·¡   J   J   K‰¡   J   J   m   w ó.   ﬂ•/`ˇˇˇˇP(`/`ê P£@`∫ -ˇˇˇÙPî `A8	F`î@`F
+ˇˇˇˇPEP4!`ò +`í@`G`ñ 
+PP$`L `ˇˇˇˇPPPD"`± +ˇˇˇÁPI8	PÄÄ¥  §  
+        ˇˇˇˇ        ı      8   “+Êı8      	                     Ω  Œ   ﬂm   ¢•	
+`EQ<   ÆÏZÚ<                             ¡   ·J   ‰w  ﬂ• `P$PÄà   "mî∏à   I                          ¡   J   ö9   ó   ¡   J   ·J   ‰w  ﬂ¡  ·J   ‰¡   m   w ﬂó   •@`î `ë 
+P$`ˇˇˇˆPIPÄ   ˛ÍâØ‡   ì                       $º  ·   üB   ó   ·   ü1   ó   ·   ü    ó   ·   ü   ó   †   ó   ¢ó   ¡   º  ¡  Nﬂ´¡   º  Rﬂô   ó    §≠∞±   ﬂ±   ﬂ“ó   ¢• !`— !`A6 !`!%`ó -ë !`AQÄÄ               ˇˇˇˇ        h      (  ˇT'Ω(  õ                '       Ω  Œ   ﬂΩ Œ   ﬂ¡   ¡  ö   ó   ¡   Œ   ﬂó   ¡   ¡      ¡   J   ù   ó   ﬂ   ó   &   &s ·J   ‰9   ¡   <   ¡   <   s L	   ﬂ¡  ·J
+   ‰h      i       i      i   m   w ﬂ¡   J   ù   ó   ﬂ¡   9   L   ó   ﬂ¡  ·J
+   ‰¡   J   m   w ﬂ¡   J   õ8   ó   ¡   J	   ·J   ‰      s ·J   ‰   w ﬂó    ¡   J	   ·J   ‰¡   J   ù   ó$   ﬂª   J   ó&   w ﬂ•í `	ê `ê@`#¶ ˇˇˇ€P
+L%*J`PI
+`£ %ˇˇˇ÷PD`™@`
+ˇˇˇPDÄ  •`î `õ 
+PP `ë § ˇˇˇ˜P$	PÄÄÄh   çD÷h   7                         ¡   º 9   Nﬂ¡   º Kõ   ó   ¡   º 9   Nﬂó   • `/`ì `î@PÄÑ  ycMot  x	               ·      Ω  Œ   ﬂΩ Œ   ﬂ¡      ¡   J   ù   ó   ﬂ   ó   &   &s Õ   ﬂÕ  ﬂŒ   ﬂ¡   æ   ·J   ‰9   ¡  <   ¡  <   ¡   <	   s L
+   ﬂ¡   J   ö”   ó   ¡   ¡   J   s Õ  ﬂÕ  ﬂò   æ  æ  KÕ  öò   ó   ¡  J   æ  Kõj   ó   ¡  J   æ  ¡   Nﬂ¡   ¡   J   ·J   ‰ª   Ä   æ  &   &   „  Å    s L   ﬂô   ó   æ  0(Õ  ﬂôZˇˇˇó!   ¡   ö#   ó#   æ   ·J   ‰   w ﬂôH  ó%   ¡   J   ú   ó'   ﬂ¡
+  ¡   J   Kó)   ök   ó*   ¡
+  ¡   J   K·J   ‰æ   ¡   ¡  ¡  w ﬂ¡  ·J   ‰h   ¡  i    ¡  i   m   w ﬂôÆ  ó2   ¡   J      ö#   ó5   æ   ·J   ‰   w ﬂô  ó7   ¡   J   ö…   ó9   ¡      s ·J   ‰æ   s Õ  ﬂ¡      s ·J   ‰¡   J   ù   ó@   ﬂ¡   J   óA   s ·J   ‰æ  w ﬂæ   ·J   ‰    w ﬂ¡  L!   ﬂ¡  ·J   ‰h   ¡  i    ¡  i   m"   w ﬂô.   óK   ¡   J#   ö   óM   ¡   $   L   ﬂóN   ¡   J   ·%   üu   óP   ·&   ü≈   óQ   ·'   üH  óR   ·(   ü≥  óS   ·)   ü#  óT   ·$   üú  óU   ·   üC  óV   †e  óV   ¡   *   ¡   &+   &s ·J,   ‰¡   J-   ù   ó\   ﬂ   ó\   s ·J   ‰æ  s Œ   ﬂôó  ó_   ¡   .   ¡   &/   &s ·J,   ‰¡   J-   ù   óe   ﬂ   óe   s ·J   ‰æ  s Œ   ﬂ¡   J0   ö$   ój   ¡   ·J0   ‰¡   J0   w ﬂóm   ô  óm   ¡   1   ¡   &+   &s ·J,   ‰¡   J-   ù   ós   ﬂ   ós   s ·J2   ‰3   ¡   J4   s ·J5   ‰æ  s Œ   ﬂôá  ó{   ¡   6   ¡   J(   &+   &s ·J,   ‰¡   J-   ù   óÇ   ﬂ   óÇ   s ·J2   ‰3   ¡   J4   s ·J5   ‰æ  s Œ   ﬂô  óä   ¡   7   ¡   &8   &s ·J   ‰æ  s Œ   ﬂ¡   J9   öC   óë   ¡  ·J   ‰¡   J9   m:   w ﬂ¡   ·J,   ‰¡   J4   w ﬂóò   ô|  óò   ¡      s ·J   ‰¡   J   ù   óú   ﬂ¡   J   óù   s ·J   ‰æ   w ﬂ¡   ¡   J
+   L   ﬂ¡  ·J;   ‰¡   ¡  w ﬂæ   ·J   ‰   ¡   s ·J   ‰<   w ﬂ¡   L=   ﬂôƒ   ó©   ¡   ¡   J   s ·J   ‰æ   w ﬂôò   ó≠   ¡  ·J   ‰h   ¡  i    ¡  i   m>   w ﬂ¡      s ·J   ‰¡   J   ù%   óµ   ﬂ¡   J   ù   ó∑   ﬂ   ó∑   s ·J   ‰æ   w ﬂô   ó∫   ¡   J   ú6   óº   ﬂ¡   J   $   ú   óø   ﬂ¡   J      ó¡   öp   ó¬   ¡   ·J?   ‰@   ¡  JA   s ·J?   ‰B   ¡  JC   w ﬂ¡   JD   ö$   ó    ¡   ·J?   ‰¡   JD   w ﬂóÕ   ¡   JE   ö)   óœ   æ   ·J   ‰F   ¡   JE   &w ﬂó”   ¡   ¡   LG   ﬂ¡   æ  LH   ﬂæ   ·J   ‰¡  JI   w ﬂ¡  J!   ú   ó€   ﬂ¡  JJ   JK   ó›   ö(   óﬁ   æ   ·J?   ‰L   ¡  JM   w ﬂó·   •í `#¶ ˇˇˇ‹P(`&`G`ê %**J!PI`î `
+ˇˇˇˇP( `fó `ô `ï `ñ î ˇˇˇÔPˇˇˇ¯P)`J4`ï@`ë `ê P.`¥@`ó ˇˇˇÏPD`
+
+ˇˇˇÓP>$@&`ö `ê P. `î `	P
+ˇˇˇ˜P(`P
+§ ˇˇˇ˚P
+'ˇˇˇ˜P$`ê P$`,`
+
+ˇˇˇÓPN1 `î `ï@5`ˇ `:ˇˇˇƒP*&ü ˇˇˇ¸P
+ˇˇˇ˜P)`:; `'ˇˇˇ◊P*&ü ˇˇˇ¸P
+ˇˇˇ˜PI?!`î !`
+ˇˇˇ˘PIB`:D `>ˇˇˇ¿P*&ü ˇˇˇ¸P& ˇˇˇÔP
++ˇˇˇˆP)`:I `;ë ˇˇˇ√P*&ü ˇˇˇ¸P& ˇˇˇÔP
++ˇˇˇˆP)`:N `%ˇˇˇŸP
+;ˇˇˇ˜P)!`î !`
+ˇˇˇÌPDT!`
+ˇˇˇ¸PIV`:X `P
+§ ˇˇˇ˚P
+'ˇˇˇ˜P$`ï `
+ˇˇˇÛP$`ê ˇˇˇÏPP$`,`:` `
+ˇˇˇˇP
+ˇˇˇ˜P$`:d `
+
+ˇˇˇÓPDl`P
+¥ ˇˇˇ˚P
+-ˇˇˇ˜P$`Jq`œ `,*ˇˇˇÙP*)ˇˇˇıPDv`î `
+
+ˇˇˇ˝PI|`î `ˇˇˇËPIÄ  Ç`ê ` `
+ˇˇˇ˜P `¥ `ê '
+ˇˇˇ‹P PÄÄÄÑ         ∆   ´   ê   
+ËóAê   V                  	       º J   ¡   ¡   Nﬂ¡  ·J   ‰¡   J   s ö#   ó   º J   ¡   ¡   J   Nﬂó	   • `î `
+ˇˇˇıP-`û@PÄÄX   ≥ƒ•ΩX   )                         º J   ¡   ¡   Nﬂº J   ¡   ¡   Nﬂ• `î `î PÄÄÄ|   ìÃG9|   9                         ¡      s ·J   ‰º  s ·J   ‰º s ·J   ‰¡   w ﬂ• %`P
+ˇˇˇ¸P
+ˇˇˇ˚P
+ˇˇˇ˜P$!PÄê   I9|¸ê   V                  	       º J   ¡   ¡   Nﬂ¡  ·J   ‰¡   J   s ö#   ó   º J   ¡   ¡   J   Nﬂó	   • !`î %`
+ˇˇˇıP-%`û@PÄÄT  á®UT  Â                       Ω  Œ   ﬂΩ Œ   ﬂﬁÕ   ﬂæ   Œ   ﬂ¡   ¡  öé   ó   ¡   Œ   ﬂ¡   J   ·J   ‰   s ·J   ‰s  ·J   ‰9      <   	   <
+   s ·J   ‰m   s ·J   ‰9      <      <
+   w ﬂó   ¡   J   ·J   ‰s  ·J   ‰m   w ﬂ•ò `*`	ê `K`ñ 
+P
+P
+
+
+ˇˇˇÁP
+1ˇˇˇ˚PJ
+
+ˇˇˇÌPI`ë 
+P
+ˇˇˇ˚PD2	PÄ§   ÷a%Ö§   ^                	        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰æ   ·J   ‰      s ·J   ‰s  s ·J   ‰      w ﬂ•&!`ˇˇˇˇP(`ï P
+PˇˇˇÿP*Z$PÄÄ`  .Ó=`  ê        
+       7        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡   J   æ  KÕ  ﬂ¡  ·J   ‰æ  J   s ú,   ó	   ﬂæ  J   ·J   ‰¡   æ  ¡   s ó   ù   ó   ﬂæ  J   ó   Õ  ﬂæ   ·æ  ö   ó      ô   ó      ó   K‰   w ﬂæ  J	   öb  ó   æ   ·J
+   ‰   s ·J   ‰   æ  w ﬂæ  J	   ·   üS   ó   ·   üB   ó   ·   üm   ó   ·   ü\   ó   ·   ü°   ó   †”   ó   æ  J   ·J   ‰æ  J   ù   ó"   ﬂ   ó"   w ﬂôó   ó#   æ  J   ·J   ‰æ  J   ù   ó'   ﬂ   ó'   s ·J   ‰   æ  J   w ﬂôA   ó-   æ  J   ·J   ‰æ  J   ù   ó1   ﬂ   ó1   w ﬂô   ó2   æ  J   ö-   ó4   ¡  J   ·J   ‰¡   æ  ¡   w ﬂó7   •&`ˇˇˇˇP(`ê P(`î !`	ˇˇˇıPû 0ˇˇˇÔP®@`≥ ,PD	`ì@`ê P1ˇˇˇÔPD`Ë `ê û ˇˇˇ¸P$`: `ê û ˇˇˇ¸P& ˇˇˇÔP$`: `ê û ˇˇˇ¸P$`J`ì@!`ë ˇˇˇÓPI#PÄÄÄ§  ˙f~§                 $       ﬁÕ  ﬂº  ¡       º &   &s ·J   ‰9   ¡   ·J   ‰s  <   ¡   ·J   ‰s  <      <   s ·J	   ‰
+   º  s ·J   ‰æ  s ·J   ‰   ¡   J   s ·J   ‰   ¡   J   s L   Õ   ﬂ¡   J   J   õE   ó   æ   ·J   ‰9      <   ¡    ª   s ·J   ‰s  <   w ﬂó$   æ   ¢•F`	A
+ˇˇˇΩP*P
+P	
+ˇˇˇœP**ˇˇˇËP*ˇˇˇÛP*$ˇˇˇÓP*"ˇˇˇPM`ô `%*ˇˇˇ˛P
+PHPI`$	QÙ   Ë23˜‰   á                       º  ·J   ‰l   s Õ   ﬂh    Õ  ﬂÕ  ﬂò   æ   æ  KÕ  öB   ó   æ  K·J   ‰s  Õ  ﬂæ  ·J   ‰æ  w ﬂæ  0(Õ  ﬂô∞ˇˇˇó   æ  ¢• `
+
+ˇˇˇ˙P(`J
+ `fó 	`	PH	`
+ˇˇˇ˚PD `ï@`QÄÄÄÙ          '   U   ¯  F=—¯  z        	       $       ﬁÕ  ﬂº  ¡   ö-   ó   æ  ·J   ‰s  ·J   ‰   w ﬂô8  ó   º  J   ú   ó   ﬂº  J   ó	   ö[   ó
+   æ  ·J   ‰s  ·J   ‰ª   ·J   ‰   9   º  J   <	   º  J   <
+   s w ﬂô∏   ó   º     öT   ó   æ  ·J   ‰   s J   Õ   ﬂæ   ú   ó   ﬂæ   ·J   ‰   w ó   ﬂôV   ó   º  ö#   ó   æ  ·J   ‰   w ﬂô+   ó!   º  õ   ó"   æ  ·J   ‰   w ﬂó$   æ  ¢•&	`ê 	`PP.`™ 	`P
+ë ˇˇˇ÷PˇˇˇÒP.`ì `ê P-	`ü Pì `-	`ê P.`-	`ê PI`QÄÄ–	  qe f∞	  Ñ        
+       ¬      $ﬁÕ  ﬂº  Éö   ó   º  Ã ﬂ   Ã  ﬂó   º ö    ó   9   º <   Ã ﬂô&   ó   º ¡  ö   ó   9   Ã ﬂó	   ¡  ·J   ‰9   ¡  º ù   ó   ﬂ9   ó   s Õ   ﬂ¡   ª   s Œ   ﬂº  ·   ü1   ó   ·	   ü‡  ó   ·
+   üÕ  ó   †a  ó   æ   J   õ   ó   ª   Ä   „  Å ßó   æ   J   ·J   ‰l   s ö-   ó   ª   Ä   æ   J   &   &„  Å ßó    æ   J   ú8   ó#   ﬂæ   J   ù#   ó&   ﬂ¡  ·J   ‰æ   J   s ó)   ö   ó*   ª   Ä   „  Å ßó,   ¡  0(Œ  ﬂæ      ¡  &L   ﬂ¡  æ   J   æ   J   Nﬂ¡	  æ   J   æ   Nﬂæ   J   õ   ó7   æ      L   ﬂó8   ¡  õ  ó9   ¡   ·J   ‰9   ¡  J   <   ¡  J   <   ¡  J   <    ¡  J!   <"   ¡  J#   <$   ¡  J%   <&   '   s ·J   ‰(   )   ¡  J*   s ·J   ‰9+   ¡  J,   <(   ¡  J-   <.   ¡  J/   <0   ¡  J!   <"   ¡  J1   <$   ¡  J2   <&   3   w ﬂŒ  ﬂóZ   ¡   ·J   ‰4   æ   J   &æ   J   æ   ¡  J4   w ﬂæ   J   ·5   ü    ób   ·6   ü   óc   †µ   óc   ¡   ·J   ‰7   æ   J   &æ   J   æ   ¡  J7   s ·J   ‰8   æ   J   &æ   J   æ   ¡  J8   w ﬂôE   óo   ¡   ·J   ‰9   æ   J   &æ   J   æ   ¡  J9   w ﬂô   óu   æ   J   õ   ów   ¡  ·J   ‰æ   w ﬂóy   ô√  óy   æ   J   õ{   ó{   ¡   ·J:   ‰;   w ﬂ¡  ·J<   ‰¡  m=   w ﬂ9>   Œ  ﬂ9?   Œ	  ﬂŒ  ﬂŒ  ﬂ¡   @   s ·JA   ‰w  ﬂôp  óÖ   ¡  æ   J   KöW  óà   ¡   '   s ·JB   ‰C   s Õ  ﬂæ  JD   ú6   óç   ﬂæ  ·JE   ‰s  JF   JG   ·JH   ‰æ   J   s óî   ö)   óï   æ  ·J   ‰I   9J   <K   w ﬂóô   ´¡	  ¡  æ   J   KKJL   ö/   óû   ¡	  ¡  æ   J   KKJL   ·JA   ‰w  ﬂó§   ¡	  ¡  æ   J   KRﬂô0   ó¶    §≠∞±  ﬂ±  ﬂ¡	  ¡  æ   J   KNﬂ“ó©   ¡   ·J:   ‰¡  æ   J   Kw ﬂó≠   ô≈   ó≠   ¡  JN   JO   ú   ó±   ﬂ¡  JN   JP   ó¥   ù   óµ   ﬂº ú   ó∑   ﬂº ó∑   ö<   ó∏   ¡   Q   s ·J<   ‰mR   s ·JS   ‰T   U   w ﬂóæ   ô'   óæ   ª   ÄV   º  &W   &„  Å ßó¬   æ  ¢•&	`/	`'	`N	`/	`ñ `ê 	`N`
+ò ˇˇˇÂP(`ˇˇˇˇPI`¿@`ì `PI`ê ˇˇˇ˙P-`î ˇˇˇÿPI`ï ° 	ˇˇˇÚPí `PI`-`	,`ô `î@#`ì `î@'`O)`,%/////E*PJ2Gî ˇˇˇœP*%/////E3PD<`L@`,
+	
+ˇˇˇÿPDC`µ `,!
+	
+ˇˇˇŸP*!
+	
+ˇˇˇŸP$`:J `
+
+	
+ˇˇˇﬁP$`JX`ì `
+ˇˇˇ˘PI[`:] `ì `ë 
+P$`ˇˇˇÔPDd`+`+`'`Gi`P
+,P.`ô $`PP(`ü $Pî #	ˇˇˇ˝Pí `ê )ˇˇˇ„P9p!`§ `° $PIu`£ +`ù@z`ˇˇˇ¸PI|`:~ `õ † ¢ `P
+ˇˇˇ˚PJÄ  äZ ` `ˇˇˇﬁP `QÄÄÄ–	  ¿	  M   h  #   ˇˇˇˇ        ˜  i   D   J[ÙÄD                            ¡   ·J   ‰º w ﬂ• `ˇˇˇ¸P$PÄ∞   ï?[∞   k                        ﬁÕ   ﬂæ   J   öV   ó   ¡  ·J   ‰9      æ   J   &   &<   ¡  J   ·J   ‰æ   s <   w ﬂó   •&`ì `%ï ë ˇˇˇ˜PHPIPÄÄÄà   ©?Èà   L   	                     Ω Œ   ﬂ¡   ¡  ö   ó   9   Œ   ﬂó   ¡  ·J   ‰º  J   m   w ﬂ•)	`	ê 	`ê@`ˇˇˇÔP4P¨  kî{¨  [                        º J   ·   üS   ó   ·   üB   ó   ·   üb   ó   ·   üà   ó   ·   ü—   ó   †¯   ó   º ¡   º  Kù   ó   ﬂ   ó   L   ﬂô«   ó	   º ¡   º  Kö   ó   ô   ó   ó   L	   ﬂôê   ó   º ¡   º J   Kù   ó   ﬂ   ó   º J   ö   ó   ô   ó   ó   L	   ﬂô6   ó   º ¡   º  Kù   ó   ﬂ   ó   L	   ﬂô   ó   • `Á `ß `: `≠ `: `¶ ,™ `: `ß `JPÄî   Å< tî   R   	                     Ω Œ   ﬂ¡   ¡  ö   ó   9   Œ   ﬂó   ¡  ·J   ‰º  J   m   w ﬂ¡   ¢•)	`	ê 	`ê@`ˇˇˇÔPD`QÄÄÄT  ¥O√ZT                           º J   ·   üS   ó   ·   üB   ó   ·   ü1   ó   ·   üF   ó   ·   ü`   ó   †ù   ó   ¡   º  º J   ·J   ‰s  Nﬂôw   ó
+   ¡   º  º J   ·J	   ‰
+   s NﬂôL   ó   º J   ·J	   ‰
+   s ö!   ó   ¡   º J   º J   Nﬂó   ô   ó   • `Á `ó P%`: `ú P%`: `î P-`ú@`JPÄê   ≠ÿ‘ê   Y                  
+       º  J   ú2   ó   ﬂ¡       º  J   &   &s ·J   ‰s  ó   ù   ó	   ﬂº  J   ó
+   ¢• `ô ˇˇˇÔP
+ P†QÄÄÑ   ŒóœÑ   G                        Ω  Œ   ﬂΩ Œ   ﬂ¡   õ   ó   Œ   ﬂó   º ·J   ‰m   w ﬂ¡   ¢•í 	`/	`L`
+ˇˇˇ˚PDÄ  £`Q<
+  J'o˜<
+  „        	       œ        ﬁÕ  ﬂ¡   æ  s Œ   ﬂæ  Õ   ﬂæ  J   ·J   ‰s  Õ  ﬂæ     ú$   ó   ﬂ¡   ·J   ‰   s J   ó	   öj   ó
+   ¡   ·J   ‰s  Õ  ﬂ¡   ·J   ‰s  ·J	   ‰s  Œ   ﬂ¡   ·J
+   ‰s Õ   ﬂæ   J   ·J   ‰s  Õ  ﬂó   æ  ·   ü®   ó   ·   ü¸   ó   ·   üÎ   ó   ·   ü,  ó   ·   ü  ó   ·   ü¸  ó   ·   ü   ó   ·   ü¯  ó   ·   üÑ  ó   ·   üÁ  ó   †Á  ó   9   ¡   ·J   ‰   s <   9   <   Œ   ﬂ¡   ¡   J   ¡   ·J   ‰s  ¡  s Œ  ﬂô∂  ó)   9   ¡   ·J   ‰s  <   ¡   ·J   ‰   s <   m    s  <   Œ   ﬂôd  ó5   ¡   ·J   ‰   s ·¡  üS   ó8   ·   üB   ó9   ·   ü1   ó:   ·   üw   ó;   ·   ü‘   ó<   †j  ó<   9    ¡   ·J   ‰   s <   ¡   ·J   ‰   s <   m!    s  <   Œ   ﬂô#  óH   9"      <   ¡   ·J   ‰   s <   ¡   ·J   ‰   s <   ¡   ·J   ‰#   s <$   Œ   ﬂôµ   óW   9%      <   ¡   ·J   ‰   s <   ¡   ·J   ‰   s <   ¡   ·J   ‰&   s <   ¡   ·J   ‰'   s <(   ¡   ·J   ‰#   s <$   Œ   ﬂô   ól   ¡  Œ   ﬂól   ôr  ól   )   Œ   ﬂô]  ól   ¡   ·J   ‰   s ·   ü1   óo   ·   üî   óp   ·   ü˛   óq   †û  óq   9*      <   æ  ù   ót   ﬂ¡   æ   s óu   <   ¡   ·J   ‰   s <   ¡   ·J+   ‰s  <(   Œ   ﬂô?  ó~   9,      <   æ  ù   óÅ   ﬂ¡   æ   s óÇ   <   ¡   ·J   ‰   s <   ¡   ·J   ‰#   s <$   Œ   ﬂôƒ   óç   9-      <   æ  ù   óê   ﬂ¡   æ   s óë   <   ¡   ·J   ‰   s <   ¡   ·J   ‰   s <   ¡   ·J+   ‰s  <(   ¡   ·J   ‰#   s <$   Œ   ﬂô   ó§   ¡  Œ   ﬂô   ó§   ôT  ó§   9.      <   æ  ù   óß   ﬂ¡   æ   s ó®   <   ¡   ·J   ‰   s <   ¡   ·J+   ‰s  <$   9/   <0   Œ   ﬂ¡   ·J   ‰s  ·J1   ‰m2   w ﬂô∑   ó∏   93      <   æ  ù   óª   ﬂ¡   æ   s óº   <   ¡   ·J   ‰   s <   ¡   ·J+   ‰s  <(   Œ   ﬂôC   ó≈   ô9   ó≈   94   5   <   ¡   ·J6   ‰s <5   Œ   ﬂô   ó    ¡   ö.   óÀ   ¡  0(Œ  ﬂ¡  7   ¡  &¡   Nﬂóœ   •&`ˇˇˇˇP)`)`ê PH`¶ Pó `P(`P
+P)`P(`ê PM`ˇπ0 `ë Pê `
+Pˇˇˇ’P)`:0! `%P( 
+ ë P*>PN'`:+ `ë Pﬁ `%ë P( 
+ ë P*>PN6`:8 `%* 
+ ë P*ë P( 
+ ë Pê@?`:A `%* 
+ ë P*ë P(ë P(ë P( 
+ ë Pê@J`:L `ê@O`:Q `+`:U `ë P¿ `%*ï ˇˇˇıP- 
+ ë P*PN^`:` `%*ï ˇˇˇıP- 
+ ë P* 
+ ë Pê@g`:i `%*ï ˇˇˇıP- 
+ ë P*  ë P*P( 
+ ë Pê@r`:t `+`Jx`:z `%*ï ˇˇˇıP- 
+ ë P*P(ê `P
+ˇˇˇ˚P ` `%*ï ˇˇˇıP- 
+ ë P*P ` ` `
+P.` `/`-`
+í P0   5€<´0                             m   ¢• `%QÄÄ<   ˘˛√<                             ¡   ·J   ‰w  ﬂ• `P	PÄ0   5€<´0                             m   ¢• `%QÄÄ<   ˘˛√<                             ¡   ·J   ‰w  ﬂ• `P	PÄh   †K´h   3                        ﬁÕ   ﬂ¡   J   æ   J   ¡   æ   s ·J   ‰s  Nﬂ•&`ô ˇˇˇ˛P
+P%PÄÄÑ   	2≥+Ñ   =                        ¡    º  s Õ   ﬂ9   Õ  ﬂ¡    æ  æ   ·J   ‰s  w ﬂæ  ¢• `ˇˇˇˇP(`J`PˇˇˇÚPD`QÄ3ıÿ  `ﬁ     Pü  É    `ç   ‚  {    `e    `C  p	  `e    `E  p
+  `Ô  P  ﬂ    `P  Q  D  ∞   è  I  ﬂ  ä  ö  Œ    a  k    ! [   Ï  „     @ {    @B    @•  B  pA  0  í  Í    @D  p  @Á  Ë    @" ç P  #   @‚    @  @	  @
+  @Ô  å   F  p  @  @ÿ  $ à    `å   A  p  `í           @  ¢   ù    •  !     "  #  $  %  &    `    /    `  6     )    +  ,  -  .    pI  0  1    @#  %  3  4      `í           @6  ¢ 7  ù  !     ê     @#  &  %    `Ñ  J  ±    K  L  I  M  N  O  P  Q    `T  U    `T  U  W      X  Y  Z  [  ]    @  @B  ^    _  `  a  b  à  c  +  d  ;  6   E  F    `T  U    f  g  V    @W  E  F    `I  ú W  i      j  k  l    `W  l  I  ú Y  Z  T  U    f  g  V    @E  F  n    `D  x  u    f  g  V    @W  E  F    `q    ú s  t  I  E  F  W   u  v  w    p  D    `E  F    `q  ú s  t  I  z  D    `  `  `i    @x  y    `T  U      j  I  w    p  `  %      Å  Ç  =  ;  É  t  >  Ñ  I  ú +    6   •    #  0  F  1  E  $  2  &    p m    `W  }  k  E  F  T  U   m    pw    p  `Ü  T  á     `W  i     @  ä  å  Ö  Ü  ç  T  é  ∞   è  ê    ë  O  0  í  ì  I  L  Y  î  ñ  !  @ò  ô  ö  õ  ú  ú ù  m  j  Ü  û  ü  †  °  á  !  `á  W  i  "  @é  L  #  @  ä  §  I  õ  Y  •  ¶  ú ß  6   Œ   ®  ∞   è  ™  "  `á  W  i  $  @é  L  %  @  ä  Ç  I  ö  Y  •  ¶  ú ß  6   Œ   ®  ∞   è  ™  #  `t  Æ  W  i  }  é  Ü  $  `t  Æ  W  i  }  Ü  %  `W  }  ±  &  `W  }  Ç  ú q  ±  '  `W  i  }  ±  Ç  ú q  T  U    ä  ≥    ñ  Y  •  ¶  é  ú  (  `W  i  }  Ç  ú q  é    ñ  T  U  °  )  `W  i  }  µ  B  Y  •  ò  T  U  ∂  ∑  A  6   +      j  L  I  ∏  *  `U  +  `W  }  =  6   +  ª  ,  `á  W  i  }  Ω  æ  ø  ≥    ñ  é  °  5  6     -  `á  W  i  }  ¡  æ  é  /  `Ç  ±  E  %    F  #  2      j  .  `'  @¬    h  +  ?  ;  6   ∏    8  √    ∞   ï   9  :  W  i    x  ƒ   à    %  &    #  $  2  ∆  %  p2  `«  1  `(  p5  `‹   [    6  `4  `[    «  å   *  p0  `W  i  (  @?  =  6   Ç  w  '  p3  `  ∞   ≥    ñ  é    x  »  ƒ  9  :  )  p8  `*  @+  @:  `Ã  ∂  A  ∑  ;  `Ã  Õ  <  `  ‚  ﬂ    =  `Ã  ∂  A  ∑  9  `œ     ê   –  W  -  @i  }  µ  °  “  †  {  ⁄  á  (  )  i  ÷  ’  Ω  ◊  0  6   å   .  pÿ  Ÿ  ⁄    €  ‹  ›  /  pB  ﬁ  ﬂ  „  í  Í  Ï  ‡  ·  ‚  P  ‰  Â  3  Ê  O  Á  Ë  È  Î  Ì  Ó  Ô  0  pd  ò  A  1  p ™  ≠  ê  Ø  ?  Ò  Ú  ©  —         Û  S  7  `…     ê   À  W  )  @i  }    å   ∑  Ã  Õ  ,  p†  ,  @B  -  p°      "  Ω  î      Ù  ?  `4      ı    @  `W  µ  B  ∂  •  6   Ω  ¡  0  ∞   ˜  O  ﬂ  „  í  Í  Ï  ©  ‚  P  ê   Á  Ë    ∏  >  `  ∞   ï -    .  @        å   3  p/  @ê   ä  4  pA  `¯  ˘    0  @3  4      W  }  ˙   V  S  h  {  Ç     ˚  1  @ı      B  `ö    V  x  y  f  g  2  @E  F  =  W  i    j  ¡  Z  Ω  D  `x  F  `ç i  <  @ ]     B  C  `d  3  @  4  @]  5  @6  @    à  ˛  Ÿ    P   [  B  ^  c   ‹      7  @∫   ¢   ´   S   ∞   ≤   s  	 
+ π  8  @¥  º   ¿   ®  ß  Æ  V  æ  %  o  y  e  x   å   9  p9  @:  @ «  .   I  W  }  +  ú j  ;  @ª    E  `        :  p    "   "  H  `0  ﬂ  „  í  Í  Ï  ê   P  Ë  G  `=  @å   Õ  <  pJ  `0  ﬂ  „  Ï  í  Í  ©  ‚  O  Á  P  I  `>  @å   Õ  >  pK  `?  @ä    `6  p?  p@  p                 	      @  @  @  @              p    p    p5  8    @:  <  ;  >  =  9    @@  ?  A    @B    @D  E  F    p  @  pS    pV  	  pe  
+  ph    pm    po    pv    py    p{    pÖ    pà    p¢    p´    p≠    pØ    p∞    p≤    p®    pß    p¥     pπ  !  p∫  "  pº  #  p¿  &  @$  p&  p+  pd  2  p∏  5  p√  ◊ 7  pi  8  p;  p =  p G  p n        `  pf  ˇXÑG                –  w             R              k              g      %             5        í      G        ü      S        ¢      V        æ      e        …   
+   h        ”      m              o        ‰      &            v          	   y        ;     {             '            '         	   Ä             )       H     Ö        L  *   à        v     ¢        é     ´        ¶     ≠        Æ     Ø        µ     ∞        π     ≤        ¿     ®        ‘     ß        ·     ¥        ˜     π        ˘     ∫              º             ¿        $  #   ;             *       W     =        I     +       G     +       Q     +       K     ,       “     d        o     -       Ñ  N   -       r     .       w     .       z     .            .            ∏        Ó     /       Ù     /            √               ‘        7     0       U  X   1       J     2       L  	   2       ∑     3       ≠  
+   4       »     5       º     6                    O                8   7             8             9             8             9             :       Õ     ;       ùH©¿      5ı      5ı                Äq  )ı  i  )ı     
+           c	  ≤  [	  ≤  J   $          È  ¿  ·  ¿  _              L  ´  D  ´  l   %              ±  ˛  ±  à   "            "  ö    ö  ¥               ˚  V  Û  V  ≈              ®  #  †  #  À              c#  ,$  [#  ,$  ¸              v$  v&  n$  v&               æ&  Ú(  ∂&  Ú(              Ç7)  c-  /)  c-                !,  G-  ,  G-  1  1             ß-  .  ü-  .  9              J.  Ë/  B.  Ë/  >            Ç@0  (@  80  (@  M              4  ?4  4  ?4  a  )            b4  @  Z4  @  d               =  ‚>  =  ‚>  í  $            T>  ≤>  L>  ≤>  ö  ,             c@  ˝@  [@  ˝@  ™              A  —W  A  —W  ±             %X  Ì]  X  Ì]  4             ;^  Ìc  3^  Ìc  _             id  ùe  ad  ùe  ã             f  g  f  g  ï             Vg  ¡g  Ng  ¡g  ü  !           ˇg  ¡h  ˜g  ¡h  §  !           +i  jl  #i  jl  ¨  !            l  o  ¬l  o  ∆  !           Uo  <t  Mo  <t  ◊              çt  »t  Öt  »t  ˙             u  öu  ˇt  öu  ˇ             ‘u  Dx  Ãu  Dx               |x  ßy  tx  ßy              ÇÊy  Ç  ﬁy  Ç  $              ¿Ä  ˝Å  ∏Ä  ˝Å  S  I          Ç2Ç  ¯ä  *Ç  ¯ä  [            Ä Ñ  ëÑ  Ñ  ëÑ  h  %            9Ñ  }Ñ  1Ñ  }Ñ  h  >            ûá  Îä  ïá  Îä  }  Y             ià  «ä  aà  «ä  Å  )          Äã  ã™  ã  ã™  î              ¨å  6ç  §å  6ç  û  A          Ä›ç  @©  ’ç  @©  ®  '            ¿ì  §î  ∏ì  §î  ∆  1            ‘ñ  ]ó  Ãñ  ]ó  ’  5            <û  “û  4û  “û  ˘  >             ¢  ,£  ¢  ,£    9          Ç¶™  ¥≥  û™  ¥≥  >             o¨  0≠  g¨  0≠  E  i            ¬≠  ß≥  ∫≠  ß≥  L  /            Œ≥  É∑  ∆≥  É∑  q              $∏  Õπ  ∏  Õπ  à             ∫  Sº  ∫  Sº  ó            Çëº  „”  âº  „”  ©              Ã  [Ã  Ã  [Ã  	  ,           “  "”  ˙—  "”  ,  8           Ä7‘  Í÷  /‘  Í÷  ?  (            •‘  Â÷  ù‘  Â÷  D             Ä>◊  ‘Ÿ  6◊  ‘Ÿ  [  (            ¨◊  ∑Ÿ  §◊  ∑Ÿ  `               ⁄  _⁄  ÙŸ  _⁄  x            Äõ⁄  ˜Û  Ü⁄  ˜Û  }            Ç€  ◊Û  €  ◊Û  Ç              Q‚  {‚  I‚  {‚  ß  (             d‚  x‚  \‚  x‚  ß  ;            Ë‰  Â  ‡‰  Â  ∂  0             ˚‰  Â  Û‰  Â  ∂  C            ı  KÒ  Ì  KÒ    /             3Ù  ¬Ù  +Ù  ¬Ù  $  "          5°›Óœ¿ƒŸ_ŸD0z      g¯ﬁ˚g¯ﬁ˚Hıg¯Ây   Z    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/jquery.contextMenu.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:08:02 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|b1b9b238-4eb7-457f-001f-25c6b4cebae5|
+Accept-Ranges: bytes
+ETag: W/"62773-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 62773
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:08:02 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|b1b9b238-4eb7-457f-001f-25c6b4cebae5|
+Accept-Ranges: bytes
+ETag: W/"62773-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 62773
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=88
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 535 net-response-time-onstop 595 alt-data 1;62773,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  ≈)

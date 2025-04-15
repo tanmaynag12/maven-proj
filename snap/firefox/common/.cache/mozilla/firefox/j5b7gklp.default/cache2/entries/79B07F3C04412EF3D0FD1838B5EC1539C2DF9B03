@@ -1,0 +1,2669 @@
+
+
+
+
+
+<!DOCTYPE html>
+<html> 
+<head> 
+    <title>Welcome to CMR</title>
+    <meta charset="utf-8">
+    <!-- Stylesheet -->
+    <link type="text/css" rel="Stylesheet" href="css/bootstrap.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="css/jquery-ui-1.8.17.custom.css" media="screen"/>
+	<link rel="stylesheet" type="text/css" href="css/web-style.css" />
+	<link rel="stylesheet" type="text/css" href="css/applicantStudentProfile.css" />
+	<!-- Font -->
+	<link rel="stylesheet" type="text/css" href="css/sansFont.css" />
+	
+	<link rel="stylesheet" href="frameworks/intl-tel-input-master/css/intlTelInput.css">
+    <link rel="stylesheet" href="frameworks/intl-tel-input-master/css/demo.css">
+	
+	<!-- JavaScript -->
+	<script type="text/javascript" src="js/jquery-1.7.2.min.js"></script>
+	<script type="text/javascript" src="js/bootstrap.js"></script>
+	<script type="text/javascript" src="js/jquery-ui-1.8.21.custom.min.js"></script>
+	<script type="text/javascript" src="js/jquery.session.js"></script>
+	<script type="text/javascript" src="scripts/login.js"></script>
+	<script type="text/javascript" src="js/checkUserAuthentication.js"></script>
+	<script type="text/javascript" src="js/jquery.numeric.js" ></script> 
+	<link rel="stylesheet" href="css/font-awesome/css/font-awesome.min.css">
+	<link rel="stylesheet" type="text/css" href="css/jquery.alerts.css" media="screen"/>
+	<script type="text/javascript" src="js/jquery.alerts.js"></script>
+	<!-- <script type="text/javascript" src="https://www.google.com/jsapi"></script> -->
+	<script type="text/javascript" src="scripts/GoogleMultilingual/googleJsapi.js"></script>
+	<script type="text/javascript" src="scripts/GoogleMultilingual/googleMultilanguage.js"></script>
+	<script src="frameworks/intl-tel-input-master/js/intlTelInput.js"></script>
+	<script src="frameworks/intl-tel-input-master/css/intlTelInput.css"></script>
+	<script type="text/javascript" src="/js/gems_plugins.js"></script>
+	<script type="text/javascript" src="/js/react/moment.min.js"></script>
+		
+		<script type="text/javascript">
+		
+		$(document).keydown(function(event){
+		    if(event.keyCode==123){
+		        return false;
+		    }
+		    else if (event.ctrlKey && event.shiftKey && event.keyCode==73){        
+		             return false;
+		    }
+		    else if (event.ctrlKey && event.shiftKey && event.keyCode==74){        
+	             return false;
+	    }
+		});
+
+		$(document).on("contextmenu",function(e){        
+		   e.preventDefault();
+		});
+
+	    $(document).ready(function() {
+	        $(".disableEvent").on("contextmenu",function(){
+	           return false;
+	        }); 
+	    });
+
+	    $('selector').contextmenu(function() {
+	        return false;
+	    });
+	    
+	    
+	    if($('#customerHelper').val()=="HPTU_SERVER" || $('#customerHelper').val()=="ATAL_MEDICAL_SERVER"){
+	    	$('#lastName').hide();
+	    
+	    }
+	    
+		</script>
+		 <script>  
+        function capitalize(textboxid, str) {
+            // string with alteast one character
+            if (str && str.length >= 1)
+            {       
+                var firstChar = str.charAt(0);
+                var remainingStr = str.slice(1);
+                if($('#customerHelper').val()=="HPTU_SERVER" || $('#customerHelper').val()=="ATAL_MEDICAL_SERVER")
+                	str = firstChar.toUpperCase() + remainingStr.toUpperCase();
+                else
+                	str = firstChar.toUpperCase() + remainingStr.toLowerCase();
+            }
+            document.getElementById(textboxid).value = str;
+        }
+
+    </script>  
+	<script type="text/javascript">
+	
+		var paramVal = getURLParameter('error');
+		//alert("paramVal: "+paramVal);
+		if(paramVal.toLowerCase() == 'true'){
+			var username = getUsernameCookie();
+			//alert(username);
+			if(username != null &&  username != ''){
+				alert('In if');
+				window.location.replace('checkUserAccountLocked.json?username='+username);
+			}
+		}
+		
+		$('#RetrievePasswordDialog').modal({
+			backdrop: 'static',
+			keyboard: false,
+			show: false
+		}).css({
+			width: '500px',
+			'margin-left': function () {
+				return -($(this).width() / 2);
+			}
+		});
+		
+	</script>
+
+	<!-- Favicon -->
+	<link rel="icon" type="image/x-png" href="img/favicon.png" />
+    <link rel="shortcut icon" type="image/x-png" href="img/favicon.png" />
+    
+    <!--[if lt IE 9]>
+	<script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+	
+	<!-- Meta -->
+	<meta name="description" content="Governing Educational Management System (GEMS)" />
+    <meta charset="UTF-8" />
+    <meta name="application-name" content="GEMS" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	
+	<!-- Google Analytics -->
+	
+
+
+	
+		<script type="text/javascript">
+		  var _gaq = _gaq || [];
+		  _gaq.push(['_setAccount', 'UA-39531207-1']);
+		  _gaq.push(['_trackPageview']);
+		
+		   (function() {
+		    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+		    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+		    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		  })();
+		</script>
+		<!-- Google tag (gtag.js) -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=G-70Q2G5SZRG"></script>
+		<script>
+		  window.dataLayer = window.dataLayer || [];
+		  function gtag(){dataLayer.push(arguments);}
+		  gtag('js', new Date());
+		  gtag('config', 'G-70Q2G5SZRG');
+		</script>
+				
+	
+
+	
+
+
+<script src="scripts/applicantEmployee/applicantLogin.js"></script>
+<script src="scripts/applicantEmployee/sweetAlert.js"></script>
+
+  <!-- <script type="text/javascript">
+	/* $(document).ready(function() {
+	 $.session("eventMenu", "cancel");
+	//alert($.session("eventMenu"));/Android
+	if (/webOS|iPhone|iPod|BlackBerry|Symbian/i.test(navigator.userAgent)) {
+		window.location.href = "m.login.htm";
+	} 
+}); */
+</script>   -->
+<style type="text/css">
+#applicantAdmissionDiv label {
+	text-align: left;
+}
+#applicantAdmissionDiv .span12 {
+	margin-left: 0;
+}
+div.preview.loading {
+	background: url('css/icons/ajax-loader.gif') no-repeat;
+	margin-left:200px;
+	height: 30px;
+}
+
+div.preview { float: left; width: 30px; margin-top: 5px;}
+select option[default] {
+    color: #fff;
+}
+.login-title-wrap1 {
+    margin: 25px auto 30px;
+    text-align: center;
+    width: 1200px;
+}
+.login-box1 {
+    background-color: #fff;
+    margin: 0 auto;
+    width: 98%;
+}
+.login-box2 {
+    background-color: #fff;
+    margin: 5px auto;
+    width: 95%;
+}
+.my-span {
+    width: 340px;
+}
+/* https://intl-tel-input.com/ */
+.juno-flag {
+	height: 15px;
+	width: 20px;
+	box-shadow: 0px 0px 1px 0px #888;
+	background-image: url("css/icons/flags.png");
+	background-repeat: no-repeat;
+	background-color: #DBDBDB;
+	background-position: -2413px 0px;
+}
+.juno-flagDubai {
+	height: 15px;
+	width: 20px;
+	box-shadow: 0px 0px 1px 0px #888;
+	background-image: url("css/icons/flags.png");
+	background-repeat: no-repeat;
+	background-color: #DBDBDB;
+	background-position: -44px 2px;
+	back
+}
+.no-copy {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+@media (max-width: 767px){
+.login-title-wrap1{
+width: 100% !important;
+}
+#txtCapecha{
+
+padding: 10px;
+width: 83%;
+margin-left: 16px !important;
+margin-top: 13px !important;
+}
+.login-Pages{}
+}
+@media (max-width: 767px){
+.login-title-wrap1{
+width: 100% !important;
+}
+#txtCapecha{
+
+padding: 10px;
+width: 83%;
+margin-left: 16px !important;
+margin-top: 13px !important;
+}
+.login-Pages{
+display:none;}
+}
+
+@media (max-width: 768px) {
+ #checkDetailsAgainstEmailDialog {
+	width: 300px;
+	position: absolute;
+	left: 125%;
+	top: 100%;
+	transform: translate(-50%, -50%);
+  }
+}
+@media (max-width: 768px) {
+ #commonModal {
+	width: 355px;
+	left: 125%;
+	top: 75%;
+	transform: translate(-50%, -50%);
+  }
+}
+
+.swal-button {
+	padding: 7px 26px;
+}
+
+.swal-button {
+	background-color: #71badd;
+	color: #000;
+}
+</style>
+<script type="text/javascript">
+	    		$(document).ready(function() {
+	    			
+					if (window.location.toString().indexOf("cmr.edu.in") != -1) {
+						$('#customerId').val("3d4b02921bef355e733552a30241be1c");
+						$('#customerLogo').attr("src", "img/CMR.png");
+					}else if (window.location.toString().indexOf("edufice.net") != -1) {
+						$('#customerId').val("3d4b02921bef355e733552a30241be1c");
+						$('#customerLogo').attr("src", "img/CMR.png");
+					}else {
+						$('#customerId').val("fe5b31e6f6e7ed9c86833a85efa904f5");
+						$('#customerLogo').attr("src", "img/CMRIT.png");
+					}
+					
+					
+						
+					
+					
+						fetchCampusName();
+					
+					
+	    		});
+	    	
+	  
+	    			$('document').ready(function(){ 
+	    				$("#ApplicantBirthdate").datepicker({
+	    					dateFormat : "M dd,yy",
+		    				inline : true,
+		    				changeMonth : true,
+		    				changeYear : true,
+		    				maxDate:new Date(),
+		    				yearRange: '1947:2023',
+		    				firstDay : 1,
+	    					
+	    				});
+	    				
+	    			});
+    			
+</script>
+<script>
+window.flow = {
+		isMobileNoVerify: false,
+}
+</script>
+</head>
+
+	<body style="background-color: #FFF;" onload="fetchCampusName();setSelectedProg();dteChangeRegistrationNo();" >
+
+
+
+	<!-- ======================================= -->
+	<p class="login-powered"> <small><a href="https://juno.org.in/why-juno-campus" target="_blank">Powered by <strong>JUNO Campus</strong></a></small> </p>
+	
+	<!-- <p class="login-Pages">
+		<small>
+			<a href="TermsAndConditions.htm" target="_blank">Terms &amp; Conditions</a>&nbsp;|&nbsp;
+			<a href="RefundAndCancellation.htm" target="_blank">Refund / Cancellation Policy</a>&nbsp;|&nbsp;
+			<a href="Products.htm" target="_blank">Products</a>&nbsp;|&nbsp;
+			<a href="PrivacyPolicy.htm" target="_blank">Privacy Policy</a>
+		</small>
+	</p> -->
+	
+	
+	
+	<div id="login-fixed"> <!-- DO NOT ADD ANYTHING HERE --> </div>
+	
+	<input type="hidden" id="customerId" value="3d4b02921bef355e733552a30241be1c" />
+	
+	
+	
+	
+	
+
+	<script >
+
+</script>
+	<input type="hidden" id="campusId" value="null" />
+	<input type="hidden" id="instituteId" value="null" />
+    <input type="hidden" id="instituteStrengthId" value="null" />
+    <input type="hidden" id="fixedGender" value="null" />
+    <input type="hidden" id="multipleProgramSelection" value="false" />
+    <input type="hidden" id="campaignNameId" value="Null" />
+    <input type="hidden" id="campaignSourceId" value="Null" />
+    <input type="hidden" id="campaignMediumId" value="Null" />
+      <input type="hidden" id="bscId" value="null" />
+    
+    
+     <input type="hidden" id="StudentElective" value="" />
+      <input type="hidden" id="isEntrance" value="" />
+    <input type="hidden" id="customerHelper" value="CMR_SERVER" />
+	<div class="login-title-wrap">
+	
+	<div class="login-title-wrap">
+		
+		
+			<img id="customerLogo" src="getCustomerLogo.json" />
+		
+    	
+    	
+		
+    </div>
+	
+	</div>
+	
+	<div class="row-fluid login-title-wrap1">
+	
+		<div class="login-box-wrap span8">
+	
+			<div class="border bor-rad-3 box-shad-5-DDD" style="padding:5px 0;">
+			<div class="login-box1 clearfix">
+				<div id="applicantGuidelinesDiv" class="borderBackgroundCss" style="overflow:auto; display: none; " align="left"></div>
+				<div id="applicantRegistrationDiv" align="center">
+								
+								
+				<div style="text-align: left;margin-bottom:15px;font-size: 14px;" class="alert alert-info">
+									<i class="fa fa-address-card-o fa-lg" aria-hidden="true"></i>
+									<strong>
+									
+											&nbsp;&nbsp; Applicant Registration &nbsp;
+									
+										 
+										<u style="cursor:pointer" onclick="showGuidelines()">Instructions </u>
+										<i class="fa fa-spinner fa-pulse fa-lg fa-fw" style="position: absolute;right: 38%;top: 36%;display:none;" id="guideLineIcon"></i> 
+										
+										
+									</strong>
+								</div>
+								
+					 <!-- <div class="well" style="padding:1px;">
+					 <b>Course:</b>&nbsp;<span id="departmentNamelbl"></span>&nbsp;&nbsp;&nbsp;&nbsp;
+					  <b>Campus:</b>&nbsp;<span id="campuslbl"></span>&nbsp;&nbsp;&nbsp;&nbsp;
+					 <br><b>Institute:</b>&nbsp;<span id="institutelbl"></span>
+					</div> --> 	
+				
+					<fieldset class="custom-fieldset"><legend style="font-size: 12px;"><i class="fa fa-university fa-lg" aria-hidden="true"></i>&nbsp;&nbsp;Admission Process</legend>
+				
+					<table style="width: 95%;margin:0px auto;" id="applicantRegistrationTLB" > 
+						<tr>
+							<th colspan="3">
+							</th>
+						</tr>
+						 
+						
+						<tr><td style="padding-bottom: 3px; width: 25%;" colspan="3"><select id="cmbCampus" onchange="fetchInstituteListWithoutCall();" style="background: none repeat scroll 0% 0% white; border-radius: 3px 3px 3px 3px; height: 40px; margin: 0px; padding: 10px; border: 1px solid rgb(204, 204, 204); width: 98%; box-shadow: 0px 1px 1px rgba(0, 0, 0, 0.075) inset;"></select></td>
+						<td style="padding-bottom: 3px; width: 38%;" colspan="3"><select id="cmbInstitute"  onchange="fetchInstituteCourseStrengthWithoutCall()" style="background: none repeat scroll 0% 0% white; border-radius: 3px 3px 3px 3px; height: 40px; margin: 0px; padding: 10px; border: 1px solid rgb(204, 204, 204); width: 98%; box-shadow: 0px 1px 1px rgba(0, 0, 0, 0.075) inset;"></select></td>
+						<td style="padding-bottom: 3px; width: 40%;" colspan="3"><select id="selInstituteCourseStrength" onchange="setSelectedProg()" style="background: none repeat scroll 0% 0% white; border-radius: 3px 3px 3px 3px; height: 40px; margin: 0px; padding: 10px; border: 1px solid rgb(204, 204, 204); width: 98%; box-shadow: 0px 1px 1px rgba(0, 0, 0, 0.075) inset;"></select></td></tr>
+							
+						
+						</table>
+						  
+						 </fieldset>
+						 <fieldset class="custom-fieldset" style="padding-top: 12px;"><legend style="font-size: 12px;"><i class="fa fa-user fa-lg" aria-hidden="true"></i>&nbsp;&nbsp;Personal Details</legend>
+						<table style="width: 95%;margin:-3px auto;" id="applicantRegistrationTLB" >
+						 
+						
+						
+
+						<tr>
+							
+									
+									
+									
+										<td style="padding-bottom: 3px;" colspan="3">
+										<input type="text" id="firstName" placeholder="First Name" onkeyup="javascript:capitalize(this.id, this.value);" style="width: 31%; padding: 10px; display:inline;margin-right: 15px;"/>
+										
+											<input type="text" id="middleName" placeholder="Middle Name / Father Name" onkeyup="javascript:capitalize(this.id, this.value);" style="width: 31%; padding: 10px;display:inline; margin-right: 15px;"/>
+										
+										<input type="text" id="lastName" placeholder="Last Name" onkeyup="javascript:capitalize(this.id, this.value);" style="width: 31%; padding: 10px;display:inline;"/> </td>
+									
+									
+						</tr>
+				
+						
+						
+						
+						
+						<tr>
+						
+							<td colspan="3" style="padding-bottom: 3px;position:relative"><input type="text" id="emailIdName"  placeholder="Email Id" style="display:inline;width: 64.00%; padding: 10px;margin-right: 18px;" onblur="checkAluminiEmailId()"/><!-- <span id="emailInfo" style="color:red;display:none;" ></span> -->
+							<i class="fa fa-spinner fa-pulse fa-lg fa-fw" style="position: absolute;right: 38%;top: 36%;display:none;" id="emailLoadingIcon"></i>
+							
+							<div style="position:relative;display:inline;">
+								
+							  
+								<input type="text" id="mobileNo" maxlength="10" placeholder=" Mobile No." style="display:inline;width: 222px; padding: 10px; margin: 0;padding-left: 53px;" class="validnum" />&nbsp;<!-- <span id="mobileInfo" style="color:red;display: none;" > --></span> </td>
+								
+															
+								
+								
+							</div>
+						</tr>
+						
+						
+						
+						
+						<tr class="categoryDropCls" style="display: none;">
+						<td style="padding-bottom: 3px;" colspan="2" >
+			   				<i class="fa fa-spinner fa-pulse fa-lg fa-fw" style="position: absolute;right: 35%;top: 9%;display:none;" id="categoryLoadingIcon"></i>
+			   				<select  id="cmbCategory" onchange="fetchAmountofApplicationFee()" style="background: none repeat scroll 0% 0% white; border-radius: 3px 3px 3px 3px; height: 35px; margin: 0px; padding: 3px; border: 1px solid rgb(204, 204, 204); width: 96%; box-shadow: 0px 1px 1px rgba(0, 0, 0, 0.075) inset;"></select>	
+			   			<input type="hidden" id="categoryWisePayment" value="0" />
+			   			</td>
+			   			<td style="padding-bottom: 3px; display: none;" colspan="2" class="catNumberTextCls">
+			   				<input type="text" id="CATRegistrationNumber" onblur="checkCATRegistrationNo();" placeholder="CAT Registration Number" maxlength="8" style="padding: 10px; display:inline;margin-right:-37px; width: 95%"/>
+			   				<i class="fa fa-spinner fa-pulse fa-lg fa-fw" style="position: absolute;right: 38%;top: 36%;display:none;" id="CATLoadingIcon"></i>
+			   				</td>
+						</tr>
+						
+						
+						<tr>
+							<td rowspan="2" style="width:150px;"><img src="imageCaptcha.jpg" id="captchaImage" style="border:1px solid black;"/>
+							</td>
+							<td style="vertical-align:middle;" colspan="2"><input type="text" id="txtCapecha" placeholder="Enter Captcha" style="padding: 10px; width:92%;">
+							
+							<!-- &nbsp; <span id="captchaInfo" style="color:red;" > --> </span>
+									
+							</td>
+						</tr>
+						<tr><td colspan="2"><strong><a href="javascript:void(0);" onclick="refreshImg()"style="margin-left: 10px;"><i class='fa fa-refresh'></i> Reload Captcha</a></strong></td></tr>
+						<tr><td colspan="3" id="errorAlert"></td></tr>
+						
+						<tr>
+							<td colspan="3" style="text-align:center;"><div class="preview"></div> <strong class="label label-warning pull-left lblTimeWarn" style="display:none;">This may take some time. Please wait.</strong><br>
+								
+								
+									<button type="button" class="login-btn bor-rad-3" id="btnRegister" onclick="addAdmissionApplicant()" style="width: 50%;font-weight:bold;"><i class="fa fa-sign-in fa-lg"></i> Register</button>								
+								
+								
+								<!-- <input type="button"  class="login-btn bor-rad-3" id="btnRegister" onclick="addAdmissionApplicant()" style="width: 50%;" value="Register" /> -->
+							</td>
+						</tr>
+						
+						<!-- <tr><td></td><td></td>
+							<td style="float:right;text-align: right;width:100%;">
+							<div id="header-translate">
+								<div id="google_translate_element"></div><script type="text/javascript">
+								function googleTranslateElementInit() {
+								  new google.translate.TranslateElement({pageLanguage: 'en', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
+								}
+								$(document).ready(function() {
+									$('.goog-te-gadget-icon').remove();
+									$('.goog-te-menu-value').html('<span> Language</span><span class="caret" style="margin-top:10px;margin-left:2px;"></span>');
+								});
+								</script><script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+							</div>
+							</td>
+						</tr> -->
+						<!-- <tr>
+							<th colspan="3">
+								<br><b>Your password will be send on the specified Email Id / Mobile No. In case of any difficulty please Contact: 0712-2580011, 2583238, 2583239 ext 676,678</b>
+							</th>
+						</tr> -->
+					</table>
+					</fieldset>
+				</div>
+			</div>
+			</div>
+			</div>
+			
+			<div class="login-box-wrap span4">
+			<div class="border bor-rad-3 box-shad-5-DDD" style="padding:5px 0; margin-left: 50px;margin-right: -50px;border: 1px solid #8D8787;">
+				<div class="login-box2">
+				<div id = "divLoginResponse">
+					
+				</div>
+				<form id="form-sign-up" action="j_spring_security_check" method="post" onsubmit="return setUsernameCookie()">
+				<div class="alert alert-info" style="text-align: center;margin-bottom:30px;font-size: 12px;"><i class="fa fa-sign-in fa-lg" aria-hidden="true"></i> <strong>Once successfully registered please login with registered Email Id and password you've received on your Email Id mobile no to online application form.</strong></div>
+					<table style="margin:55px 10%;width:75%">
+					<tr  class="loginForm forgetPasswordForm">
+						<td style="padding-bottom: 3px;"> 
+							<input name="j_username" type="text" id="j_username" placeholder="Username" style="width: 100%; padding: 12px; margin: 0;" /> 
+						</td>
+					</tr>
+					<tr class="loginForm">
+						<td style="padding-bottom: 3px;"> 
+							<input name="j_password" type="password" id="password-1" placeholder="Password" style="width: 100%; padding: 12px; margin: 0;" /> 
+						</td>
+					</tr>
+					<tr class="loginForm">
+						<td style="padding-bottom: 15px;"> 
+							<small> <label><input name="_spring_security_remember_me" value="1" id="remember" type="checkbox"> Remember me on this computer </label> </small> 
+						</td>
+					</tr>
+					<tr class="loginForm">
+						<td style="padding-bottom: 3px;">
+							<button type="submit" class="login-btn bor-rad-3" id="signin_submit" style="width: 109%;font-weight:bold;"><i class="fa fa-sign-in fa-lg"></i> Login</button> 
+							<!-- <input type="submit" id="signin_submit"  value="Login" class="login-btn bor-rad-3" style="width: 100%;"> --> 
+						</td>
+					</tr>
+					<tr class="forgetPasswordForm" style="display: none;">
+								<td style="padding-bottom: 3px;"><input
+									id="retrievepassword" type="button" onclick="passwordHint()"
+									value="Retrieve Password" class="login-btn bor-rad-3"
+									style="width: 100%;"></td>
+							</tr>
+					<tr class="loginForm">
+								<td style="text-align: center;"><small><a
+										id="forgotPasswordLink" href="javascript:void(0)"
+										onclick="showForgotPasswordInline()" class="login-pwd-txt">
+											Forgot password?</a></small></td>
+							</tr>		
+					 <!-- <tr>
+						<td style="text-align: center;"> 
+							<small> <a href="javascript:void(0)" onclick = "showGetPasswordDialog()" style="color: #777;"> Forgot password?</a> </small> 
+						</td>
+					</tr>  -->
+					</table>
+					<!-- <div class="take-exam" style="">
+						<a href="javascript:void(0)" onclick="displayTestKeyModal()">Take your online examination &raquo;</a><br>
+						<a href="applicantRegistration1.htm?flag=1" >Applicant Registration &raquo;</a><br>
+						     <a href="alumniRegistration.htm" >Alumni Registration &raquo;</a>
+					    <span style="color:red">Alumni Registration Start From 02:00 PM</span> 
+					</div> -->
+				</form>
+					
+				</div>
+				</div>
+				</div>
+				
+	</div>
+
+	<br/>
+	<div class="modal hide fade" id="forgetPasswordAuthenticationModal" style="width:600px;">
+			<div class="modal-header">
+			   	<button type="button" class="close" data-dismiss="modal">X</button>
+				   	<h3>Forget password response</h3>
+		   	</div>
+			<div class="modal-body" id="forgetPasswordAuthenticationModalBody">
+				 		
+			</div>
+			<div class="modal-footer">
+			 	<input type="button" class="btn btn-inverse btn-mini  " data-dismiss="modal" value="Close" />
+			</div>
+		</div>
+	
+	<div class="modal hide fade" id="onlineTestModal" style="width:1200;">
+	   	<div class="modal-header">
+	   	<button type="button" class="close" data-dismiss="modal">X</button>
+	   	<h3>Applicant Verification</h3>
+	   	</div>
+	   	<div class="modal-body" id="onlineTestModalBody">
+	   		<table class="table table-bordered">
+				<tr><td>Enter your key</td> <td><input type="text" id="keyId" /></td></tr>
+				<tr><td colspan="2"><input class="btn btn-inverse btn-mini  " type="button" value="Submit" onclick="onlineTestKeyVerification()" /></td></tr>
+			</table>
+	   	</div>
+	   	<div class="modal-footer">
+	   	<input type="button" class="btn btn-inverse btn-mini  " data-dismiss="modal" value="Close" />
+	   	</div>
+	</div>
+	
+	<div class="modal hide fade" id="RetrievePasswordDialog" style="width:1200;">
+	   	<div class="modal-header">
+	   	<button type="button" class="close" data-dismiss="modal">X</button>
+	   	<h3>Retrieve Password</h3>
+	   	</div>
+	   	<div class="modal-body" id="">
+	   		<table style="margin:auto">
+			<tr class="input msg">
+				<td style="padding-bottom: 15px;">Please enter your valid User Name to get your password</td>
+			</tr>
+			<tr class="input">
+				<td style="padding-bottom: 3px;"> 
+					<input name="j_username_forgetpassword" type="text" id="j_username_forgetpassword" placeholder="Enter valid user name" style="width: 92.6%; padding: 10px; margin: 0;" /> 
+				</td>
+			</tr>
+			<tr class="response">
+				<td style="padding-bottom: 3px;" class="response">
+				</td>
+			</tr>
+			</table>
+	   	</div>
+	   	<div class="modal-footer">
+	   		<input type="button" class="btn btn-info btn-mini btn-retrievepassword " value="Submit" onclick="passwordHint()" />
+	   		<input type="button" class="btn btn-inverse btn-mini  btn-retrievepasswordClose" data-dismiss="modal" value="Close" />
+	   	</div>
+	</div>
+	
+	<div class="modal hide center" id="checkDetailsAgainstEmailDialog"  data-backdrop="static" data-keyboard="false" >
+	   	<div class="modal-header"><!-- Kiran -->
+	   	<!-- <button type="button" class="close" data-dismiss="modal">X</button> -->
+	   	<h3>Warning!</h3>
+	   	</div>
+	   	<div class="modal-body">
+	   		<strong id="errorDetailsTemp">Please enter your valid User Name to get your password</strong>	
+	   	</div>
+	   	<div class="modal-footer">
+	   		<input type="button" class="btn btn-info btn-mini" value="Yes" id="submitCheckDetailsAgainstEmailDialog"/>
+	   		<input type="button" class="btn btn-inverse btn-mini" data-dismiss="modal" value="No, Login with this account." id="noCheckDetailsAgainstEmailDialog"/>
+	   		<input type="button" class="btn btn-danger btn-mini" data-dismiss="modal" value="Cancel" id="cancelCheckDetailsAgainstEmailDialog"/>
+	   	</div>
+	</div>
+	
+	<div id="commonModal" class="modal" data-backdrop="static" style="display: none; width: 800px;">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+					<h3 id="commonModalHeading"></h3>
+				</div>
+				<div id="commonModalBody" class="modal-body" align="center"></div>
+				<div class="modal-footer" id="modalFooter">
+					<a class="btn btn-success" id="btnCloseEvaluationSchema" onclick="saveMergerDetails()"><b>Save</b></a> &nbsp;&nbsp;
+					<a class="btn btn-danger" id="btnCloseEvaluationSchema" onclick="javascript:$('#commonModal').modal('hide'); $('#emailIdName').val('');"><b>Close</b></a> &nbsp;
+				</div>
+	</div>
+	
+	<div id="gemsCommonAuthenticationModal" class="modal hide fade">
+    <div class="modal-header"><button type="button" class="close" data-dismiss="modal">x</button><h3>Authentication Required</h3>
+        
+    </div>
+    <div class="modal-body">
+        <div class="gemsCommonAuthenticationSentOtpBody">
+            <div class="gemsCommonAuthenticationSentOtpInfo"></div>
+        </div>
+        <div class="alert alert-danger alert-dismissible fade in gemsCommonAuthenticationError" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+    	<a class="btn btn-success btn-mini verifyOTPforGemsCommonSecurity_" href="javascript:void(0);" onclick="verifySentOTP();"> Verify </a>
+        <input type="button" class="btn btn-inverse btn-mini" onclick="$('#gemsCommonAuthenticationModal').modal('hide')" value="Close" />
+    </div>
+</div>
+
+	<div id="gemsCommonAuthenticationModaEmail" class="modal hide fade">
+    <div class="modal-header"><button type="button" class="close" data-dismiss="modal">x</button><h3>Authentication Required</h3>
+        
+    </div>
+    <div class="modal-body">
+        <div class="gemsCommonAuthenticationSentOtpBody">
+            <div class="gemsCommonAuthenticationSentOtpInfoMail"></div>
+        </div>
+        <div class="alert alert-danger alert-dismissible fade in gemsCommonAuthenticationError" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+    	<a class="btn btn-success btn-mini verifyOTPforGemsCommonSecurity_" href="javascript:void(0);" onclick="verifyEmailSentOTP();"> Verify </a>
+        <input type="button" class="btn btn-inverse btn-mini" onclick="$('#gemsCommonAuthenticationModaEmail').modal('hide')" value="Close" />
+    </div>
+</div>
+
+	<div id="commonModalNITIE" class="modal" data-backdrop="static" style="display: none; width: 900px; margin-left: -37%">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+					<h3 id="commonModalHeadingNITIE"></h3>
+				</div>
+				<div id="commonModalBodyNITIE" class="modal-body" align="center"></div>
+				<div class="modal-footer" id="modalFooter">
+					<a class="btn btn-success" id="btnCloseEvaluationSchema" onclick="checkverificationAlldeatils()"><b>Register</b></a> &nbsp;&nbsp;
+					<a class="btn btn-danger" id="btnCloseEvaluationSchema" onclick="$('#commonModalNITIE').modal('hide');"><b>Back</b></a> &nbsp;
+				</div>
+	</div>
+
+
+	<!-- ======================================= -->
+</body>
+<script type="text/javascript">
+function disableComboCommon(cmb){
+	
+		$('#'+cmb).attr("disabled",true);
+	
+}
+function fetchCampusName(){
+	
+    
+    if($('#customerHelper').val()=="HPTU_SERVER" || $('#customerHelper').val()=="ATAL_MEDICAL_SERVER"){
+    	$('#lastName').hide();
+    }
+	var urlDomainName = window.location.host;
+	var customerId = 0;
+		
+	if(urlDomainName=="kjedu.in")
+		customerId="db32227ae3fc2517e96ad2a3eed93d62";
+	else	
+		customerId=$('#customerId').val();
+	
+	
+	
+	if($('#customerHelper').val()=="RAMAIAH_SERVER"){
+		customerId="3d4b02921bef355e733552a30241be1c";
+	}
+	if($('#customerHelper').val()=="RAMAIAH_UNIVERSITY_SERVER"){
+			customerId="fe5b31e6f6e7ed9c86833a85efa904f5";
+		}
+	
+	if($('#customerHelper').val()=="XISS_SERVER"){
+		if(window.location.toString().indexOf("erp.xiss.ac.in") != -1){
+			customerId="3d4b02921bef355e733552a30241be1c";
+		}
+		else {
+			customerId="fe5b31e6f6e7ed9c86833a85efa904f5";
+		}
+	}
+	
+	if($('#customerHelper').val()=="JDGROUP_SERVER"){
+		if(window.location.toString().indexOf("erp.jdcoem.ac.in") != -1){
+			customerId="3d4b02921bef355e733552a30241be1c";
+		}
+		else {
+			customerId="fe5b31e6f6e7ed9c86833a85efa904f5";
+		}
+	}
+	if($('#customerHelper').val()=="MIT_SERVER"){
+		customerId="3d4b02921bef355e733552a30241be1c";
+	}
+	if($('#customerHelper').val()=="VCET_SERVER"){
+		customerId="fe5b31e6f6e7ed9c86833a85efa904f5";
+	}
+	if($('#customerHelper').val()=="MANDSAUR_SERVER"){
+		customerId="6759d798d7e0e2f6d2b133ccc98f2573";
+	}
+	if($('#customerHelper').val()=="ICT_MUMBAI_SERVER"){
+		customerId="fe5b31e6f6e7ed9c86833a85efa904f5";
+	}
+	if($('#customerHelper').val()=="CMR_SERVER"){
+		if(window.location.toString().indexOf("cmr.edu.in") != -1){
+			customerId="3d4b02921bef355e733552a30241be1c";
+		}else if(window.location.toString().indexOf("edufice.net") != -1){
+			customerId="3d4b02921bef355e733552a30241be1c";
+		}
+		else {
+			customerId="fe5b31e6f6e7ed9c86833a85efa904f5";
+		}
+	}
+	
+	
+	var campusId = $('#campusId').val();
+	
+	if($('#customerHelper').val()=="MGMU_SERVER"){
+		LinkUrl = "anon_fetchAdmisiionComboDataForMGM.json";
+	}else{
+		LinkUrl = "fetchComboCampusInstituteCourseForApplicantAdmission.json";
+	}
+	
+	$.ajax({
+		url: LinkUrl+'?customerId='+customerId,
+		headers:{'security-helper-prop':true},
+		dataType:'json',
+		success:function(jArray){
+			$('#cmbCampus').html('');
+			var boiler = '';
+			for(var i in jArray){
+				boiler = '<option trustAbbr="'+jArray[i]["trustAbbr"]+'" value="'+jArray[i]["campId"]+'" >'+jArray[i]["campName"]+'</option>';
+				$('#cmbCampus').append(boiler);
+				$('#cmbCampus option:last').data('institutes', jArray[i]["institutes"]);
+			}
+			
+			/* for(var i=0;i<jArray.length;i++){
+				boiler += '<option trustAbbr="'+jArray[i]["trustAbbr"]+'" value="'+jArray[i]["campusId"]+'" >'+jArray[i]["campusName"]+'</option>';
+			}
+			$('#cmbCampus').html(boiler); */
+			
+			if(jArray.length>0){
+				if(campusId!=undefined && campusId!=null && campusId!=''){
+					
+					$('#cmbCampus').val(campusId);
+					
+					
+						//$('#cmbCampus').attr("disabled",true);
+						disableComboCommon('cmbCampus');
+					
+					fetchInstituteListWithoutCall();
+				}else{
+					fetchInstituteListWithoutCall();
+					$('#cmbCampus').attr("disabled",true);
+				}
+			}
+			if($('#customerHelper').val()=="BML_SERVER"){	
+					popforbml();
+			}
+		},
+		error:function(){
+			//jAlert("in Error Admission Type CMB","Error");
+		}
+	});
+	if($('#customerHelper').val()=="NITIE_SERVER"){
+		setTimeout(function(){
+			var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+			if(courseName == 'PGDIE' || courseName == 'PGDSM'){
+				$('#candSponsSpan').show();
+			}else if(courseName == 'Doctoral Level Fellowship'){
+				$('#candSponsSpan').show();
+				$('#candInterSpan').hide();
+			}else{
+				$('#candSponsSpan').hide();
+			}		
+		},300);
+	}
+}
+function fetchInstituteListWithoutCall(){
+	var instituteId = $("#instituteId").val();
+	if(($('#customerHelper').val()!="DYPATIL") && (instituteId=="ea8c174eb75cdb45fb4592f4665e5d41" ||instituteId=="81f01c10e8dd1ee4ef4e9b16729dc36b" ||instituteId=="0e23d151567edee3f8b2223a22f24d7c" ) ){
+		$('#customerLogo').attr("src", "img/dypnewlogo1.png");
+		$('#customerLogo').attr("width", "441px");
+		$('#customerLogo').attr("height", "400px");
+	}
+	if($('#customerHelper').val()=="XLRI_SERVER"){
+		 $('#customerLogo').attr("width", "441px");
+	}
+	var instiArray = $('#cmbCampus option:selected').data('institutes');
+	$('#cmbInstitute').html('');
+	if(instiArray!=undefined){
+		var boiler = '';
+		if($('#customerHelper').val()!="HPTU_SERVER" &&  $('#customerHelper').val()!="ATAL_MEDICAL_SERVER"){
+			boiler+='<option value="0">-- Select Institute --</option>';
+		}
+		$('#cmbInstitute').append(boiler);
+		for(var i in instiArray){
+			boiler = '<option instAbbr="'+instiArray[i]["iAbbr"]+'" value="'+instiArray[i]["iId"]+'" >'+instiArray[i]["iName"]+'</option>';
+			$('#cmbInstitute').append(boiler);
+			$('#cmbInstitute option:last').data('courses', instiArray[i]["courses"]);
+		}
+		
+		if(instituteId!=undefined && instituteId!=null && instituteId!=''){
+			$('#cmbInstitute').val(instituteId);
+			
+				//$('#cmbInstitute').attr("disabled",true);
+				disableComboCommon('cmbInstitute');
+			
+			fetchInstituteCourseStrengthWithoutCall();
+		}else{
+			$('#cmbInstitute').attr("disabled",true);
+		}
+	}
+}
+function fetchInstituteCourseStrengthWithoutCall(){
+	var instituteStrengthId = $('#instituteStrengthId').val();
+	var jArray = $('#cmbInstitute option:selected').data('courses');
+	var multipleProgram=false;
+	if(jArray!=undefined){
+		var boiler = '<option value="0" roundStructureId="0" >-- Select Course --</option>';
+		if($('#customerHelper').val()=="REVA_SERVER"){
+		for(var i in jArray)
+		{
+				boiler += '<option roundStructureId="'+jArray[i]["rsId"]+'" value="'+jArray[i]["icsId"]+'" >'+jArray[i]["rsNm"]+'</option>';
+		}
+		}else if($('#customerHelper').val()=="XLRI_SERVER"){
+			for(var i in jArray)
+			{
+				boiler += '<option courseType="'+jArray[i]["courseType"]+'"  courseName="'+jArray[i]["cNm"]+'" roundStructureIdDecr="'+jArray[i]["roundStructureIdDecr"]+'" instituteCourseId="'+jArray[i]["instCoId"]+'" roundStructureId="'+jArray[i]["rsId"]+'" value="'+jArray[i]["icsId"]+'" >'+jArray[i]["cNm"]+'</option>';
+			}
+		
+		}else{
+			for(var i in jArray)
+			{	
+				if(jArray[i]["cNm"] == "First Year(BE)")
+					boiler += '<option courseType="'+jArray[i]["courseType"]+'"  courseName="'+jArray[i]["cNm"]+'" roundStructureIdDecr="'+jArray[i]["roundStructureIdDecr"]+'" instituteCourseId="'+jArray[i]["instCoId"]+'" roundStructureId="'+jArray[i]["rsId"]+'" value="'+jArray[i]["icsId"]+'" style="font-weight:bold;">'+jArray[i]["cNm"]+' '+jArray[i]["rsNm"]+'</option>';					
+				else
+					boiler += '<option courseType="'+jArray[i]["courseType"]+'"  courseName="'+jArray[i]["cNm"]+'" roundStructureIdDecr="'+jArray[i]["roundStructureIdDecr"]+'" instituteCourseId="'+jArray[i]["instCoId"]+'" roundStructureId="'+jArray[i]["rsId"]+'" value="'+jArray[i]["icsId"]+'" >'+jArray[i]["cNm"]+' '+jArray[i]["rsNm"]+'</option>';
+			}
+		}
+		$('#selInstituteCourseStrength').html(boiler);
+		if(instituteStrengthId!=undefined && instituteStrengthId!=null && instituteStrengthId!=''){
+			$('#selInstituteCourseStrength').val(instituteStrengthId);
+				//$('#selInstituteCourseStrength').attr("disabled",true);
+				disableComboCommon('selInstituteCourseStrength');
+			for(var i in jArray){
+				if(jArray[i]["icsId"]==instituteStrengthId){
+					multipleProgram=jArray[i]["OtherProgramName"]!="-"?true:false;
+					$('#multipleProgramSelection').val(multipleProgram);
+				}
+			}	
+			var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+			if(courseName=="BBP"){
+				$('#applicantRegistrationTLB').hide();
+				$('#eligibilityCritlbl').show();
+				$('#disclaimerforbmlTR').show();
+				$('#customerLogo').attr("src", "img/bmu_axis.png");
+				$('#customerLogo').attr("width", "441px");
+			}
+		}else{
+			$('#selInstituteCourseStrength').attr("disabled",true);
+		}
+	}
+	setSelectedProg();
+}
+function initUserMerger(adhaarNo,emailId)
+{
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	var admissionType = $('input[name = "candidateCategory"]:checked').val();
+	
+	$("#commonModalHeading").html("<h1>Login merger - Identity Verification</h1>");
+	var boiler = '<table class="table table-bordered">'+
+	'<tr><td colspan="2">Email id&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3"><input type="text" id="emailIdModal" length="10" disabled></td></tr>'+
+	'<tr class="hideForNITIE"><td colspan="2">Date of birth&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3"><input type="text" id="dobIdModal" length="10" readonly></td></tr>'+
+	'<tr class="hideForNITIE"><td colspan="2">Mothers name&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3"><input type="text" id="motherNameIdModal" length="10"></td></tr>';
+	
+	if($('#customerHelper').val()=="NITIE_SERVER"){
+		if(admissionType =='Direct'){
+			boiler +='<tr class="showForNITIE"><td colspan="2">CAT/GATE Registration Number&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3"><input type="text" id="CATRegNo" length="10"></td></tr>';
+		}
+		boiler +='<tr class="hideForVLFM"><td colspan="2">Candidate Category&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3">'+
+		'<select id="cmbCategoryReRegister" ></select>'+
+		'</td></tr>';
+	}
+	
+	if(adhaarNo!='' && adhaarNo!= undefined && adhaarNo!= 'undefined'){
+		boiler +='<tr class="hideForNITIE" id="adhaarMsg"><td colspan="5">Enter any one following detail,<strong> Same </strong> as that of which you have entered earlier.&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td></tr>';
+	    boiler +='<tr class="hideForNITIE" id="adhaarTxt"><td colspan="2">Aadhaar-card No.</td><td><input type="text" id="adharIdModal" maxlength="12"></td><td><strong>Or</strong> Passport No.</td><td><input type="text" id="passportIdModal" length="10"></td></tr>';
+	    
+	    boiler +='<tr class="hideForNITIE" style="display:none;" id="otpMsg"><td colspan="5">Enter following detail,<strong> Same </strong> as sent on your registered mobile number.&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td></tr>';
+		boiler +='<tr class="hideForNITIE" style="display:none;" id="otpTxt"><td colspan="2">OTP</td><td><input type="text" id="otpIdModal" length="8"><span></span>'+
+			'<i class="fa fa-spinner fa-pulse fa-lg fa-fw" style="position: absolute;right: 35%;top: 9%;display:none;" id="sendOTPmailSpinner"></i>'+
+		'</td><td> <a class="btn btn-success" id="btnSendOTP" onclick="sendOTP()"><b>Send OTP</b></a> &nbsp;&nbsp;</td></tr>';
+	}else{
+		
+		boiler +='<tr class="hideForNITIE" style="display:none;" id="adhaarMsg"><td colspan="5">Enter any one following detail,<strong> Same </strong> as that of which you have entered earlier.&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td></tr>';
+	    boiler +='<tr class="hideForNITIE" style="display:none;" id="adhaarTxt"><td colspan="2">Aadhaar-card No.</td><td><input type="text" id="adharIdModal" maxlength="12"></td><td><strong>Or</strong> Passport No.</td><td><input type="text" id="passportIdModal" length="10"></td></tr>';
+	    if(emailId!='' && emailId!= undefined){
+		boiler +='<tr class="hideForNITIE" id="otpMsg"><td colspan="5">Enter following detail,<strong> Same </strong> as sent on your registered emailId.&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font><strong> '+emailId+' </strong></td></tr>';
+	    }
+		boiler +='<tr class="hideForNITIE" id="otpTxt"><td colspan="2">OTP</td><td><input type="text" id="otpIdModal" length="8"></td><td><a class="btn btn-success" id="btnSendOTP" onclick="sendOTP()"><b>Send OTP</b></a> &nbsp;&nbsp;</td></tr>';
+	}
+	
+	boiler +='<tr><td colspan="3"> All fields marked with <font style="color:red;font-weight:bold;">*</font> are mandatory. <br> Your login id is your e-mail id. </td><td><div class="preview"></div></td></tr>'+
+	'</table>';
+	$("#commonModalBody").html(boiler);
+	if($('#customerHelper').val()=="NITIE_SERVER"){
+		$('.hideForNITIE').hide();	
+	}
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	
+	if(courseName =='VLFM'){
+		$('.hideForVLFM').hide();		
+	}
+	
+	fetchCategoryReservations();
+	$("#modalFooter").html();
+	$("#commonModal").modal('show');
+	$('#emailIdModal').val($('#emailIdName').val());
+	
+	$('#dobIdModal').datepicker({
+		dateFormat : 'M dd,yy',
+		changeMonth : true,
+		changeYear : true,
+		yearRange : "-80:+0",
+		firstDay : 1
+	});
+}
+
+
+function sendOTP()
+{
+	var EmailId = $("#emailIdModal").val();
+	var InstituteCourseStrength = $('#selInstituteCourseStrength option:selected').val();
+	var customerId = $('#customerId').val();
+
+	if(EmailId == "")
+		{
+			swal("E-mail id can not be blank !");
+			return false;
+		}
+	
+	
+	$.ajax({
+		url:'generateOTP.json?EmailId='+EmailId+'&InstituteCourseStrength='+InstituteCourseStrength+'&customerId='+customerId, 
+		dataType:'json',
+		type : 'POST',
+		async:false,
+		beforeSend: function() {
+			$('#sendOTPmailSpinner').show();
+		},
+		complete: function() {
+			$('#sendOTPmailSpinner').fadeOut(2000);
+		},
+		headers:{'security-helper-prop':true},
+		success:function(jObject)
+		{
+			if (jObject != null && jObject != undefined) 
+			{
+				var status = jObject["status"];
+				if(status==true){
+				  swal("OTP sent on your registered Email Id");
+				}else{
+					swal("Failed to Send OTP");
+				}
+			}else{
+				jAlert("Please try again later","Message");
+			}
+			
+			
+		},
+		error:function(){
+			jAlert("In Course Duration error","Error");
+		}
+	});	
+	
+	
+}
+
+
+function saveMergerDetails()
+{
+	var emailId = $("#emailIdModal").val();
+	var dob = $("#dobIdModal").val();
+	var motherName = $("#motherNameIdModal").val();
+	var adhar = $("#adharIdModal").val();
+	var passport = $("#passportIdModal").val();
+	var otp = $("#otpIdModal").val();
+	var categoryId = $("#cmbCategoryReRegister").val();
+	var admissionTypeId = 0;
+	var catRegNo = '';
+	
+	if($('#customerHelper').val()=="NITIE_SERVER" && $('#CATRegNo').is(":visible") ){
+		catRegNo = $('#CATRegNo').val();
+		
+		if(catRegNo == ""){
+			swal("CAT Registration Number can not be blank !");
+			return false;
+		}
+		
+	}if($('#customerHelper').val()=="NITIE_SERVER" && $('#emailIdModal').is(":visible") ){
+		
+		if(emailId == ""){
+			swal("E-mail id can not be blank !");
+			return false;
+		}
+		
+	}
+	
+	if($('#customerHelper').val()!="NITIE_SERVER"){
+	
+	if(emailId == "")
+		{
+			swal("E-mail id can not be blank !");
+			return false;
+		}
+	if(dob == "")
+		{
+		swal("Date of birth can not be blank !");
+			return false;
+		}
+	if(motherName == "")
+		{
+		swal("Mother name can not be blank !");
+			return false;
+		}
+	
+	if($('#adharIdModal').is(":visible") && $('#passportIdModal').is(":visible")){
+		if(adhar == "" && passport == "")
+			{
+			swal("Please enter either adhaar no. or passport no. Or login to old profile and edit details !");
+				return false;
+			}
+		}else if($('#otpIdModal').is(":visible")){
+			if(otp == "")
+			{
+				swal("Please enter OTP Or login to old profile and edit details !");
+				return false;
+			}
+		}
+	}
+	
+	if($('#cmbCategoryReRegister').is(':visible') && $('#customerHelper').val()=="NITIE_SERVER"){
+		if(categoryId =='0'){
+			swal("Please Select Category!");
+			return false;
+		}
+		admissionTypeId = $('#cmbCategoryReRegister option:selected').attr("admissionTypeId");
+	}
+	
+	var roundStructureId = $('#selInstituteCourseStrength option:selected').attr("roundStructureId");
+	var InstituteCourseStrength = $('#selInstituteCourseStrength option:selected').val();
+	var customerId = $('#customerId').val();
+	var instituteCourseId = $('#selInstituteCourseStrength option:selected').attr("instituteCourseId");
+	var instName = $('#cmbInstitute option:selected').text();
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	var courseType = $('#selInstituteCourseStrength option:selected').attr('courseType');
+	var instAbb = $('#cmbInstitute option:selected').attr('instAbbr');
+	
+	if(InstituteCourseStrength == null || InstituteCourseStrength == undefined || InstituteCourseStrength == "" || InstituteCourseStrength == "0" || roundStructureId =="0" )
+	{
+		//$("#selInstituteCourseStrength")
+		swal("Please select course name !");
+		return false;
+		
+	}
+	
+	$.ajax({
+		url : 'restApi/applicantStudentAlreadyRegisteredCloning.json', // saveMergerOfUserLogins.json
+		//url : 'restApi/saveMergerOfUserLogins.json', // saveMergerOfUserLogins.json
+		data : {
+			emailId : emailId,
+			dob : dob,
+			motherName : motherName,
+			adhar : adhar,
+			passport : passport,
+			otp : otp,
+			roundStructureId : roundStructureId,
+			InstituteCourseStrength : InstituteCourseStrength,
+			customerId : customerId,
+			instituteCourseId : instituteCourseId,
+			instName : instName,
+			courseName : courseName,
+			courseType : courseType,
+			instAbb : instAbb,
+			categoryId : categoryId,
+			admissionTypeId : admissionTypeId,
+			catRegNo : catRegNo
+			
+		},
+		headers:{'security-helper-prop':true},
+		dataType : 'json',
+		type : 'POST',
+		async : false,
+		beforeSend : function() {
+			$('div.preview').addClass('loading');
+		},
+		complete : function() {
+			$('div.preview').removeClass('loading');	
+		},
+		success : function(jObject) {
+			
+			
+			
+			if (jObject != null && jObject != undefined) 
+			{
+				var errorMsg = "";
+				var errArr = jObject["errorArr"];
+				if(errArr.length > 0)
+				{
+					for(var a=0; a<errArr.length; a++)
+					{
+						errorMsg += errArr[a]["errMsg"]+"<br>";
+					}
+					jAlert(errorMsg);
+					return false;
+				}else
+				{
+					//jAlert("Identity verfied successfully ! <br> Please login with your user id and password again. <br> Redirecting to login page in 5 Sec..");
+					swal("Identity verified successfully ! Please login with your user id and password again.")
+					.then((value) => {
+						window.location="login.json";
+					});
+					
+				}
+				
+			}else{
+				jAlert("Technical error occurred !");
+			}
+		},
+		error : function() {
+			jAlert("Error in merging user logins !","Error");
+		}
+	});
+	
+}
+function fetchInstituteList()
+{
+	var campusId = $('#cmbCampus').val();
+	var instituteId = $("#instituteId").val();
+	$.ajax({
+		url:'instituteList.json?campusId='+campusId,	
+		dataType:'json',
+		headers:{'security-helper-prop':true},
+		//async:false,
+		success:function(jArray){
+			var boiler = '<option value="0">-- Select Institute --</option>';
+			for(var i=0;i<jArray.length;i++){
+				boiler += '<option value="'+jArray[i]["instituteId"]+'" >'+jArray[i]["instituteName"]+'</option>';
+			}
+			$('#cmbInstitute').html(boiler);
+			if(instituteId!=undefined && instituteId!=null && instituteId!='' && instituteId!='null'){
+				$('#cmbInstitute').val(instituteId);
+				
+					//$('#cmbInstitute').attr("disabled",true);
+					disableComboCommon('cmbInstitute');
+				
+				fetchInstituteCourseStrength();
+			}else{
+				$('#cmbInstitute').attr("disabled",true);
+			}
+		},
+		error:function(){
+			//jAlert("in Error Admission Type CMB","Error");
+		}
+	});
+}
+
+function fetchInstituteCourseStrength()
+{
+	var instituteId = $('#cmbInstitute').val();
+	var instituteStrengthId = $('#instituteStrengthId').val();
+	$.ajax({
+		url:'fetchInstituteCoursesForApplicantAdmission.json?instituteId='+instituteId, 
+		dataType:'json',
+		headers:{'security-helper-prop':true},
+		//async:false,
+		success:function(jArray){
+			var boiler = '<option value="0" roundStructureId="0" >-- Select Course --</option>';
+			for(var i=0;i<jArray.length;i++)
+			{
+				if(jArray[i]["courseName"] == "First Year(BE)")
+					boiler += '<option courseName="'+jArray[i]["courseName"]+'" roundStructureIdDecr="'+jArray[i]["roundStructureIdDecr"]+'" instituteCourseId="'+jArray[i]["instituteCourseId"]+'" roundStructureId="'+jArray[i]["roundStructureId"]+'" value="'+jArray[i]["instituteStrengthId"]+'" style="font-weight:bold;">'+jArray[i]["courseName"]+' '+jArray[i]["roundName"]+'</option>';					
+				else
+					boiler += '<option courseName="'+jArray[i]["courseName"]+'" roundStructureIdDecr="'+jArray[i]["roundStructureIdDecr"]+'" instituteCourseId="'+jArray[i]["instituteCourseId"]+'" roundStructureId="'+jArray[i]["roundStructureId"]+'" value="'+jArray[i]["instituteStrengthId"]+'" >'+jArray[i]["courseName"]+' '+jArray[i]["roundName"]+'</option>';
+			}
+			$('#selInstituteCourseStrength').html(boiler);
+			if(instituteStrengthId!=undefined && instituteStrengthId!=null && instituteStrengthId!='' && instituteStrengthId!='null'){
+				$('#selInstituteCourseStrength').val(instituteStrengthId);
+				
+				
+					//$('#selInstituteCourseStrength').attr("disabled",true);
+					disableComboCommon('selInstituteCourseStrength');
+				
+			}else{
+				$('#selInstituteCourseStrength').attr("disabled",true);
+			}
+		},
+		error:function(){
+			//jAlert("in Error Admission Type CMB","Error");
+		}
+	});
+}
+function addAdmissionApplicant()
+{
+	
+	if($('#customerHelper').val()=="NITIE_SERVER"||$('#customerHelper').val()=="LOCAL_SERVER"){
+		$('#commonModalNITIE').modal('hide');
+	}
+	
+	//var customerId = $('#customerId').val();
+	var urlDomainName = window.location.host;
+	var customerId = 0;
+	var validationLogStr = new Array();	
+	if(urlDomainName=="kjedu.in")
+		customerId="db32227ae3fc2517e96ad2a3eed93d62";
+	else	
+		customerId=$('#customerId').val();
+
+	var firstName = $('#firstName').val().trim();
+	var middleName = $('#middleName').val().trim();
+	var lastName = $('#lastName').val().trim();
+	var emailIdName = $('#emailIdName').val().trim();
+	var mobileNo = $('#mobileNo').val().trim();
+	var InstituteCourseStrength = '';
+	var txtCapecha = $("#txtCapecha").val().trim();
+	var FixedGender = $("#fixedGender").val().trim();
+	var StudentElective = $("#StudentElective").val().trim();
+	var isEntrance = $("#isEntrance").val().trim();
+	var Aadharno = $('#AdharcardNo').val();
+	var DteNo = $('#Dteno').val();
+	var countryCode = ini_CountryCode.getSelectedCountryData().dialCode;
+	var instName = $('#cmbInstitute option:selected').text();
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	var courseType = $('#selInstituteCourseStrength option:selected').attr('courseType');
+	var instAbb = $('#cmbInstitute option:selected').attr('instAbbr');
+	var candidateCategory = '';
+	var CATRegistrationNumber = '';
+	var categoryReservationId = 0;
+	var admissionTypeId = 0;
+	var physicallyHandicapped = '';
+	var abcId = '';
+	var dateofbirth='null';
+	var otherprogram='';
+	InstituteCourseStrength =  $('#selInstituteCourseStrength').val();
+	
+	
+	var txtCapecha1 = $("#captchaInfo");
+	var isValid = true;
+	$('#applicantRegistrationTLB input[type=text]').each(function(){
+		if(!($(this).val()!=undefined && $(this).val().trim()!='')){
+			if($(this).attr('id') != 'middleName' && $(this).attr('id') != 'lastName' && $(this).attr('id') != 'CATRegistrationNumber'){
+				$(this).css("border","1px solid red");
+				isValid = false;
+				if($(this).prop('placeholder')!=undefined){
+					validationLogStr.push($(this).prop('placeholder'));
+				}
+			}
+		}else{
+			$(this).css("border","1px solid #CCCCCC");
+		}
+		
+	});
+	
+	 if (emailIdName != ""  && emailIdName.includes(',')){
+		 $('#emailIdName').css("border","1px solid red");
+		 isValid = false;
+	 }else{
+		 $('#emailIdName').css("border","");		
+	 }
+	
+	 if (validateEmail() && firstName != "" && emailIdName != "" && mobileNo != "") {
+		 
+		var regExp = /^[A-Za-z]+$/;
+		var firstNameInfo = $("#firstNameInfo");
+		var mobileInfo = $("#mobileInfo");
+		var mobileNoObk = $("#mobileNo");
+		var emailIdObk = $("#emailIdName");
+		var txtCapecha1 = $("#captchaInfo");
+		
+ 		if (mobileNo.length < 10 && countryCode=="91") 
+ 		{
+ 			//lastNameInfo.hide();
+			//mobileInfo.text("Enter valid mobile number");
+			
+			errorAlertBootstrap("Enter valid mobile number");
+			mobileNoObk.css("border","1px solid red");
+			//mobileInfo.show();
+			mobileInfo.hide();
+			isValid = false;
+			return ;
+		}else{
+			mobileNoObk.css("border","");
+			mobileInfo.hide();
+			isValid = true;
+		}
+ 		
+ 		/* if(($('#customerHelper').val()=="MGMU_SERVER")){
+			var isOtpVer = mobileNoObk.data('isOTPVerified');
+			if(isOtpVer!=true){
+				errorAlertBootstrap("Please verify OTP of mobile number!");
+				mobileNoObk.css("border","1px solid red");
+				//mobileInfo.show();
+				mobileInfo.hide();
+				isValid = false;
+			}else{
+				mobileNoObk.css("border","");
+				mobileInfo.hide();
+				isValid = true;
+			}
+		}	 */
+ 		if($('#customerHelper').val()=="HPTU_SERVER" || $('#customerHelper').val()=="ATAL_MEDICAL_SERVER"){
+			var isOtpVer = emailIdObk.data('isOTPVerified');
+			if(isOtpVer!=true){
+				errorAlertBootstrap("Please verify OTP of Email Id!");
+				emailIdObk.css("border","1px solid red");
+				//mobileInfo.show();
+				mobileInfo.hide();
+				isValid = false;
+			}else{
+				mobileNoObk.css("border","");
+				mobileInfo.hide();
+				isValid = true;
+			}
+		}	
+		if($('#customerHelper').val()=="NITIE_SERVER" && courseName !="VLFM"){
+			
+			if($("#candidateCategoryTRCls").is(":visible") && $('[name="candidateCategory"]:checked').val()==undefined){
+				$('#candidateCategoryTRCls').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#candidateCategoryTRCls').css('border', 'none');
+			}
+			
+			if($("#CATRegistrationNumber").is(":visible") && $('#CATRegistrationNumber').val().trim() == ""){
+				$('#CATRegistrationNumber').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#CATRegistrationNumber').css('border', 'none');
+			}
+			
+			if($("#cmbCategory").is(":visible") && $('#cmbCategory').val() == "0"){
+				$('#cmbCategory').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#cmbCategory').css('border', 'none');
+			}
+			if($("#physicallyHandicappedTR").is(":visible") && $('[name="physicallyHandicapped"]:checked').val()==undefined){
+				$('#physicallyHandicappedTR').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#physicallyHandicappedTR').css('border', 'none');
+			}
+			if($("#ApplicantBirthDayTR").is(":visible") &&  $('#ApplicantBirthdate').val().trim() == ""){
+				$('#ApplicantBirthdate').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#ApplicantBirthdate').css('border', 'none');
+			}
+			
+		}
+		if($('#customerHelper').val()=="BML_SERVER"){
+			if($("#ApplicantBirthDayTR").is(":visible") &&  $('#ApplicantBirthdate').val().trim() == ""){
+				$('#ApplicantBirthdate').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#ApplicantBirthdate').css('border', 'none');
+			}
+			 var checkedCheckboxes = $(".disclaimerforbml:checked").length;
+			if($("#disclaimerforbmlTR").is(":visible") && checkedCheckboxes!=1){
+				$('.disclaimerforbml').css("border", "1px solid red");
+				isValid = false;
+			}
+		}
+		 //isValid = true;
+	 } else {
+		 isValid = false;
+	 }
+	
+	if(InstituteCourseStrength==null || InstituteCourseStrength=='null' || InstituteCourseStrength=="0")
+	{
+		swal("Please Select Course Name");
+		isValid = false;
+	}
+	if($('#customerHelper').val()=="BML_SERVER"){
+		dateofbirth=$('#ApplicantBirthdate').val().trim();
+	}
+	if($('#customerHelper').val()=="NITIE_SERVER"){
+		 candidateCategory = $('input[name = "candidateCategory"]:checked').val();
+		 CATRegistrationNumber = $('#CATRegistrationNumber').val().trim();
+		 categoryReservationId =  $('#cmbCategory option:selected').val();	
+		 admissionTypeId = $('#cmbCategory option:selected').attr("admissionTypeId");	
+		 physicallyHandicapped = $('input[name = "physicallyHandicapped"]:checked').val();
+		 dateofbirth=$('#ApplicantBirthdate').val().trim();
+		 $('.ckallProgram:checked').each(function() {
+			 var courseName = $(this).attr('data-name');
+			  var ICS =  $(this).attr('data-icsid');
+			 var RoundStructureId = $(this).attr('roundStructureId');
+			
+			if(InstituteCourseStrength!=ICS){
+				otherprogram=otherprogram!=''?otherprogram+","+ICS+"_"+RoundStructureId+"_"+courseName:ICS+"_"+RoundStructureId+"_"+courseName;
+			}
+			 
+		 });
+		 console.log("otherprogram",otherprogram);
+	}
+	if($('#customerHelper').val()=="XLRI_SERVER"||$('#customerHelper').val()=="LOCAL_SERVER"){
+	if($("#candidateCategoryTRCls").is(":visible") && $('[name="candidateCategory"]:checked').val()==undefined){
+		$('#candidateCategoryTRCls').css("border", "1px solid red");
+		isValid = false;
+	}else{
+		$('#candidateCategoryTRCls').css('border', 'none');
+	}
+	if($("#cmbCategory").is(":visible") && $('#cmbCategory').val() == "0"){
+		$('#cmbCategory').css("border", "1px solid red");
+		isValid = false;
+	}else{
+		$('#cmbCategory').css('border', 'none');
+	}
+	categoryReservationId =  $('#cmbCategory option:selected').val();	
+	 admissionTypeId = $('#cmbCategory option:selected').attr("admissionTypeId");
+	}
+	if($('#customerHelper').val()=="ICT_MUMBAI_SERVER"){
+		
+		abcId = $('#abcId').val().trim();
+		if(abcId==""){
+			swal("Please Enter ABC Id");
+			isValid = false;
+		}
+		
+	}
+	
+	
+	
+	if(isValid)
+	{
+		var appliedForCampus = false;
+		var appliedForCampusName = '';
+		if($('#customerHelper').val()=='IMT_DUBAI_SERVER'){
+			appliedForCampus = true;
+			appliedForCampusName = "Dubai";
+		}
+		
+		var roundStructureId = $('#selInstituteCourseStrength option:selected').attr("roundStructureId");
+		var roundStructureIdNew = $('#selInstituteCourseStrength option:selected').attr("roundStructureIdDecr");
+		var instituteCourseId = $('#selInstituteCourseStrength option:selected').attr("instituteCourseId");
+		if(instituteCourseId == undefined || instituteCourseId == 'undefined'){
+			//instituteCourseId =  data-instituteCourseId
+			instituteCourseId = $('#cmbCampus option:selected').attr("data-instituteCourseId");
+		}
+		
+		var URL1=window.location.href;
+		var admFormCampSource = undefined;
+		var campaignName=$('#campaignNameId').val()!=null?$('#campaignNameId').val():"undefined";
+		var campaignMedium=$('#campaignMediumId').val()!=null?$('#campaignMediumId').val():"undefined";
+		var campaignSource=$('#campaignSourceId').val()!=null?$('#campaignSourceId').val():"undefined";
+		var bscId=$('#bscId').val()!=null?$('#bscId').val():"undefined";
+
+	 $.ajax({
+			url:'restApi/applicantStudentRegistration.json',//addAdmissionApplicant.json  addAdmissionApplicantSP.json   
+			//url:'restApi/addAdmissionApplicantSP.json',//addAdmissionApplicant.json  addAdmissionApplicantSP.json
+			data:{
+				InstituteCourseStrength : InstituteCourseStrength,
+				customerId : customerId,
+				firstName :firstName,
+				middleName : middleName,
+				lastName : lastName,
+				emailIdName : emailIdName,
+				mobileNo:mobileNo,
+				txtCapecha : txtCapecha,
+				URL1 : URL1 , 
+				roundStructureId : roundStructureId,
+				FixedGender : FixedGender,
+				StudentElective :StudentElective,
+				isEntrance:isEntrance,
+				Aadharno:Aadharno,
+				DteNo:DteNo,
+				admFormCampSource:admFormCampSource,
+				appliedForCampusName:appliedForCampusName,
+				countryCode:countryCode,
+				instituteCourseId:instituteCourseId,
+				instName:instName,
+				courseName:courseName,
+				courseType:courseType,
+				instAbb:instAbb,
+				candidateCategory:candidateCategory,
+				CATRegistrationNumber:CATRegistrationNumber,
+				categoryReservationId:categoryReservationId,
+				admissionTypeId:admissionTypeId,
+				physicallyHandicapped:physicallyHandicapped,
+				abcId:abcId,
+				dateofbirth:dateofbirth,
+				otherprogram:otherprogram,
+				campaignName:campaignName,
+				campaignMedium:campaignMedium,
+				campaignSource:campaignSource,
+				bscId:bscId
+			},
+			dataType:'json',
+			type:'POST',
+			headers:{'security-helper-prop':true},
+			async:false,
+			beforeSend: function() {
+				$('.preview').addClass('loading');
+				$('.lblTimeWarn').show();
+				$('#btnRegister').hide();
+			},
+			complete: function() {
+				$('.preview').removeClass('loading');
+				$('.lblTimeWarn').hide();
+				$('#btnRegister').show();
+			},
+			success:function(jArray){
+				
+				if(jArray[0].status=="capachaError"){
+				    //jAlert("Invalid captcha. Please try again.");
+				    errorAlertBootstrap("Invalid captcha. Please try again.");
+				    refreshImg();
+				    return;
+				}if(jArray[0].status=="alreadyAdded"){
+				    //jAlert("Invalid captcha. Please try again.");
+				    swal("You have already applied for this course!\n You may use your credentials to login for the same.");
+				    //window.location.reload();
+				    return;
+				}
+				if(jArray[0].status=="ApplicationLimit")
+     	   		{
+     	   			//jAlert('Applicant registration fulfilled. Please try next time');
+	     	   		errorAlertBootstrap('Applicant registration fulfilled. Please try next time');
+	  				 return;
+     	   		}
+				if(jArray.isError!=undefined && jArray.isError==true){
+					swal("Sorry for inconvenience! Please contact to Admission department!");
+					return ;
+				}
+				if(jArray[0].status){
+					if(jArray[0].status!="capachaError"){
+						var msg='';
+						if($('#customerHelper').val()=="MGMU_SERVER"){
+							msg="Thank you for your interest in MGM University. <br> Your login credentials sent on your Mobile - \''"+mobileNo+"'\' & E-Mail - \''"+emailIdName+"'\'.";
+						}else if($('#customerHelper').val()=="RCOEM_SERVER"){
+							msg="Successfully Registered! <br> Please go to registered email address for getting password. <br>You will be required to use this credentials for login/ process.";
+						}else if(($('#customerHelper').val()=="BML_SERVER") && courseName=="BBP"){
+							msg="Thank You for registering with BMU Axis Bank Bharat Banking Programme.<p style='text-align:left;'>You have successfully completed the first step of the registration process.</p> <p style='text-align:left;'>We have sent your login details to the registered email address.</p><p style='text-align:left;'>Please check your email for login information.</p><p style='text-align:left;'> Login through the link provided in your mail to complete your application.</p> Thanks & Regards,\n BML Munjal University"
+						}else{
+							msg="Successfully Registered! <br> Please go to registered email address or phone number for getting password. <br>You will be required to use this credentials for login process.";
+						}
+						if($('#customerHelper').val()!="MATS_SERVER"){
+						
+						jAlert(msg,"Success",function(r) {
+						  	if (r) {
+						  		window.location.href = "login.htm";
+							  }
+							 });
+						}else{
+							window.location.href = "login.htm";
+						}
+						/* alert('Successfully Registered Please go to registered Email Id/Mobile No for getting password');
+						$("#applicantRegistrationDiv").hide();
+						$("#applicantGuidelinesDiv").html(getGuidelinesBoiler()).show();	 */					
+					}
+				} else{
+					errorAlertBootstrap('Oops something went wrong, please try again.');
+				}
+			},
+			error:function(){
+				//jAlert("in Error Admission Type CMB","Error");
+			}
+		}); 
+	}else{
+		if(validationLogStr.length>0)
+			errorAlertBootstrap(validationLogStr.join(', ')+' are not valid!');
+		setTimeout(function(){
+			$('#applicantRegistrationTLB input[type=text]').css("border","");
+		},5000);
+	}
+}
+
+function addNITIEValidationsAndPop(){
+	
+	
+	//var customerId = $('#customerId').val();
+	var urlDomainName = window.location.host;
+	var customerId = 0;
+	var validationLogStr = new Array();	
+	if(urlDomainName=="kjedu.in")
+		customerId="db32227ae3fc2517e96ad2a3eed93d62";
+	else	
+		customerId=$('#customerId').val();
+
+	var firstName = $('#firstName').val().trim();
+	var middleName = $('#middleName').val().trim();
+	var lastName = $('#lastName').val().trim();
+	var emailIdName = $('#emailIdName').val().trim();
+	var mobileNo = $('#mobileNo').val().trim();
+	var InstituteCourseStrength = '';
+	var txtCapecha = $("#txtCapecha").val().trim();
+	var FixedGender = $("#fixedGender").val().trim();
+	var StudentElective = $("#StudentElective").val().trim();
+	var isEntrance = $("#isEntrance").val().trim();
+	var Aadharno = $('#AdharcardNo').val();
+	var DteNo = $('#Dteno').val();
+	var countryCode = ini_CountryCode.getSelectedCountryData().dialCode;
+	var instName = $('#cmbInstitute option:selected').text();
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	var courseType = $('#selInstituteCourseStrength option:selected').attr('courseType');
+	var instAbb = $('#cmbInstitute option:selected').attr('instAbbr');
+	var candidateCategory = '';
+	var CATRegistrationNumber = '';
+	var categoryReservationId = 0;
+	var admissionTypeId = 0;
+	var physicallyHandicapped = '';
+	var dateofBirth='';
+	if(window.location.toString().indexOf("ictmumbai") != -1){
+		InstituteCourseStrength = $('#selInstituteCourseStrength1').val();
+	}else {
+		InstituteCourseStrength =  $('#selInstituteCourseStrength').val();
+	}
+	
+	var txtCapecha1 = $("#captchaInfo");
+	var isValid = true;
+	$('#applicantRegistrationTLB input[type=text]').each(function(){
+		if(!($(this).val()!=undefined && $(this).val().trim()!='')){
+			if($(this).attr('id') != 'middleName' && $(this).attr('id') != 'lastName' && $(this).attr('id') != 'CATRegistrationNumber'){
+				$(this).css("border","1px solid red");
+				isValid = false;
+				if($(this).prop('placeholder')!=undefined){
+					validationLogStr.push($(this).prop('placeholder'));
+				}
+			}
+		}else{
+			$(this).css("border","1px solid #CCCCCC");
+		}
+		
+	});
+	
+	 if (validateEmail() && firstName != "" && emailIdName != "" && mobileNo != "") {
+		 
+		var regExp = /^[A-Za-z]+$/;
+		var firstNameInfo = $("#firstNameInfo");
+		var mobileInfo = $("#mobileInfo");
+		var mobileNoObk = $("#mobileNo");
+		var emailIdObk = $("#emailIdName");
+		var txtCapecha1 = $("#captchaInfo");
+		
+ 		if (mobileNo.length < 10 && countryCode=="91") 
+ 		{
+ 			//lastNameInfo.hide();
+			//mobileInfo.text("Enter valid mobile number");
+			
+			errorAlertBootstrap("Enter valid mobile number");
+			mobileNoObk.css("border","1px solid red");
+			//mobileInfo.show();
+			mobileInfo.hide();
+			isValid = false;
+			return ;
+		}else{
+			mobileNoObk.css("border","");
+			// mobileInfo.hide();
+			isValid = true;
+		}
+ 		
+ 		if(window.flow.isMobileNoVerify=="true"||window.flow.isMobileNoVerify){
+			var isOtpVer = mobileNoObk.data('isOTPVerified');
+			if(isOtpVer!=true){
+				isValid = false;
+				errorAlertBootstrap("Please verify OTP of mobile number!");
+				mobileNoObk.css("border","1px solid red");
+				//mobileInfo.show();
+				// mobileInfo.hide();
+				
+			}else{
+				mobileNoObk.css("border","");
+				mobileInfo.hide();
+				isValid = true;
+			}
+		}	
+ 		if($('#customerHelper').val()=="HPTU_SERVER" || $('#customerHelper').val()=="ATAL_MEDICAL_SERVER"||$('#customerHelper').val()=="NITIE_SERVER"){
+			var isOtpVer = emailIdObk.data('isOTPVerified');
+			if(isOtpVer!=true){
+				errorAlertBootstrap("Please verify OTP of Email Id!");
+				 $("#emailIdName").css("border","1px solid red");
+				//mobileInfo.show();
+			//	mobileInfo.hide();
+				isValid = false;
+			}else{
+				emailIdObk.css("border","");
+				// mobileInfo.hide();
+				isValid = true;
+			}
+		}	
+		if($('#customerHelper').val()=="NITIE_SERVER"||$('#customerHelper').val()=="LOCAL_SERVER"){
+			
+			if($("#ApplicantBirthDayTR").is(":visible") &&  $('#ApplicantBirthdate').val().trim() == ""){
+				$('#ApplicantBirthdate').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#ApplicantBirthdate').css('border', 'none');
+			}
+			if($("#candidateCategoryTRCls").is(":visible") && $('[name="candidateCategory"]:checked').val()==undefined){
+				$('#candidateCategoryTRCls').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#candidateCategoryTRCls').css('border', 'none');
+			}
+			
+			if($("#CATRegistrationNumber").is(":visible") && $('#CATRegistrationNumber').val().trim() == ""){
+				$('#CATRegistrationNumber').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#CATRegistrationNumber').css('border', 'none');
+			}
+			
+			if($("#cmbCategory").is(":visible") && $('#cmbCategory').val() == "0"){
+				$('#cmbCategory').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#cmbCategory').css('border', 'none');
+			}
+			if($("#physicallyHandicappedTR").is(":visible") && $('[name="physicallyHandicapped"]:checked').val()==undefined){
+				$('#physicallyHandicappedTR').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#physicallyHandicappedTR').css('border', 'none');
+			}
+			
+			
+		}
+		 //isValid = true;
+	 } else {
+		 isValid = false;
+	 }
+	
+	if(InstituteCourseStrength==null || InstituteCourseStrength=='null' || InstituteCourseStrength=="0")
+	{
+		swal("Please Select Course Name");
+		isValid = false;
+	}
+	if($('#customerHelper').val()=="NITIE_SERVER"){
+		 candidateCategory = $('input[name = "candidateCategory"]:checked').val();
+		 CATRegistrationNumber = $('#CATRegistrationNumber').val().trim();
+		 categoryReservationId =  $('#cmbCategory option:selected').val();	
+		 admissionTypeId = $('#cmbCategory option:selected').attr("admissionTypeId");	
+		 physicallyHandicapped = $('input[name = "physicallyHandicapped"]:checked').val();
+		 dateofbirth= $('#ApplicantBirthdate').val().trim();
+	}
+	
+	 if (emailIdName != ""  && emailIdName.includes(',')){
+		 $('#emailIdName').css("border","1px solid red");
+		 isValid = false;
+				errorAlertBootstrap('EmailId are not valid!');
+			setTimeout(function(){
+				$('#applicantRegistrationTLB input[type=text]').css("border","");
+			},5000);
+		 
+	 }else{
+		 $('#emailIdName').css("border","");		
+	 }
+	
+	if(isValid)
+	{
+		guideLinePopup();
+	}else{
+		if(validationLogStr.length>0)
+			errorAlertBootstrap(validationLogStr.join(', ')+' are not valid!');
+		setTimeout(function(){
+			$('#applicantRegistrationTLB input[type=text]').css("border","");
+		},5000);
+	}
+}
+
+var errorTimeoutId = null;
+function errorAlertBootstrap(txt){
+	if(errorTimeoutId!=null){clearTimeout(errorTimeoutId);}
+	$('#errorAlert').html('<div class="alert alert-danger alertHideShow" style="margin-top:10px;margin-bottom: -5px;"><a href="javascript:void(0)" class="close" data-dismiss="alert" aria-label="close">&times;</a><strong>'+txt+'</strong></div>');
+	errorTimeoutId = setTimeout(function(){$('.alertHideShow').fadeOut('slow');	},5000);
+	
+}
+function showGuidelines(){
+	
+	var InstituteCourseStrength = $('#selInstituteCourseStrength option:selected').val();
+	var guidelines = '';
+	$.ajax({
+			url:'restApi/getInstituteContactDetailsRegistration.json?InstituteCourseStrength='+InstituteCourseStrength,
+			dataType:'json',
+			async:false,
+			beforeSend: function() {
+				$('#guideLineIcon').show();
+			},
+			complete: function() {
+				$('#guideLineIcon').fadeOut(2000);
+			},
+			success:function(reply){
+			var instructions="";
+            try{instructions=decodeURIComponent(reply.profileInstructions)}catch(e){instructions=reply.profileInstructions}
+            guidelines = instructions;
+			},
+ 			error:function(){
+ 				//jAlert("in Error Admission Type CMB","Error");
+ 			}
+ 		});
+	
+	$("#applicantRegistrationDiv").hide();
+	//$("#applicantGuidelinesDiv").html(getGuidelinesBoiler()).show();
+	//$("#applicantGuidelinesDiv").html(guidelines).show();
+	
+	if(guidelines=='' || guidelines=='-'){
+		$("#applicantGuidelinesDiv").html(getGuidelinesBoiler()).show();
+	}else{
+		$("#applicantGuidelinesDiv").html(guidelines).show();
+	}
+	
+	$("#applicantGuidelinesDiv").prepend('<a href="javascript:void(0);" class="btn btn-info btn-mini" onclick="hideGuidelines()"><i class="fa fa-arrow-circle-left" aria-hidden="true"></i> Back to Registration Form</a><br/>');
+	
+}
+function hideGuidelines(){
+	$("#applicantRegistrationDiv").show();
+	$("#applicantGuidelinesDiv").html('').hide();
+}
+</script>
+<script type="text/javascript">
+
+var urlDomainName = window.location.host;
+var customerId = 0;
+if($('#customerHelper').val()!=undefined && $('#customerHelper').val()=="RCOEM_SERVER"){
+function getGuidelinesBoiler(){
+	
+	
+	
+	var boiler="<i class='fa fa-info-circle'></i><strong>Once Successfully Registered Please Login with registered Email Id and password you've received on your Email ID/Mobile No.</strong>"+
+				"		<br><br><label class='label label-info'><i class='fa fa-info-circle'></i> <strong> Guidelines</strong></label>"+
+				"<div id='applicantAdmissionDiv'> " +
+				"     <!--  	<a href='javascript:void(0)' class='btn btn-inverse startTheTrip'> First time here ?</a><br><br> --> " +
+				"      	<div> " +
+				
+				"      	<div class='thumbnail alert alert-success step1 span12' style='text-align:left'> " +
+				"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Steps: &nbsp;&raquo;&nbsp;Following information is required:</h3> " +
+				"      	<div style='margin-left:5%;font-weight: bold;'> " +
+				"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(1) Personal info.</label> " +
+				"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(2) Education details.</label> " +
+				"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(3) Entrance exam details.</label> " +
+				"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(4) Payment Details for Admission form</label> " +
+				"         </div> " +
+				"      	</div> " +
+				"      	<div class='thumbnail alert alert-success step2 span12' style='text-align:left'> " +
+				"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 1 &nbsp;&raquo;&nbsp;Personal Information </h3> " +
+				"      	<div style='margin-left:5%;font-weight: bold;'> " +
+				"        <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Date of birth, Mobile No, Address, Cast, Category Details , Scanned Photo(Must be less than 40 kb).  </label> " +
+				"		 </div> " +
+				"      	</div> " +
+				"      	<div class='thumbnail  alert alert-success step3  span12' style='text-align:left'> " +
+				"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 2 &nbsp;&raquo;&nbsp;Education details starting Xth, XIIth / Diploma, Graduation (if applicable)</h3> " +
+				"      	<div style='margin-left:5%;font-weight: bold;'> " +
+				"       " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Carefully select between options of Percent System or Grade System</label> " +
+				"		 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Year of Passing of each degree should be carefully specified </label> " +
+				"		 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Board of Examination decides the normalization factor, so specify correctly</label> " +
+				" " +
+				"		 </div> " +
+				"      	</div> " +
+				"       " +
+				"      	 " +
+				"           			        " +
+				"      	<div class='thumbnail alert alert-success step6  span12' style='text-align:left'> " +
+				"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 3 &nbsp;&raquo;&nbsp;Entrance Exam Details</h3> " +
+				"      	<div style='margin-left:5%;font-weight: bold;'> " +
+				"      	  " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Select entrance exam in which you have appeared</label> " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Enter Application Id </label> " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Roll No / Sr. No </label> " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Enter Grade / Percentage / Percentile / score / Rank correctly</label> " +
+				"         </div> " +
+				"         </div> " +
+				"      	 " +
+				"      	<div class='thumbnail alert alert-success step7  span12' style='text-align:left'> " +
+				"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 4 &nbsp;&raquo;&nbsp; Fill the Payment Details for Admission</h3> " +
+				"      	<div style='margin-left:5%;font-weight: bold;'> " +
+				"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;You can pay application form fee by two modes. <br>  " +
+				"      	 						  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(a) Online Payment using Credit / Debit Card / Net Banking<br> " +
+					"	   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(b) Cash (At college cash counter)<br> " +
+					"						           </label><br> " +
+				"		 </div> " +
+				"      	</div> " +
+				
+				
+				"      	<div class='thumbnail alert alert-success step8  span12' style='text-align:left'> " +
+				"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 5 &nbsp;&raquo;&nbsp;Print the Application Request Form (ARF)</h3> " +
+				"      	<div style='margin-left:5%;font-weight: bold;'> " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;After filling all the details, take two printouts of the ARF</label> " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Affix Passport Size Photograph and sign across it.</label> " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Attach all the self-attested copies of the required documents like All Marksheets, Certificates, Category / Caste Validity document, Migration, Domicile Certificates, etc. as may be the case</label> " +
+				"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Send the signed printout of the ARF alongwith the documents to the Admissions Office before the Last Date.</label> " +
+				"		 </div> " +
+				"      	</div> " +
+				
+				
+				
+				"      	<div class='thumbnail alert alert-success step8  span12' style='text-align:left'> " +
+				"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 6 &nbsp;&raquo;&nbsp;Important Note</h3> " +
+				"      	<div style='margin-left:5%;font-weight: bold;'> " +
+				"         <label style='color: red;'><i class='icon-hand-right'></i>&nbsp;If candidate fails to submit the signed copy of the ARF and the required documents, his form will be treated as incomplete and therefore shall not be considered for preparation of the Merit List.</label> " +
+			//	"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;In case you have any trouble in logging in or filling form, you can visit our campus or contact us. Assistance will be provided. (Contact numbers: 0712-2580011, 2583238, 2583239 ext 676,678)</label> " +
+				"		  " +
+				"		 </div> " +
+				"      	</div> " +
+				
+				
+				"      	</div> " +
+				"  </div>";
+	return boiler;
+}
+}else if($('#customerHelper').val()!=undefined && $('#customerHelper').val()=="DES_SERVER"){
+	function getGuidelinesBoiler(){
+		var boiler="<i class='fa fa-info-circle'></i><strong>Once Successfully Registered Please Login with registered Email Id and password you've received on your Email ID/Mobile No.</strong>";
+		
+		
+		boiler+='<br><input type="Radio" name="guidelineType" id="guidelineForSchool" value="School" onclick="$(\'#guidelineDiv\').show();$(\'#guidelineDiv1\').hide();">&nbsp;&nbsp;<b>Guidelines For School</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+		boiler+='<input type="Radio" name="guidelineType" id="guidelineForCollage" value="College" onclick="$(\'#guidelineDiv1\').show();$(\'#guidelineDiv\').hide();">&nbsp;&nbsp;<b>Guidelines For Collage</b>';
+		
+		
+			/* boiler +="<div id='guidelineDiv'  style='display:none'> " +	
+				"<br><br><strong style='color: red;'>Guidelines For School</strong>"+
+					"<div id='applicantAdmissionDiv'> " +
+						"<div> " +
+							"<div class='thumbnail alert alert-success step1 span12'> " +
+								"<div style='margin-left:5%;font-weight: bold;'> " +
+									"<label style='color: red;'>Application Fee is NOT REFUNDABLE</label> " +
+									"<label style='color: red;'>Application is registration DOES NOT MEAN THAT ADMISSION IN THE SCHOOL IS GRANTED.</label> " +
+									"<label style='color: red;'>The AGE Criteria required for Matru Mandir/ Pre Primary/ Primary/Secondary School has to be strictly followed as prescribed by the Maharashtra State Government. If the child\'s"+
+										" age is NOT as per the required criteria, the School will reject the Application form and will"+
+										" not consider the same for any further Admission procedures.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(1) Select DES School.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(2) Select Institute and select the School you wish to apply.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(3) Select Standard you wish to apply for.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(4) Fill your details as required for registration.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(5) Enter valid email id and mobile no. All communication will be done on this email id and mobile no.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(6) Click on \'Register\' button.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(7) Once Successfully Registered, the Application form will open, and you will also get username and password on registered Email Id and password </label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(8) The Application form will open to the \'Instructions\' page of the application form. Read all instructions carefully. Fill and complete application form.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(9) <strong>* PLEASE NOTE: YOU CAN APPLY TO OTHER DES SCHOOLS THROUGH THE SAME LOGIN ID.</strong> by clicking on the link of the standard you wish to apply on the School web site. The applicants who are already registered with School ERP, will first enter the email id on the Registration Block and Enter- the system will give a POP-up message that \'You are already registered on DES. To apply for other Schools, continue with same Email-id.\' Click on OK.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(10) <strong>POP-UP WINDOW WILL OPEN ON WHICH YOU HAVE TO FILL AADHAR CARD NO.</strong> <strong style='color: red;'> OR </strong><strong>PASSPORT NO., MOTHER'S NAME AND BIRTH DATE is COMPULSORY. and submit.</strong></label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(11) The new application of new School will fetch all the details required already filled in the initial application form</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(12) <strong>If the child applicant is short listed by Mantru Mandir Sanskar Kendra 1 for Parent Child interaction with the School Management, it will be communicated through your registered email id and cell number. PLEASE DO NOT CALL THE SCHOOL FOR THE SAME. </strong></label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(13) The LAST DATE FOR APPLICATION IS 9TH DECEMBER 2018.</label> " +
+									
+									
+								"</div> " +
+							"</div> " +
+						"</div> " +
+					"</div> " +
+				"</div>"; */
+				
+				boiler +="<div id='guidelineDiv'  style='display:none'> " +	
+				"<br><br><strong style='color: red;'>Guidelines For School</strong>"+
+					"<div id='applicantAdmissionDiv'> " +
+						"<div> " +
+							"<div class='thumbnail alert alert-success step1 span12'> " +
+								"<div style='margin-left:5%;font-weight: bold;'> " +
+									"<label style='color: red;'>Application Fee is NOT REFUNDABLE</label> " +
+									"<label style='color: red;'>Application is registration DOES NOT MEAN THAT ADMISSION IN THE SCHOOL IS GRANTED.</label> " +
+									"<label style='color: red;'>The AGE Criteria required for Matru Mandir/ Pre Primary/ Primary/Secondary School has to be strictly followed as prescribed by the Maharashtra State Government. If the child\'s"+
+										" age is NOT as per the required criteria, the School will reject the Application form and will"+
+										" not consider the same for any further Admission procedures.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(1) Select DES School.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(2) Select Institute and select the School you wish to apply.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(3) Select Standard you wish to apply for.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(4) Fill your details as required for registration.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(5) Enter valid email id and mobile no. All communication will be done on this email id and mobile no.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(6) Click on \'Register\' button.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(7) Once Successfully Registered, the Application form will open, and you will also get username and password on registered Email Id and password </label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(8) The Application form will open to the \'Instructions\' page of the application form. Read all instructions carefully. Fill and complete application form.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(9) <strong>* PLEASE NOTE: YOU CAN APPLY TO OTHER DES SCHOOLS THROUGH THE SAME LOGIN ID.</strong> by clicking on the link of the standard you wish to apply on the School web site. The applicants who are already registered with School ERP, will first enter the email id on the Registration Block and Enter- the system will give a POP-up message that \'You are already registered on DES. To apply for other Schools, continue with same Email-id.\' Click on OK.</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(10) <strong>POP-UP WINDOW WILL OPEN ON WHICH YOU HAVE TO FILL AADHAR CARD NO.</strong> <strong style='color: red;'> OR </strong><strong>PASSPORT NO., MOTHER'S NAME AND BIRTH DATE is COMPULSORY. and submit.</strong></label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(11) The new application of new School will fetch all the details required already filled in the initial application form</label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(12) <strong>If the child applicant is short listed then Parent Child interaction with the School Management, it will be communicated through your registered email id and cell number. PLEASE DO NOT CALL THE SCHOOL FOR THE SAME. </strong></label> " +
+									"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(13) Last date of application form can differ for all schools.</label> " +
+									
+									
+								"</div> " +
+							"</div> " +
+						"</div> " +
+					"</div> " +
+				"</div>";
+					
+					
+					boiler +="<div id='guidelineDiv1' style='display:none'> " +	
+					"<br><br><strong style='color: red;'>Guidelines For Institute/Collages</strong>"+
+					"<div id='applicantAdmissionDiv'> " +
+					"<div> " +
+						"<div class='thumbnail alert alert-success step1 span12'> " +
+							"<div style='margin-left:5%;font-weight: bold;'> " +
+								"<label style='color: red;'>Application Fee is NOT REFUNDABLE</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(1) Select any course you wish to apply.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(2) Fill your details as required for registration.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(3) Enter valid email id and mobile no.  All communication will be done on this email id and mobile no. </label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(4) Click on \"Register\" button.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(5) Once Successfully Registered, you will get username and password on registered Email Id and password.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(6) And the link will directly open on \"Instructions\" page of the application form. Read all instructions carefully. Fill and complete application form.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(7) * PLEASE NOTE: YOU CAN APPLY TO OTHER COURSES THROUGH THE SAME LOGIN ID. by clicking on the link of the course you wish to apply on the college web site.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(8) Select the new course you wish to apply for with your EMAIL ID you have registered the first time.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(9) POP-UP WINDOW WILL OPEN ON WHICH YOU HAVE TO FILL AADHAR CARD NO./ PASSPORT NO.,  MOTHER'S NAME, BIRTH DATE. and submit.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(10) The new course application will fetch all the details required already filled in the initial application form.</label> " +
+								"<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(11) The inhouse students who are registered with ERP GEMS ie Fergusson Junior College/ BMCC/Ramanbaug/ Willingdon/Chintaman College of Commerce/Kirti College,  will first enter the email id  on the Registration Block and Enter- the system will give a POP up message  that \"You are already registered on DES. To apply for other course, continue with same Email-id.\"  Click on OK , the page will open to enter details od Adhaar card, date of birth and mother's name: Save and the Gems Login Page will open, enter your login details and fill the form.</label> " +
+							"</div> " +
+						"</div> " +
+					"</div> " +
+				"</div> " +
+			"</div>";
+					
+		return boiler;
+	}
+	
+}else{
+	function getGuidelinesBoiler(){
+		var boiler="<i class='fa fa-info-circle'></i> <strong>Once successfully registered please login with registered Email Id and password you've received on your Email Id mobile no to online application form.</strong>"+
+					"		<br><br><label class='label label-info'><i class='fa fa-info-circle'></i> <strong> Guidelines</strong></label>"+
+					"<div id='applicantAdmissionDiv'> " +
+					"     <!--  	<a href='javascript:void(0)' class='btn btn-inverse startTheTrip'> First time here ?</a><br><br> --> " +
+					"      	<div> " +
+					
+					"      	<div class='thumbnail alert alert-success step1 span12' style='text-align:left'> " +
+					"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Steps: &nbsp;&raquo;&nbsp;Following information is required:</h3> " +
+					"      	<div style='margin-left:5%;font-weight: bold;'> " +
+					"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(1) Personal info.</label> " +
+					"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(2) Education details.</label> " +
+					"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(3) Entrance exam details.</label> " +
+					"       	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(4) Scanned copy of all mark-sheets.</label> " +
+					"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(5) Scanned copy of other documents.</label> " +
+					"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;(6) Payment Details for Admission form</label> " +
+					"         </div> " +
+					"      	</div> " +
+					"      	<div class='thumbnail alert alert-success step2 span12' style='text-align:left'> " +
+					"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 1 &nbsp;&raquo;&nbsp;Personal Information </h3> " +
+					"      	<div style='margin-left:5%;font-weight: bold;'> " +
+					"        <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Date of birth, Mobile No, Address, Cast, Category Details , Scanned Photo.  </label> " +
+					"		 </div> " +
+					"      	</div> " +
+					"      	<div class='thumbnail  alert alert-success step3  span12' style='text-align:left'> " +
+					"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 2 &nbsp;&raquo;&nbsp;Education details starting Xth, XIIth / Diploma, Graduation (if applicable)</h3> " +
+					"      	<div style='margin-left:5%;font-weight: bold;'> " +
+					"       " +
+					"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Carefully select between options of Percent System or Grade System</label> " +
+					"		 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Year of Passing of each degree should be carefully specified </label> " +
+					"		 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Board of Examination decides the normalization factor, so specify correctly</label> " +
+					" " +
+					"		 </div> " +
+					"      	</div> " +
+					"       " +
+					"      	 " +
+					"           			        " +
+					"      	<div class='thumbnail alert alert-success step6  span12' style='text-align:left'> " +
+					"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 3 &nbsp;&raquo;&nbsp;Entrance Exam Details</h3> " +
+					"      	<div style='margin-left:5%;font-weight: bold;'> " +
+					"      	  " +
+					"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Select entrance exam in which you have appeared</label> " +
+					"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Enter Application Id </label> " +
+					"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Roll No / Sr. No </label> " +
+					"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Enter Grade / Percentage / Percentile / score / Rank correctly</label> " +
+					"         </div> " +
+					"         </div> " +
+					"      	 " +
+					"      	<div class='thumbnail alert alert-success step7  span12' style='text-align:left'> " +
+					"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 4 & 5 &nbsp;&raquo;&nbsp;Upload Scanned Documents</h3> " +
+					"      	<div style='margin-left:5%;font-weight: bold;'> " +
+					"      	<label style='color: black;'><i class='icon-hand-right'></i>&nbsp;All marksheets and certificates</label> " +
+					"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;Category / caste document, migration, domicile certificate etc. </label> " +
+					"	 " +
+					"		 </div> " +
+					"      	</div> " +
+					"      	<div class='thumbnail alert alert-success step8  span12' style='text-align:left'> " +
+					"      	<h3 style='font-weight: bold;'><img src='css/images/arrowGreen1.png' />Step: 6 &nbsp;&raquo;&nbsp;Payment details for admission form</h3> " +
+					"      	<div style='margin-left:5%;font-weight: bold;'> " +
+					"      	 <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;You can pay application form fee by- <br>  " +
+					"      	 		    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(a) Online- By Credit/ Debit card or by Net Banking.<br>" +
+					"						           </label><br> " +
+				//	"         <label style='color: black;'><i class='icon-hand-right'></i>&nbsp;In case you have any trouble in logging in or filling form, you can visit our campus or contact us. Assistance will be provided. (Contact numbers: 0712-2580011, 2583238, 2583239 ext 676,678)</label> " +
+					"		  " +
+					"		 </div> " +
+					"      	</div> " +
+					"      	</div> " +
+					"  </div>";
+		return boiler;
+	}
+}
+</script>
+
+<script type="text/javascript">
+$(document).ready(function(){
+	/* $("#emailIdName").keyup(function () {
+	    var VAL = this.value;
+	    var email = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
+	    if(email.test(VAL)){
+	    	//$('#emailIdName').css("border","1px solid green");
+	    	checkAluminiEmailId();
+	    }else{
+	    	$('#emailIdName').css("border","1px solid red");
+	    }
+	}); */
+	$('#mobileNo').numeric();$('#ConfirmMobileNo').numeric();
+	$('#CATRegistrationNumber').numeric();
+	 
+	 $("#firstName").off('keypress').keypress(function (e) {
+	     //if the letter is not digit then display error and don't type anything
+   		//console.log(e.which);
+	      if (!(e.which >= 65 && e.which <=122) && [32,0,8].indexOf(e.which)==-1) { 
+		        //display error message
+	    	 $('#firstName').css("border", "1px solid red");
+	               return false;
+        }
+	});
+	 
+	 $("#middleName").off('keypress').keypress(function (e) {
+	     //if the letter is not digit then display error and don't type anything
+	     	//console.log(e.which);
+	      if (!(e.which >= 65 && e.which <=122) && [32,0,8].indexOf(e.which)==-1) { 
+		        //display error message
+	    	 $('#middleName').css("border", "1px solid red");
+	               return false;
+        }
+	});
+	 
+	 
+	 $("#lastName").off('keypress').keypress(function (e) {
+	     //if the letter is not digit then display error and don't type anything
+	    	//console.log(e.which);
+	      if (!(e.which >= 65 && e.which <=122) && [32,0,8].indexOf(e.which)==-1) { 
+		        //display error message
+	    	 $('#lastName').css("border", "1px solid red");
+	               return false;
+        }
+	});
+	 
+
+});
+var lastCheckedEmailId = "";
+function checkAluminiEmailId()
+{
+	//onblur="checkAluminiEmailId()"
+	var InstituteCourseStrength = $('#selInstituteCourseStrength option:selected').val();
+	var trustAbbr = $('#cmbCampus option:selected').attr("trustAbbr");
+	 var emailIdName = $('#emailIdName').val().trim();
+	 if (validateEmail()) {
+		 $('#emailIdName').css("border","");
+	 }else{
+		 $('#emailIdName').css("border","1px solid red");
+		 return false;
+	 }
+	 
+	 if (emailIdName != ""  && emailIdName.includes(',')){
+		 $('#emailIdName').css("border","1px solid red");
+		 return false;
+	 }else{
+		 $('#emailIdName').css("border","");		
+	 }
+	 
+	 if(!$("#CATRegistrationNumber").is(":visible") && emailIdName != '' && emailIdName!=lastCheckedEmailId){
+		 //lastCheckedEmailId = emailIdName;
+		 
+		 var LinkURL = 'checkAluminiEmailId.json';
+		 if($('#customerHelper').val()=="INDIRA_PUNE"){
+			 LinkURL = 'restApi/checkAluminiEmailIdOld.json';
+		 }
+		 
+		 $.ajax({
+				url:LinkURL,
+				data:{
+					emailIdName : emailIdName,
+					InstituteCourseStrength : InstituteCourseStrength
+				},
+				dataType:'json',
+				headers:{'security-helper-prop':true},
+				type:'POST',
+				async:true,
+				beforeSend: function() {
+					//$('.checkemailpreview').addClass('loading');
+					$('#emailLoadingIcon').show();
+				},
+				complete: function() {
+					//$('.checkemailpreview').removeClass('loading');
+					$('#emailLoadingIcon').fadeOut(2000);
+				},
+				success:function(jObject){
+					if(!jObject.accountExpired){
+					if(jObject.alreadyAllocatedStatus){
+						//jAlert('Your have already applied for this course!, You may use your credentials to login for the same.');
+						swal("You have already applied for this course!\n You may use your credentials to login for the same.");
+						/* swal("", "Your have already applied for this course! You may use your credentials to login for the same.", "error", {
+							  button: "Ok",
+							}); */
+						$('#j_username').val($('#emailIdName').val());
+						$('#emailIdName').val("");
+					}else if(jObject.alreadyEmployeeAsUser){
+						swal("You are already Employee of Institute / University!\n Use another email id for Registration.");
+						
+						$('#emailIdName').val("");
+					}else if(!jObject.status){
+						var courseBatch = (jObject.CourseName!=undefined&&jObject.CourseName!=""?" for ( "+jObject.CourseName+" ) - ":"")+" "+ (jObject.batch!=undefined?jObject.batch:"");
+						$('#errorDetailsTemp').html("You are already registered on <u>"+trustAbbr+" "+courseBatch+"</u>. <br/> To apply for other course, continue with same Email-id.");
+						
+						$('#submitCheckDetailsAgainstEmailDialog').off('click').click(function(){
+							initUserMerger(jObject.adhaarNo,jObject.emailId);
+						});
+						$('#noCheckDetailsAgainstEmailDialog').off('click').click(function(){
+							$('#j_username').val($('#emailIdName').val());
+							$('#password-1').focus();
+							$('#emailIdName').val("").css('border','');
+						});
+						$('#cancelCheckDetailsAgainstEmailDialog').off('click').click(function(){$('#emailIdName').val("").css('border','');;});
+						
+						
+						$('#checkDetailsAgainstEmailDialog').modal('show');
+						$('#checkDetailsAgainstEmailDialog').modal({
+						    backdrop: 'static',
+						    keyboard: false
+						})
+						/* jConfirm("You are already registered on "+trustAbbr+". To apply for other course, continue with same Email-id.","Confirm",function(r)
+										{
+											if(r ==true)
+											{
+												initUserMerger(jObject.adhaarNo,jObject.mobileNo);
+											}else
+											{
+												
+												$('#j_username').val($('#emailIdName').val());
+												$('#emailIdName').val("");
+											}
+										}); */
+							 
+							//$('#emailIdName').val("");
+							$('#emailIdName').css("border","1px solid red");
+						}
+						else
+						{
+							$('#emailIdName').css("border","1px solid GREEN");
+						}
+					}else{
+						swal('Username has been expired (on '+trustAbbr+' portal ) please try other Email id.');
+						$('#emailIdName').val("");
+					}
+				},
+				error:function(){
+					//jAlert("in Error Admission Type CMB","Error");
+				}
+			});
+	 }
+}
+
+
+function validateEmail() {
+	var email = $("#emailIdName");
+	var emailInfo = $("#emailInfo");
+	//validation for empty emails
+	if (email.val() == "") {
+		email.addClass("error");
+		emailInfo.text("E-mail cannot be empty!");
+		//emailInfo.show();
+		emailInfo.addClass("error");
+		return false;
+	} else {
+		email.removeClass("error");
+		emailInfo.hide();
+		//emailInfo.text("*");
+		emailInfo.removeClass("error");
+	}
+	//validation for proper email formats
+	//testing regular expression
+	var a = $("#emailIdName").val();
+	var filter = /^[a-zA-Z0-9]+[a-zA-Z0-9_.-]+[a-zA-Z0-9_-]+@[a-zA-Z0-9]+[a-zA-Z0-9.-]+[a-zA-Z0-9]+.[a-z]{2,4}$/;
+	//if it's valid email
+	if (filter.test(a)) {
+		emailInfo.hide();
+		email.removeClass("error");
+		//emailInfo.text("*");
+		emailInfo.removeClass("error");
+		return true;
+	}
+	//if it's NOT valid
+	else {
+		email.addClass("error");
+		emailInfo.text("Valid E-mail please..!");
+		//emailInfo.show();
+		emailInfo.addClass("error");
+		return false;
+	}
+}
+
+function checkAadharNoAndDTENoExistance()
+{
+	 var aadhaarCardNo = $('#AdharcardNo').val();
+	 var dteApplicationNumber = $('#Dteno').val();
+
+		 $.ajax({
+				url:'checkAadharNoAndDTEexistance.json',
+				data:{aadhaarCardNo : aadhaarCardNo,dteApplicationNumber:dteApplicationNumber},
+				dataType:'json',
+				type:'POST',
+				async:false,
+				beforeSend: function() {
+					$('.checkemailpreview').addClass('loading');
+				},
+				complete: function() {
+					$('.checkemailpreview').removeClass('loading');
+				},
+				success:function(jObject){
+						if(jObject.status){
+							if(!jObject.AdharCardNoStatus){
+							
+							}
+							else{
+								swal("You have already registerd with this Aadhar no contact DEAN ADMISSION");
+							}
+							if(!jObject.DteApplicationNumberStatus){
+								}
+								else{
+									swal("You have already registerd with this DTE no contact DEAN ADMISSION");
+								}
+						}
+						else{
+							
+						}
+						
+				},
+				error:function(){
+					//jAlert("in Error Admission Type CMB","Error");
+				}
+			});
+	 
+}
+
+
+
+//function for get all courses
+var gFetchCampusInstCourses = null;
+function fetchInstituteCourseStrengthAll(){
+	var urlDomainName = window.location.host;
+	var customerId = 0;
+		
+	if(urlDomainName=="kjedu.in")
+		customerId="db32227ae3fc2517e96ad2a3eed93d62";
+	else	
+		customerId=$('#customerId').val();
+	
+	var instituteStrengthId = $('#instituteStrengthId').val();
+	
+	$.ajax({
+		url:'fetchComboCampusInstituteCourseForApplicantAdmission.json?customerId='+customerId,
+		headers:{'security-helper-prop':true},
+		dataType:'json',
+		success:function(jArray){
+			gFetchCampusInstCourses = jArray; 
+			var boiler="";
+			if($('#customerHelper').val()=="MGMU_SERVER"){
+				 boiler += '<option value="0" roundStructureId="0" >-- Select Programme --</option>';
+			}else{
+				 boiler += '<option value="0" roundStructureId="0" >-- Select Course --</option>';
+			}
+			for(var k in jArray){
+				for(var a in jArray[k].institutes){
+					var jArrCourse = jArray[k].institutes[a].courses;
+					for(var v in jArray[k].institutes[a].courses){
+						boiler += '<option courseType="'+jArrCourse[v]["courseType"]+'"  courseName="'+jArrCourse[v]["cNm"]+'" instituteCourseId="'+jArrCourse[v]["instCoId"]+'" roundStructureId="'+jArrCourse[v]["rsId"]+'" value="'+jArrCourse[v]["icsId"]+'" >'+jArrCourse[v]["cNm"]+' '+jArrCourse[v]["rsNm"]+'</option>';
+					}
+				}
+			}
+			$('#selInstituteCourseStrength').html(boiler);
+			
+			if(instituteStrengthId!=undefined && instituteStrengthId!=null && instituteStrengthId!=''){
+				$('#selInstituteCourseStrength').val(instituteStrengthId);
+				
+				
+					//$('#selInstituteCourseStrength').attr("disabled",true);
+					disableComboCommon('selInstituteCourseStrength');
+				fetchCampusByCourseId();
+			}else{
+				fetchCampusByCourseId();
+				$('#selInstituteCourseStrength').attr("disabled",true);
+			}
+			
+		},
+		error:function(){
+			//jAlert("in Error Admission Type CMB","Error");
+		}
+	});
+	
+	if($('#customerHelper').val()=="NITIE_SERVER"){
+		setTimeout(function(){
+			var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+			if(courseName == 'PGDIE' || courseName == 'PGDSM'){
+				$('#candSponsSpan').show();
+			}else if(courseName == 'Doctoral Level Fellowship'){
+				$('#candSponsSpan').show();
+				$('#candInterSpan').hide();
+			}else{
+				$('#candSponsSpan').hide();
+			}		
+		},300);
+	}
+	
+}
+
+function resetTextBoxes(){
+	
+	$('#applicantRegistrationDiv input[type="text"]').val('')
+}
+
+function fetchCampusByCourseId(){
+	if(gFetchCampusInstCourses!=null){
+		var campusId = $('#campusId').val();
+		
+		$('#cmbCampus').html('');
+		var boiler = '';
+		var jArray = gFetchCampusInstCourses;
+		var courseId = $('#selInstituteCourseStrength').val();
+		for(var k in jArray){
+			for(var a in jArray[k].institutes){
+				var jArrCourse = jArray[k].institutes[a].courses;
+				for(var v in jArray[k].institutes[a].courses){
+					if(jArrCourse[v]["icsId"]==courseId){
+						boiler = '<option trustAbbr="'+jArray[k]["trustAbbr"]+'" value="'+jArray[k]["campId"]+'" >'+jArray[k]["campName"]+'</option>';
+						$('#cmbCampus').append(boiler);
+						$('#cmbCampus option:last').data('institutes', jArray[k]["institutes"][a]);
+					}
+				}
+			}
+		}
+		
+		if(jArray.length>0){
+			if(campusId!=undefined && campusId!=null && campusId!=''){
+				
+				$('#cmbCampus').val(campusId);
+				
+				
+					//$('#cmbCampus').attr("disabled",true);
+					disableComboCommon('cmbCampus');
+				
+				fetchInstituteListForMats();
+			}else{
+				fetchInstituteListForMats();
+				$('#cmbCampus').attr("disabled",true);
+			}
+		}
+	}
+}
+
+function fetchInstituteListForMats(){
+	var instituteId = $("#instituteId").val();
+	
+	var instiArray = $('#cmbCampus option:selected').data('institutes');
+	$('#cmbInstitute').html('');
+	if(instiArray!=undefined){
+		var boiler = '<option value="0">-- Select Institute --</option>';
+		$('#cmbInstitute').append(boiler);
+		//for(var i in instiArray){
+			boiler = '<option instAbbr="'+instiArray["iAbbr"]+'" value="'+instiArray["iId"]+'" >'+instiArray["iName"]+'</option>';
+			$('#cmbInstitute').append(boiler);
+			$('#cmbInstitute option:last').data('courses', instiArray["courses"]);
+		//}
+		
+		if(instituteId!=undefined && instituteId!=null && instituteId!=''){
+			$('#cmbInstitute').val(instituteId);
+			
+				//$('#cmbInstitute').attr("disabled",true);
+				disableComboCommon('cmbInstitute');
+			
+		}else{
+			$('#cmbInstitute').attr("disabled",true);
+		}
+	}
+}
+
+function setSelectedProg(){
+	
+	setTimeout(function(){
+		
+	var selProg = $('#selInstituteCourseStrength option:selected').text();
+	var selCampus = $('#cmbCampus option:selected').text();
+	var selinst = $('#cmbInstitute option:selected').text();
+	
+	$('#departmentNamelbl').text(selProg);
+	$('#campuslbl').text(selCampus);
+	$('#institutelbl').text(selinst);
+ 	
+	if($('#customerHelper').val()=='NITIE_SERVER'){
+		 getAdmissionTypeByStrength()
+	 }	
+	if($('#bscId').val()!=null && ($('#customerHelper').val()=='XLRI_SERVER'||$('#customerHelper').val()=='LOCAL_SERVER')){
+		 getAdmissionTypeByBatchCapacityId()
+	 }
+	},1000);
+	
+}
+
+function dteChangeRegistrationNo(){
+	if($('#customerHelper').val() == "RCOEM_SERVER"){
+		
+		setTimeout(function(){
+		var courseNameHolder= $('#selInstituteCourseStrength option:selected').attr('courseName');
+		
+		 if(courseNameHolder == 'First Year B. Tech.'){
+			 $('#Dteno').attr("placeholder", 'STATE CET CELL Registration Number (Ex:EN23104382)');
+		 }else if(courseNameHolder == 'MBA'){
+			 $('#Dteno').attr("placeholder", 'STATE CET CELL Registration Number (Ex:MB23104382)');
+		 }else if(courseNameHolder == 'MCA'){
+			 $('#Dteno').attr("placeholder", 'STATE CET CELL Registration Number (Ex:MC23104382)');
+		 }
+		},500);
+	}
+}
+</script>
+  <script>
+    var input = document.querySelector("#mobileNo");
+    var preferredCountries = [''];
+    if($('#customerHelper').val()=='IMT_DUBAI_SERVER'){
+    	preferredCountries = ['ae'];
+    }else{
+    	preferredCountries = ['in'];
+    }
+    
+    var ini_CountryCode =  window.intlTelInput(input, {
+      // allowDropdown: false,
+      // autoHideDialCode: false,
+      // autoPlaceholder: "off",
+      // dropdownContainer: document.body,
+      // excludeCountries: ["us"],
+      formatOnDisplay: false,
+      // geoIpLookup: function(callback) {
+      //   $.get("http://ipinfo.io", function() {}, "jsonp").always(function(resp) {
+      //     var countryCode = (resp && resp.country) ? resp.country : "";
+      //     callback(countryCode);
+      //   });
+      // },
+       hiddenInput: "full_number",
+      // initialCountry: "auto",
+      // localizedCountries: { 'de': 'Deutschland' },
+      // nationalMode: false,
+      // onlyCountries: ['us', 'gb', 'ch', 'ca', 'do'],
+      // placeholderNumberType: "MOBILE",
+       preferredCountries: preferredCountries,
+      // separateDialCode: true,
+      utilsScript: "frameworks/intl-tel-input-master/js/utils.js",
+    });
+   
+  </script>
+</html>4<U       gøÍdgøÍeH\ŠgøÍe   S    O^partitionKey=%28https%2Ccmr.edu.in%29,:https://erp.cmr.edu.in/applicantLogins.htm necko:classified 1 strongly-framed 1 security-info FnhllAKWRHGAlo+ESXykKAAAAAAAAAAAwAAAAAAAAEaphjojH6pBabDSgSnsfLHeAAAAAgAAAAAAAAAAAAAAAAAAAAEAOQFmCjImkVxP+7sgiYWmMt8FvcOXmlQiTNWFiWlrbpbqgwAAAAAAAAZcMIIGWDCCBUCgAwIBAgIMdPmwX3JPn1TUHBs9MA0GCSqGSIb3DQEBCwUAMFUxCzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMSswKQYDVQQDEyJHbG9iYWxTaWduIEdDQyBSNiBBbHBoYVNTTCBDQSAyMDIzMB4XDTI0MDcwNTA4MDE0MFoXDTI1MDgwNjA4MDEzOVowFzEVMBMGA1UEAwwMKi5jbXIuZWR1LmluMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2bC8dXQv+75himasnY4KvNSvrO2a3CorC/EASUtZNGKFeKRHB9xbOJ44nb3q0sJcwsiIxUxTxQ19HzpkpVlMXvpfBg/6JJTxIzSRZ8k4CKp17Iw9gphSirYauuEQ6NUzdoouzkFHITyf20/K0OqDu2QpRe1Z9LybUp2SOBZwALM014H7DUa2x8YSKXtYu+oBDwzqKXGOzowIvoRjqUFxJqGCushIQlUBkOzR+kfmD/cGSiro28eU7JxRwNi0xQHFbhmg0/VMeDZQJjH2ag7VP0fKw6ro1j5UpWaOdWXZjWB0bkfh09OTE0k8s+s5PNBnCWtx2Q8hgaXE/YPsa37BuQIDAQABo4IDZDCCA2AwDgYDVR0PAQH/BAQDAgWgMAwGA1UdEwEB/wQCMAAwgZkGCCsGAQUFBwEBBIGMMIGJMEkGCCsGAQUFBzAChj1odHRwOi8vc2VjdXJlLmdsb2JhbHNpZ24uY29tL2NhY2VydC9nc2djY3I2YWxwaGFzc2xjYTIwMjMuY3J0MDwGCCsGAQUFBzABhjBodHRwOi8vb2NzcC5nbG9iYWxzaWduLmNvbS9nc2djY3I2YWxwaGFzc2xjYTIwMjMwVwYDVR0gBFAwTjAIBgZngQwBAgEwQgYKKwYBBAGgMgoBAzA0MDIGCCsGAQUFBwIBFiZodHRwczovL3d3dy5nbG9iYWxzaWduLmNvbS9yZXBvc2l0b3J5LzBEBgNVHR8EPTA7MDmgN6A1hjNodHRwOi8vY3JsLmdsb2JhbHNpZ24uY29tL2dzZ2NjcjZhbHBoYXNzbGNhMjAyMy5jcmwwIwYDVR0RBBwwGoIMKi5jbXIuZWR1LmluggpjbXIuZWR1LmluMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAfBgNVHSMEGDAWgBS9BbfzipM8c8t5+g+FEqF3lhiRdDAdBgNVHQ4EFgQUsJieK6wA8yXOS1hqeYi3dGrYydMwggF/BgorBgEEAdZ5AgQCBIIBbwSCAWsBaQB2AK8YGijWjKPgqYpMnGerCfi7vCK6rryxOKOhndP5tgMNAAABkIHp0MMAAAQDAEcwRQIgGI2k1jZ4tscRXth5IeR2DObXS30c7PjDq+aduScNuG0CIQDLDXc1UKvvpUKBub9IuyA5H6vRBn/kt8QIaOCamjk01AB2ABLxTjS9U3JMhAYZw48/ehP457Vih4icbTAFhOvlhiY6AAABkIHp0K8AAAQDAEcwRQIhALxxW0+NUmMIt5Xe6mpirldF2wCYK/ig6/Rv+2tz81e4AiAjT22vzHOACKSw8W3n8n2Xp7zlSer0RvZw2KlZ7WOgzwB3AA3h8jAr0w3BQGISCepVLvxHdHyx1+kw7w5CHrR+Tqo0AAABkIHp0NQAAAQDAEgwRgIhANRmVbp7Q7iHcpxYwL/SVrxfWbqoccK29qIeCADPXHTPAiEAwPCFU1gaIyVlzbwQDxk58Q+e7bkLG7Law+fH7BHCucEwDQYJKoZIhvcNAQELBQADggEBAH1LLnavtKDEOc4tBee2861RJRGnPXpyGCI7GC1DMNzHGhCxug1NM1VHxl5tyvFBwvdQlBsMwQzqmhui6cQT87BuolAjCqYNFl2g6gobQbq6A1SRGwB9SlvZIIFo2d7fm/lfcj/OCyTzO70pMwXbahoCjTSf7KHD3B0G4V+av1z4d69CYG/dfHm9J/DGVCUWRQ1O0mr3qODpNTInN9KeLCV4toYTY5vGyuXbM8/nHeoBQDh2bJE4O3yhuVWQCOiep16gNEw6zYibakVyAIfJWmO81Xq47AnHvCm66DjGKU8QKHKTOAYj8jcU4UGkgcqWs7fXYss9CBHMi8sFTdu4MUbAMAADAAAAAAABAQAABQAAAARQMjU2AAAAEFJTQS1QS0NTMS1TSEE1MTIAA2YKMiaRXE/7uyCJhaYy3wW9w5eaVCJM1YWJaWtuluqDAAAAAAAABlwwggZYMIIFQKADAgECAgx0+bBfck+fVNQcGz0wDQYJKoZIhvcNAQELBQAwVTELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKzApBgNVBAMTIkdsb2JhbFNpZ24gR0NDIFI2IEFscGhhU1NMIENBIDIwMjMwHhcNMjQwNzA1MDgwMTQwWhcNMjUwODA2MDgwMTM5WjAXMRUwEwYDVQQDDAwqLmNtci5lZHUuaW4wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDZsLx1dC/7vmGKZqydjgq81K+s7ZrcKisL8QBJS1k0YoV4pEcH3Fs4njidverSwlzCyIjFTFPFDX0fOmSlWUxe+l8GD/oklPEjNJFnyTgIqnXsjD2CmFKKthq64RDo1TN2ii7OQUchPJ/bT8rQ6oO7ZClF7Vn0vJtSnZI4FnAAszTXgfsNRrbHxhIpe1i76gEPDOopcY7OjAi+hGOpQXEmoYK6yEhCVQGQ7NH6R+YP9wZKKujbx5TsnFHA2LTFAcVuGaDT9Ux4NlAmMfZqDtU/R8rDqujWPlSlZo51ZdmNYHRuR+HT05MTSTyz6zk80GcJa3HZDyGBpcT9g+xrfsG5AgMBAAGjggNkMIIDYDAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADCBmQYIKwYBBQUHAQEEgYwwgYkwSQYIKwYBBQUHMAKGPWh0dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0L2dzZ2NjcjZhbHBoYXNzbGNhMjAyMy5jcnQwPAYIKwYBBQUHMAGGMGh0dHA6Ly9vY3NwLmdsb2JhbHNpZ24uY29tL2dzZ2NjcjZhbHBoYXNzbGNhMjAyMzBXBgNVHSAEUDBOMAgGBmeBDAECATBCBgorBgEEAaAyCgEDMDQwMgYIKwYBBQUHAgEWJmh0dHBzOi8vd3d3Lmdsb2JhbHNpZ24uY29tL3JlcG9zaXRvcnkvMEQGA1UdHwQ9MDswOaA3oDWGM2h0dHA6Ly9jcmwuZ2xvYmFsc2lnbi5jb20vZ3NnY2NyNmFscGhhc3NsY2EyMDIzLmNybDAjBgNVHREEHDAaggwqLmNtci5lZHUuaW6CCmNtci5lZHUuaW4wHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMB8GA1UdIwQYMBaAFL0Ft/OKkzxzy3n6D4USoXeWGJF0MB0GA1UdDgQWBBSwmJ4rrADzJc5LWGp5iLd0atjJ0zCCAX8GCisGAQQB1nkCBAIEggFvBIIBawFpAHYArxgaKNaMo+CpikycZ6sJ+Lu8IrquvLE4o6Gd0/m2Aw0AAAGQgenQwwAABAMARzBFAiAYjaTWNni2xxFe2Hkh5HYM5tdLfRzs+MOr5p25Jw24bQIhAMsNdzVQq++lQoG5v0i7IDkfq9EGf+S3xAho4JqaOTTUAHYAEvFONL1TckyEBhnDjz96E/jntWKHiJxtMAWE6+WGJjoAAAGQgenQrwAABAMARzBFAiEAvHFbT41SYwi3ld7qamKuV0XbAJgr+KDr9G/7a3PzV7gCICNPba/Mc4AIpLDxbefyfZenvOVJ6vRG9nDYqVntY6DPAHcADeHyMCvTDcFAYhIJ6lUu/Ed0fLHX6TDvDkIetH5OqjQAAAGQgenQ1AAABAMASDBGAiEA1GZVuntDuIdynFjAv9JWvF9Zuqhxwrb2oh4IAM9cdM8CIQDA8IVTWBojJWXNvBAPGTnxD57tuQsbstrD58fsEcK5wTANBgkqhkiG9w0BAQsFAAOCAQEAfUsudq+0oMQ5zi0F57bzrVElEac9enIYIjsYLUMw3McaELG6DU0zVUfGXm3K8UHC91CUGwzBDOqaG6LpxBPzsG6iUCMKpg0WXaDqChtBuroDVJEbAH1KW9kggWjZ3t+b+V9yP84LJPM7vSkzBdtqGgKNNJ/socPcHQbhX5q/XPh3r0Jgb918eb0n8MZUJRZFDU7Saveo4Ok1Mic30p4sJXi2hhNjm8bK5dszz+cd6gFAOHZskTg7fKG5VZAI6J6nXqA0TDrNiJtqRXIAh8laY7zVerjsCce8KbroOMYpTxAocpM4BiPyNxThQaSBypazt9diyz0IEcyLywVN27gxRmYKMiaRXE/7uyCJhaYy3wW9w5eaVCJM1YWJaWtuluqDAAAAAAAABZAwggWMMIIDdKADAgECAhB/HyyQLoPQ47b7O+5Hi16AMA0GCSqGSIb3DQEBCwUAMEwxIDAeBgNVBAsTF0dsb2JhbFNpZ24gUm9vdCBDQSAtIFI2MRMwEQYDVQQKEwpHbG9iYWxTaWduMRMwEQYDVQQDEwpHbG9iYWxTaWduMB4XDTIzMDcxOTAzNDMyNVoXDTI2MDcxOTAwMDAwMFowVTELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKzApBgNVBAMTIkdsb2JhbFNpZ24gR0NDIFI2IEFscGhhU1NMIENBIDIwMjMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDTQm+TkAOmk7SuAOePUzXhchvTfYBqzjT0kkUBvxxSOKkU62HvJIt1pYt7ezrehKznHd5bDNOlfgEWTNlvFPV6glId9PYzTBnlA49wIiOyv5gHxMC9XbIlLKr56ZGs38W2AJJNpZdInmOKlbxIn9UC5c8zO4A/bJim49yONDkbKuywNeC74WG1jGrIU/sFK/H2NCGHlBXnOEvJy5qfyf4nRTDT1ZFArokZDkfMNlCKeQ16X59lk1EbWAT1B6H60cGmWuRqUHWDzmomQ84ntKgS8qyYORqOCCT+xKrs0/LMVpr9UEZmJFEb4WTEIGeIYPnrXw9Di2tzAfIyiNIU5s4dAgMBAAGjggFfMIIBWzAOBgNVHQ8BAf8EBAMCAYYwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFL0Ft/OKkzxzy3n6D4USoXeWGJF0MB8GA1UdIwQYMBaAFK5sBaOTE+Ki5+LXHNbH8H/IZ1OgMHsGCCsGAQUFBwEBBG8wbTAuBggrBgEFBQcwAYYiaHR0cDovL29jc3AyLmdsb2JhbHNpZ24uY29tL3Jvb3RyNjA7BggrBgEFBQcwAoYvaHR0cDovL3NlY3VyZS5nbG9iYWxzaWduLmNvbS9jYWNlcnQvcm9vdC1yNi5jcnQwNgYDVR0fBC8wLTAroCmgJ4YlaHR0cDovL2NybC5nbG9iYWxzaWduLmNvbS9yb290LXI2LmNybDAhBgNVHSAEGjAYMAgGBmeBDAECATAMBgorBgEEAaAyCgEDMA0GCSqGSIb3DQEBCwUAA4ICAQB8ySQyjmDiafV+3h3jFHaQfNikO6SELVdg/B9Jk3cD2cQFp2N0pkwfuK5LW8Xy5JyDbr/fQNE96fZ8VGyvrrYQLJQJHg596KIY12hC9x6wz1el7DcctA/ioeD6zvviE0u8ZEPhopIrAWosytyoLDq0QB9f320VawPiPNsLqTy2NIvMSXR9NSV+Qlpam8tWSmD163y0Px3nVvKYKDknonrBxemaxIaeSwGhtpzX6deaAHuNAL151TxnjUUWjzsFXeQK2tZax2RBq85syxdQ+X8A7zL+M64BbPTDK8+cqib6jpbi8oNjr/pc/Kk115s4nqaPJogunSq6hC+GPHzsHMQ2HmznsAg7IgalLSwMQKFUM/MsR9GwfYUnz9bnCgXSe+wFOp9hIKpuVBsd4MO0KPsyV/wl+poy6pxsTisxLJ94fIJ1lDCdz+v26Oe2Hr3UAmHHJh4IzTiZ60kh7twHp3h0Wb493l6u9jjHfavS5DVDSynLVWM2pQmO6yxi5c3IyYUdK4tBDo+t4+YfmVxIxClgrM+gP9GI1UP88rQ7e+47m+HejugpvUV/OhqcOwUVOvDRos51Fb+2Ys9ZU1WUBvxp34HzRgmwvgddidAbzBgAVvwuHBIPJP2/4LULWVwgcTucTQACn0lIfENiyZr2mLiDQ+GDcGA6bZ65NHPDtHRLNWYKMiaRXE/7uyCJhaYy3wW9w5eaVCJM1YWJaWtuluqDAAAAAAAABYcwggWDMIIDa6ADAgECAg5F5rsDgzPDhWVI5v9FUTANBgkqhkiG9w0BAQwFADBMMSAwHgYDVQQLExdHbG9iYWxTaWduIFJvb3QgQ0EgLSBSNjETMBEGA1UEChMKR2xvYmFsU2lnbjETMBEGA1UEAxMKR2xvYmFsU2lnbjAeFw0xNDEyMTAwMDAwMDBaFw0zNDEyMTAwMDAwMDBaMEwxIDAeBgNVBAsTF0dsb2JhbFNpZ24gUm9vdCBDQSAtIFI2MRMwEQYDVQQKEwpHbG9iYWxTaWduMRMwEQYDVQQDEwpHbG9iYWxTaWduMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAlQfoc8pm+ewUyns89w0I8bRFCyyCtEjG61s8roO4QZIzFKRvf+kqzMawiGvFtonRxrL/FM5RFCHsSt0bWsbWh+5NOhUG7WRmC5KAykTec5RO86eJf094YwjIElBtQmYvTbl5KE1SGooagLcZgQ5+xIq8ZEwhHENo1z08isWyZtWQmrcxBsW+4m0yBqYe+bnrqqO4v76CY1DQ8BiJ3+QPefXqoh8q0nAue+e8k7ttU+JIfIwQBzj/ZrJ3YX7g6ow8qrSk9vOVShIHbf2MsonP0KBhd8hYdLDUIzr3XTrKotudCd5dRC2Q8YHNV5L6frxQBGM032uTGL5rNrI55KwkNrfw77YcE1eTtt6y+OKFt3OiuDWqRfLgnTahb1SK8XJWbi6IxVFCRBWU7qPFOJabTk5aC0fzBjZJdzC8cTflpuwhCHX85mEWP3fV2ZGXhAps1AJNdMAU7f05+4PyXhShBLAL6f7uj+FuC7IIs2FmCWqxBjplllnA8DX9ydoojRoRh3CBCqiadR2eOoYFAJ7bgNYl+dwFnidZTHY5W+r5paHYgw/R/98wEfmFzzNI9cptZBQselhP00sIScWVZBpjDnk99bOMylitnEJFeW4OhxlcVLFltr+Mm9wT6Q1vuC7cZ27JixG1hBSKABlwg3mRl5HUGie/Nx4yB9gUYzwoTK8CAwEAAaNjMGEwDgYDVR0PAQH/BAQDAgEGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFK5sBaOTE+Ki5+LXHNbH8H/IZ1OgMB8GA1UdIwQYMBaAFK5sBaOTE+Ki5+LXHNbH8H/IZ1OgMA0GCSqGSIb3DQEBDAUAA4ICAQCDJe3o0f2VUs2ewASgkWnmXNCE3tytok/oR3jWZZipW6g8h3wCitFutxZz5l/AVJjVdL7BzeIRka0jGD3d4XJElrSVXsB7jpl4FkMTVlezorM7tXfcQHKso+ubNT6xCCGh58RDN3kyvrXnnCxMvEMpmY4w06wh4OMd+tgHM3ZUACIquU0gLnBo2uVT/INc053y/0QMRGby0uO9RgAabQK6JV2NoTFR3VRGHE3bmZbvGhwEXKYV73jgef5d2z6qTFX9mhWpb+Gm+99wMOnD7kJG7cKTBYn6fWN7P9BxgXwA6JiuDng0wyX7rwqfIGvdOxOPEoziQRpIenOgd2nHtlx/gsge/lgbKCuobK1ebcAF0nu364D+JTf+AptorEJdw+71zNzwUHXSNmmc5nsE324GabbeCglIWYfrexRgemSqaUPvkcdM7BjdbO9TLYyZ4V7ycj7PVMi9Z+ykD0xF/9O5MCMHTI8Qv4aW2ZlatJlXHKTMuxWJU7osBQ/kxJ4ZsRg01Uyduu33H68klQR4qAO77oHl2l98i0qhkHQlp7M+S8gsVr3HyO844lyS8Hn3nIS6dC1hASB+ftHyTwdZX4stQ1LrRgyU4fVmR3l31VRbH60kN8tFWk6gREjI2LCZxRWECfbWSUnAZbjmGnFuoKjxguhFPmzWAtcKZ4MFWsmkEAAAAAEAAAAAAAEAAAAAS3Rsc2ZsYWdzMHgwMDAwMDAwMDplcnAuY21yLmVkdS5pbjo0NDNecGFydGl0aW9uS2V5PSUyOGh0dHBzJTJDY21yLmVkdS5pbiUyOQAA request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:05:56 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|408afa04-7e1e-c6f7-001f-25a966cab611|
+Content-Type: text/html;charset=ISO-8859-1
+Content-Language: en-US
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:05:56 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|408afa04-7e1e-c6f7-001f-25a966cab611|
+Content-Type: text/html;charset=ISO-8859-1
+Content-Language: en-US
+Set-Cookie: JSESSIONID=E886E51A50A19103ED36A1AF8C545410; Path=/; HttpOnly
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=100
+Connection: Keep-Alive
+Transfer-Encoding: chunked
+ ctid 1 uncompressed-len 0 net-response-time-onstart 165 net-response-time-onstop 254  ²+

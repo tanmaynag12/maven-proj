@@ -1,0 +1,734 @@
+
+/*
+<script type="text/javascript" src="/js/juno-tags/juno-mobile-input.js"></script>
+
+<juno-mobile-input id="mobileNo" type="tel"></juno-mobile-input>
+*/
+(function(){
+
+if(customElements.get('juno-mobile-input')!=undefined){
+	//To solve error of re-declearation of tag 
+	return false;
+}
+
+var intlInputScript_script_src = '/frameworks/intl-tel-input-master/js/intlTelInput.js';
+var intlInputScript_css_href = '/frameworks/intl-tel-input-master/css/intlTelInput.css';
+
+function mobileNumberPluginValid(main_context){
+	
+	const shadow = main_context.shadowRoot;
+  	const input = shadow.querySelector('input');
+	const validMsg = shadow.querySelector('.jim-valid');
+	const errorMsg = shadow.querySelector('.jim-invalid');
+	/*var input = document.querySelector("#phone"),
+  		errorMsg = document.querySelector("#error-msg"),
+  		validMsg = document.querySelector("#valid-msg");*/
+	
+	// here, the index maps to the error code returned from getValidationError - see readme
+	var errorMap = ["Invalid number", "Invalid country code", "Too short", "Too long", "Invalid number"];
+	
+	// initialise plugin
+	main_context.itiObj = window.intlTelInput(input, {
+	  	preferredCountries: ['in', 'ae'],
+		autoPlaceholder: "off",
+		separateDialCode: true,
+		utilsScript: "/frameworks/intl-tel-input-master/js/utils.js"
+
+	});
+	
+	var reset = function() {
+	  input.classList.remove("error");
+	  errorMsg.innerHTML = "";
+	  errorMsg.classList.add("hide");
+	  validMsg.classList.add("hide");
+	};
+	
+	// on blur: validate
+	var onBlurEvent = function() {
+	  reset();
+	  if (input.value.trim()) {
+		var regex = /^[-()+,0-9 ]+$/;
+		//console.log(input.value);
+	    if (regex.test(input.value) && main_context.itiObj.isValidNumber()) {
+	      validMsg.classList.remove("hide");
+		  main_context.setAttribute('is-valid', true);
+	    } else {
+	      main_context.setAttribute('is-valid', false);
+		  input.classList.add("error");
+	      var errorCode = main_context.itiObj.getValidationError();
+	      errorMsg.innerHTML = errorMap[errorCode]==undefined?'Invalid number':errorMap[errorCode];
+	      errorMsg.classList.remove("hide");
+	    }
+	  }
+	};
+	input.addEventListener('blur', onBlurEvent);
+	
+	var setAttributeDialCode = function(){
+		console.log(window.intlTelInputGlobals.getInstance(input));
+		var countryData = window.intlTelInputGlobals.getInstance(input).getSelectedCountryData()
+		main_context.setAttribute('dial-code', countryData.dialCode);
+		main_context.SelectedCountryData = countryData;
+	};
+	input.addEventListener("countrychange", setAttributeDialCode);
+	
+	setAttributeDialCode();
+	main_context.setAttribute('is-valid', false);
+	
+	
+	if(main_context.getAttribute('value')!=undefined){
+		main_context.value = main_context.getAttribute('value');	
+		setTimeout(()=>{
+			reset();
+			onBlurEvent();
+		}, 1500);
+		
+	}
+	
+	// on keyup / change flag: reset
+	input.addEventListener('change', reset);
+	input.addEventListener('keyup', reset);
+
+	
+}
+
+	
+
+class Juno_Input_Mobile_Number extends HTMLElement {
+	static init_counter = 0;  
+	
+	// Specify observed attributes so that
+	// attributeChangedCallback will work
+	/*static get observedAttributes() {
+	   return ['dial-code'];
+	}*/
+	
+	
+	constructor() {
+	    // Always call super first in constructor
+	    super();
+		
+		
+	    // Element functionality written in here
+	    var element = this;
+	    var initCounter = Juno_Input_Mobile_Number.init_counter++;
+
+		// Create a shadow root
+		this.attachShadow({mode: 'open'}); // sets and returns 'this.shadowRoot'
+		
+		// Create (nested) span elements
+		const wrapper = document.createElement('div');
+		
+		const inputMMobileNum = wrapper.appendChild(document.createElement('input'));
+		inputMMobileNum.setAttribute('type', 'tel');
+		inputMMobileNum.setAttribute('id', 'juno-mobile-input-'+initCounter);
+		
+		
+		const ele_spanValid = wrapper.appendChild(document.createElement('span'));
+		ele_spanValid.classList.add('jim-valid');
+		ele_spanValid.classList.add('hide');
+		ele_spanValid.innerHTML = '<span style="font-size: 15px;">&#10003;</span> Valid';
+		
+		const ele_spanInValid = wrapper.appendChild(document.createElement('span'));
+		ele_spanInValid.classList.add('jim-invalid');
+		ele_spanInValid.classList.add('hide');
+		
+	    console.log('Juno_Input_Mobile_Number',Juno_Input_Mobile_Number.init_counter, element);
+	    
+
+		if(window.intlTelInput==undefined && initCounter==0){
+			
+			const script_intlTelInput = document.createElement('script');
+			script_intlTelInput.setAttribute('type', 'text/javascript');
+			script_intlTelInput.setAttribute('src', intlInputScript_script_src);
+			
+			window.document.body.append(script_intlTelInput)
+		}
+		
+		const linkElem = document.createElement('link');
+		linkElem.setAttribute('rel', 'stylesheet');
+		linkElem.setAttribute('href', intlInputScript_css_href);
+		
+		const style = document.createElement('style');
+		style.textContent = `
+		.jim-valid, .jim-invalid {
+			margin-left: 5px;
+		}
+		.jim-valid {
+			color: #0fb6a4;
+		}
+		.hide {
+			display: none;
+		}
+		.error {
+			color: red;
+		}
+		input {
+			font-size : 13px;
+		}
+		`;
+	    this.shadowRoot.append(style, linkElem, wrapper);
+	  }
+
+		get value(){
+			var mobileNo = '';
+			if(this.getAttribute('is-valid')=="true"){
+				mobileNo = this.shadowRoot.querySelector('input').value;
+				mobileNo = mobileNo.replace(/[-(), ]/g,'');
+				var dialCode = '+'+this.SelectedCountryData.dialCode;
+				if(mobileNo.includes(dialCode)){
+					//mobileNo = mobileNo.replace(dialCode,'');
+				}else{
+					mobileNo = dialCode+mobileNo;
+				}
+			}
+			return mobileNo;
+		}
+		
+		set value(data){
+			const input = this.shadowRoot.querySelector('input'); 
+			setTimeout(()=>{
+				try{
+				if(data!=undefned && data.length==10 && !data.includes('+91')){
+					data='+91'+data;
+				}
+				}catch(e){}
+				input.value =  data;
+				
+				input.dispatchEvent(new MouseEvent('keyup'));
+				input.dispatchEvent(new MouseEvent('blur'));
+				setTimeout(()=>{
+					input.dispatchEvent(new MouseEvent('blur'));
+				},2000);
+			
+			}, 500);
+		}
+	
+	   connectedCallback() {
+		    //console.log('Custom square element added to page.');
+		    //updateStyle(this);
+			//mobileNumberPluginValid(this);
+			const main_context = this;
+			if(window.intlTelInput!=undefined){
+				mobileNumberPluginValid(main_context);
+			}else{
+				
+				var interval_tmp = setInterval(()=>{
+					if(window.intlTelInput!=undefined){
+						mobileNumberPluginValid(main_context);
+						clearInterval(interval_tmp);
+					}
+				}, 1500);
+			}
+			
+		}
+		
+		/*  disconnectedCallback() {
+		    console.log('Custom square element removed from page.');
+		  }
+		
+		  adoptedCallback() {
+		    console.log('Custom square element moved to new page.');
+		  }
+		
+		  */
+
+		/*attributeChangedCallback(name, oldValue, newValue) {
+		    //console.log('Custom square element attributes changed.');
+		    if(name=='dial-code'){
+				
+			}
+		}*/
+}
+
+	customElements.define('juno-mobile-input', Juno_Input_Mobile_Number);
+
+})();
+
+
+
+
+/*
+<script src="frameworks/intl-tel-input-master/js/intlTelInput.js"></script>
+<script src="frameworks/intl-tel-input-master/css/intlTelInput.css"></script>
+<script type="text/javascript" src="js/cleave.js"></script>
+
+	
+	
+function mobileNumberPlugin(){
+	
+
+ var input = document.querySelector("#mobileNo");
+    var preferredCountries = ['in'];
+    //if($('#customerHelper').val()=='IMT_DUBAI_SERVER'){
+    //	preferredCountries = ['ae'];
+    //}else{
+	//	preferredCountries = ['in'];
+    //}
+    
+    var ini_CountryCode =  window.intlTelInput(input, {
+      // allowDropdown: false,
+      // autoHideDialCode: false,
+      // autoPlaceholder: "off",
+      // dropdownContainer: document.body,
+      // excludeCountries: ["us"],
+      formatOnDisplay: false,
+      // geoIpLookup: function(callback) {
+      //   $.get("http://ipinfo.io", function() {}, "jsonp").always(function(resp) {
+      //     var countryCode = (resp && resp.country) ? resp.country : "";
+      //     callback(countryCode);
+      //   });
+      // },
+       hiddenInput: "full_number",
+      // initialCountry: "auto",
+      // localizedCountries: { 'de': 'Deutschland' },
+      // nationalMode: false,
+      // onlyCountries: ['us', 'gb', 'ch', 'ca', 'do'],
+      // placeholderNumberType: "MOBILE",
+       preferredCountries: preferredCountries,
+      // separateDialCode: true,
+      utilsScript: "frameworks/intl-tel-input-master/js/utils.js",
+    });
+
+	input.addEventListener("countrychange", function() {
+	  	var countryData = window.intlTelInputGlobals.getInstance(document.querySelector("#mobileNo")).getSelectedCountryData()
+		
+		cleavePhone.setPhoneRegionCode(countryData.iso2);
+	});
+	
+	var cleave = new Cleave("#mobileNo", {
+	   	phone: true,
+	   	phoneRegionCode: 'IN'
+	});
+	
+
+}
+
+*/
+
+
+
+
+
+        ¯L  x¯L≥   20250331133932-8l€L  |óΩ9   https://erp.cmrit.ac.in/js/juno-tags/juno-mobile-input.js      Î!  
+/*
+<script type="text/javascript" src="/js/juno-tags/juno-mobile-input.js"></script>
+
+<juno-mobile-input id="mobileNo" type="tel"></juno-mobile-input>
+*/
+(function(){
+
+if(customElements.get('juno-mobile-input')!=undefined){
+	//To solve error of re-declearation of tag 
+	return false;
+}
+
+var intlInputScript_script_src = '/frameworks/intl-tel-input-master/js/intlTelInput.js';
+var intlInputScript_css_href = '/frameworks/intl-tel-input-master/css/intlTelInput.css';
+
+function mobileNumberPluginValid(main_context){
+	
+	const shadow = main_context.shadowRoot;
+  	const input = shadow.querySelector('input');
+	const validMsg = shadow.querySelector('.jim-valid');
+	const errorMsg = shadow.querySelector('.jim-invalid');
+	/*var input = document.querySelector("#phone"),
+  		errorMsg = document.querySelector("#error-msg"),
+  		validMsg = document.querySelector("#valid-msg");*/
+	
+	// here, the index maps to the error code returned from getValidationError - see readme
+	var errorMap = ["Invalid number", "Invalid country code", "Too short", "Too long", "Invalid number"];
+	
+	// initialise plugin
+	main_context.itiObj = window.intlTelInput(input, {
+	  	preferredCountries: ['in', 'ae'],
+		autoPlaceholder: "off",
+		separateDialCode: true,
+		utilsScript: "/frameworks/intl-tel-input-master/js/utils.js"
+
+	});
+	
+	var reset = function() {
+	  input.classList.remove("error");
+	  errorMsg.innerHTML = "";
+	  errorMsg.classList.add("hide");
+	  validMsg.classList.add("hide");
+	};
+	
+	// on blur: validate
+	var onBlurEvent = function() {
+	  reset();
+	  if (input.value.trim()) {
+		var regex = /^[-()+,0-9 ]+$/;
+		//console.log(input.value);
+	    if (regex.test(input.value) && main_context.itiObj.isValidNumber()) {
+	      validMsg.classList.remove("hide");
+		  main_context.setAttribute('is-valid', true);
+	    } else {
+	      main_context.setAttribute('is-valid', false);
+		  input.classList.add("error");
+	      var errorCode = main_context.itiObj.getValidationError();
+	      errorMsg.innerHTML = errorMap[errorCode]==undefined?'Invalid number':errorMap[errorCode];
+	      errorMsg.classList.remove("hide");
+	    }
+	  }
+	};
+	input.addEventListener('blur', onBlurEvent);
+	
+	var setAttributeDialCode = function(){
+		console.log(window.intlTelInputGlobals.getInstance(input));
+		var countryData = window.intlTelInputGlobals.getInstance(input).getSelectedCountryData()
+		main_context.setAttribute('dial-code', countryData.dialCode);
+		main_context.SelectedCountryData = countryData;
+	};
+	input.addEventListener("countrychange", setAttributeDialCode);
+	
+	setAttributeDialCode();
+	main_context.setAttribute('is-valid', false);
+	
+	
+	if(main_context.getAttribute('value')!=undefined){
+		main_context.value = main_context.getAttribute('value');	
+		setTimeout(()=>{
+			reset();
+			onBlurEvent();
+		}, 1500);
+		
+	}
+	
+	// on keyup / change flag: reset
+	input.addEventListener('change', reset);
+	input.addEventListener('keyup', reset);
+
+	
+}
+
+	
+
+class Juno_Input_Mobile_Number extends HTMLElement {
+	static init_counter = 0;  
+	
+	// Specify observed attributes so that
+	// attributeChangedCallback will work
+	/*static get observedAttributes() {
+	   return ['dial-code'];
+	}*/
+	
+	
+	constructor() {
+	    // Always call super first in constructor
+	    super();
+		
+		
+	    // Element functionality written in here
+	    var element = this;
+	    var initCounter = Juno_Input_Mobile_Number.init_counter++;
+
+		// Create a shadow root
+		this.attachShadow({mode: 'open'}); // sets and returns 'this.shadowRoot'
+		
+		// Create (nested) span elements
+		const wrapper = document.createElement('div');
+		
+		const inputMMobileNum = wrapper.appendChild(document.createElement('input'));
+		inputMMobileNum.setAttribute('type', 'tel');
+		inputMMobileNum.setAttribute('id', 'juno-mobile-input-'+initCounter);
+		
+		
+		const ele_spanValid = wrapper.appendChild(document.createElement('span'));
+		ele_spanValid.classList.add('jim-valid');
+		ele_spanValid.classList.add('hide');
+		ele_spanValid.innerHTML = '<span style="font-size: 15px;">&#10003;</span> Valid';
+		
+		const ele_spanInValid = wrapper.appendChild(document.createElement('span'));
+		ele_spanInValid.classList.add('jim-invalid');
+		ele_spanInValid.classList.add('hide');
+		
+	    console.log('Juno_Input_Mobile_Number',Juno_Input_Mobile_Number.init_counter, element);
+	    
+
+		if(window.intlTelInput==undefined && initCounter==0){
+			
+			const script_intlTelInput = document.createElement('script');
+			script_intlTelInput.setAttribute('type', 'text/javascript');
+			script_intlTelInput.setAttribute('src', intlInputScript_script_src);
+			
+			window.document.body.append(script_intlTelInput)
+		}
+		
+		const linkElem = document.createElement('link');
+		linkElem.setAttribute('rel', 'stylesheet');
+		linkElem.setAttribute('href', intlInputScript_css_href);
+		
+		const style = document.createElement('style');
+		style.textContent = `
+		.jim-valid, .jim-invalid {
+			margin-left: 5px;
+		}
+		.jim-valid {
+			color: #0fb6a4;
+		}
+		.hide {
+			display: none;
+		}
+		.error {
+			color: red;
+		}
+		input {
+			font-size : 13px;
+		}
+		`;
+	    this.shadowRoot.append(style, linkElem, wrapper);
+	  }
+
+		get value(){
+			var mobileNo = '';
+			if(this.getAttribute('is-valid')=="true"){
+				mobileNo = this.shadowRoot.querySelector('input').value;
+				mobileNo = mobileNo.replace(/[-(), ]/g,'');
+				var dialCode = '+'+this.SelectedCountryData.dialCode;
+				if(mobileNo.includes(dialCode)){
+					//mobileNo = mobileNo.replace(dialCode,'');
+				}else{
+					mobileNo = dialCode+mobileNo;
+				}
+			}
+			return mobileNo;
+		}
+		
+		set value(data){
+			const input = this.shadowRoot.querySelector('input'); 
+			setTimeout(()=>{
+				try{
+				if(data!=undefned && data.length==10 && !data.includes('+91')){
+					data='+91'+data;
+				}
+				}catch(e){}
+				input.value =  data;
+				
+				input.dispatchEvent(new MouseEvent('keyup'));
+				input.dispatchEvent(new MouseEvent('blur'));
+				setTimeout(()=>{
+					input.dispatchEvent(new MouseEvent('blur'));
+				},2000);
+			
+			}, 500);
+		}
+	
+	   connectedCallback() {
+		    //console.log('Custom square element added to page.');
+		    //updateStyle(this);
+			//mobileNumberPluginValid(this);
+			const main_context = this;
+			if(window.intlTelInput!=undefined){
+				mobileNumberPluginValid(main_context);
+			}else{
+				
+				var interval_tmp = setInterval(()=>{
+					if(window.intlTelInput!=undefined){
+						mobileNumberPluginValid(main_context);
+						clearInterval(interval_tmp);
+					}
+				}, 1500);
+			}
+			
+		}
+		
+		/*  disconnectedCallback() {
+		    console.log('Custom square element removed from page.');
+		  }
+		
+		  adoptedCallback() {
+		    console.log('Custom square element moved to new page.');
+		  }
+		
+		  */
+
+		/*attributeChangedCallback(name, oldValue, newValue) {
+		    //console.log('Custom square element attributes changed.');
+		    if(name=='dial-code'){
+				
+			}
+		}*/
+}
+
+	customElements.define('juno-mobile-input', Juno_Input_Mobile_Number);
+
+})();
+
+
+
+
+/*
+<script src="frameworks/intl-tel-input-master/js/intlTelInput.js"></script>
+<script src="frameworks/intl-tel-input-master/css/intlTelInput.css"></script>
+<script type="text/javascript" src="js/cleave.js"></script>
+
+	
+	
+function mobileNumberPlugin(){
+	
+
+ var input = document.querySelector("#mobileNo");
+    var preferredCountries = ['in'];
+    //if($('#customerHelper').val()=='IMT_DUBAI_SERVER'){
+    //	preferredCountries = ['ae'];
+    //}else{
+	//	preferredCountries = ['in'];
+    //}
+    
+    var ini_CountryCode =  window.intlTelInput(input, {
+      // allowDropdown: false,
+      // autoHideDialCode: false,
+      // autoPlaceholder: "off",
+      // dropdownContainer: document.body,
+      // excludeCountries: ["us"],
+      formatOnDisplay: false,
+      // geoIpLookup: function(callback) {
+      //   $.get("http://ipinfo.io", function() {}, "jsonp").always(function(resp) {
+      //     var countryCode = (resp && resp.country) ? resp.country : "";
+      //     callback(countryCode);
+      //   });
+      // },
+       hiddenInput: "full_number",
+      // initialCountry: "auto",
+      // localizedCountries: { 'de': 'Deutschland' },
+      // nationalMode: false,
+      // onlyCountries: ['us', 'gb', 'ch', 'ca', 'do'],
+      // placeholderNumberType: "MOBILE",
+       preferredCountries: preferredCountries,
+      // separateDialCode: true,
+      utilsScript: "frameworks/intl-tel-input-master/js/utils.js",
+    });
+
+	input.addEventListener("countrychange", function() {
+	  	var countryData = window.intlTelInputGlobals.getInstance(document.querySelector("#mobileNo")).getSelectedCountryData()
+		
+		cleavePhone.setPhoneRegionCode(countryData.iso2);
+	});
+	
+	var cleave = new Cleave("#mobileNo", {
+	   	phone: true,
+	   	phoneRegionCode: 'IN'
+	});
+	
+
+}
+
+*/
+
+
+
+
+
+”ò¿Ÿr   o        p≤}      customElements     €9Âõ      juno-mobile-input      “íÇ       intlInputScript_script_src     b˚ï4      /frameworks/intl-tel-input-master/js/intlTelInput.js   *Ñ'      intlInputScript_css_href   &≈\|6      /frameworks/intl-tel-input-master/css/intlTelInput.css     ˘éÖ      mobileNumberPluginValid    –>U      main_context   gK4£      shadow	     á6w
+      shadowRoot
+     ÿ1:Ú      querySelector      √oΩI      validMsg   ˙´>
+      .jim-valid     ú%Nç      errorMsg   ñl:…      .jim-invalid   ˜h)˝      errorMap   1◊›Ï      Invalid number     äÑw      Invalid country code   Œbs	      Too short      È¬∂      Too long   îû3·      itiObj     ¯2áâ      window     Àº:∞      intlTelInput   .If      preferredCountries     ∫~õ      autoPlaceholder    ˙¯Öﬂ      off    Ã R      separateDialCode   ß)ªT      utilsScript    t˛-      /frameworks/intl-tel-input-master/js/utils.js      ÛWÄπ      reset       Ÿ∂z	      classList      *N∑∆      remove      ˛tuW      error!      Q√:	      innerHTML"      üvÙ}      hide#   ¿d›      onBlurEvent$    óñôb      trim%   ≤cT      regex&      ık‘      ^[-()+,0-9 ]+$'     ﬁî 8      isValidNumber(      ó{⁄D      setAttribute)   +`sb      is-valid*   •wKë	      errorCode+      ﬂr
+∞      getValidationError,      rO      addEventListener-   ƒ∫·%      blur.   CÎ˙ã      setAttributeDialCode/   ˛Q1      console0    =X˚      log1    £—      intlTelInputGlobals2    	%ˆ:      getInstance3    DÑ      countryData4    éƒZ      getSelectedCountryData5     5©úß	      dial-code6      Ÿwa      dialCode7   ÿ¯Q*      SelectedCountryData8    ∂≈Òó      countrychange9      4>ÙE      getAttribute:   3AtŸ
+      setTimeout;     Á˛¡      change<     KH`      keyup=      	J§Í      Juno_Input_Mobile_Number>   ˜*ıq      HTMLElement?    {6;      init_counter@   5´Yî      initCounterA    Ïàcâ      attachShadowB   óx5      openC   YC˘∏      wrapperD    ∏OÄ      documentE   DC      createElementF      ú≥ÊŸ      divG    ‚-€      inputMMobileNumH    ≠$~      appendChildI    IPJM      telJ    ÓTÂ      juno-mobile-input-K     ‹j	√      ele_spanValidL      ±4PB      spanM   IŒA	      jim-validN      ª‹˘D4      <span style="font-size: 15px;">&#10003;</span> ValidO   7Î≥      ele_spanInValidP    ^Å°M      jim-invalidQ    €l|      script_intlTelInputR    5bH¡      text/javascriptS    ú∑»õ      srcT    òh;      bodyU   ‹B-      appendV     ÷Ä†K      linkElemW   ¸IÎ’      linkX   ¨Êí‹      relY    ÏÆIl
+      stylesheetZ     ª©`X      href[   b»≈e      textContent\    Ô÷Ü¶¿      
+		.jim-valid, .jim-invalid {
+			margin-left: 5px;
+		}
+		.jim-valid {
+			color: #0fb6a4;
+		}
+		.hide {
+			display: none;
+		}
+		.error {
+			color: red;
+		}
+		input {
+			font-size : 13px;
+		}
+		]   •Äb	      get value^      KBá      mobileNo_   ∫Æü÷      [-(), ]`    BΩ[Ω	      set valuea      6ó(Å      datab   ÇÇåt      undefnedc   m ﬁ      +91d    aﬁÔ'      dispatchEvente      §·=Ñ
+      MouseEventf     ıñ      connectedCallbackg      '_¨»      interval_tmph   Ïà       setIntervali    bPk      clearIntervalj      ˝Ìu      definen     _fd¿      mobileNumberPluginValid/<o      —…e      set value/<p    5=Ów      set value/</<q      ëç¥y      connectedCallback/interval_tmp<      ¿ Ô%,â                                                                                                                                                                       	                
+                                    
+             
+                 
+           	      
+          
+                                                                        
+                                                ≥Oåc                             P  P  P         =                P  P  P#  P.               `  P  P                              %  *                3                            =  P         ä                 ç   @  ã   á      
+       C  G  K  O  V  
+            Q                ã                 ^  6  ã               a  Pã              `                         e                                g  Pã               P                Ø¬0∞&      _     IÙ$KEÆ˙ö                          o  á&’™ç!´!   @      N¿_«@                             m    w  ﬂ•@`FÄ  ÙP4Ä 7PÄÄÄ∞  +3}p                         ∞±   ﬂm   Œ   ﬂª   ·J   ‰   s  ö   ó   §“•ó      Œ   ﬂ   Œ   ﬂ–   ª	   p·ö   ó	   ·J   ô   ó
+   ﬂr
+ó   ;‰q   ‰‚>   =   h   m   i    ±  ﬂm   C   m   G   m   =   ﬂ≥   æ  K„  w  ﬂ Õ  ﬂ“—±   ﬂª   ·J   ‰   æ   w ﬂ“• ë@`ë PL`1Ä  ÓH"`+ `;Ye”@Ä  •JÄ  ¥JÄ  «´@Ä  Ï`ë +ˇˇˇ‰PPÄÄ∞           ˇˇˇˇ    4             U   ç       
+   Z   á      ‹  èÃ    	      	       *      Ω  Œ   ﬂ–   ∞±  ﬂ¡  J   ±  ﬂæ  ·J   ‰   s ≥   ﬂæ  ·J   ‰   s ≥   ﬂæ  ·J   ‰   s ≥   ﬂh      i       i   	   i   
+   i      i   Œ  ﬂ¡  ª   ·J   ‰¡   9   h      i       i   <      <   <      <   s L   ﬂm   Œ  ﬂm   Œ  ﬂ¡   ·J   ‰   ¡  w ﬂm   Õ   ﬂ¡   ·J   ‰   æ   w ﬂæ    w  ﬂ¡  ·J   ‰   w ﬂ¡  ·J   ‰    s  ö;   ó    ¡  ¡  ·J   ‰    s L    ﬂª!    m"   ‹w ﬂó&   ¡   ·J   ‰#   ¡  w ﬂ¡   ·J   ‰$   ¡  w ﬂ—•	K`/`ê P)`ê P)`ê PI`Ω@`ë *%û *&JPI`K`K/`ë ˇˇˇÁPD1`J7`ë (ˇˇˇﬁPD9`)`í PD=`ë P,`ñ "P)`5BC?PIG`ë !ˇˇˇÂP$`ë  ˇˇˇÊP5KPÄÄÄ‹        ˆ  ˇˇˇˇ¨   I‹`¶¨   n                  
+        ¡   µ   J   ·J   ‰   w ﬂ¡   µ      L   ﬂ¡   J   ·J   ‰   w ﬂ¡   µ   J   ·J   ‰   w ﬂ• `õ P$`ï `ñ P$`õ P$PÄ‡  ∑Ÿ©.‡  i                "        ¡   w  ﬂ¡   µ   J   ·J   ‰s  ö@  ó   l   Õ   ﬂæ   ·J   ‰¡   J   s ú   ó	   ﬂ¡  J   ·J   ‰s  ó   öD   ó   ¡   µ   J   ·J   ‰	   w ﬂ¡  ·J
+   ‰   w ﬂô±   ó   ¡  ·J
+   ‰   w ﬂ¡   J   ·J   ‰   w ﬂ¡  J   ·J   ‰s  Õ  ﬂ¡   µ   ¡  æ  K ö   ó      ô   ó   ¡  æ  Kó   L   ﬂ¡   J   ·J   ‰	   w ﬂó"   • `*`ñ P-`J
+`
+ˇˇˇ˚Pü )Pí `õ P$`í P `í P$`ñ P$`ë P(`î *∞ `ñ PIPÄÄ‹   Áè‡Ú‹   Ñ                         ª   ·J   ‰ª   J   ·J   ‰¡   µ   s w ﬂª   J   ·J   ‰¡   s ·J   ‰s  Õ   ﬂ¡  ·J   ‰   æ   J	   w ﬂ¡  æ   L
+   ﬂ• `ë '
+ˇˇˇÙPˇˇˇ·P$`ë 'ˇˇˇÙP
+P(`ë '	ˇˇˇÊP$`/PÄÄ@   Òv⁄G@                             ¡   w  ﬂ¡   w  ﬂ• `*`*PÄ8   Pyñò8                          ﬁÕ   ﬂæ   <   ﬂ•fPÄl  á„ö:L                 Q       ﬁÕ  ﬂ5Õ  ﬂ∞±  ±  ±  ±  ±  ±	  ﬂ∆ÜÄæ  É  æ  áﬂ±  ﬂæ  ∂Õ   ﬂ¡   µ   ·J   0·Ê(M   ﬂÕ  ﬂæ  ∂·J   ‰9      <   w ﬂª   ·J   ‰	   s ±  ﬂæ  ·J
+   ‰ª   ·J   ‰   s s ±  ﬂæ  ·J   ‰      w ﬂæ  ·J   ‰      æ  &w ﬂæ  ·J
+   ‰ª   ·J   ‰   s s ±  ﬂæ  J   ·J   ‰   w ﬂæ  J   ·J   ‰   w ﬂæ     M   ﬂæ  ·J
+   ‰ª   ·J   ‰   s s ±  ﬂæ  J   ·J   ‰   w ﬂæ  J   ·J   ‰   w ﬂª   ·J   ‰   ¡   J   æ   w ﬂª   J    ú   ó5   ﬂæ  ó6   öz   ó7   ∞±
+  ﬂª   ·J   ‰   s ±
+  ﬂæ
+  ·J   ‰       w ﬂæ
+  ·J   ‰!   ¡  w ﬂª   J   J"   ·J#   ‰æ
+  w ﬂ“óC   ª   ·J   ‰$   s ±  ﬂæ  ·J   ‰%   &   w ﬂæ  ·J   ‰'   ¡  w ﬂª   ·J   ‰(   s ±	  ﬂæ	  )   M*   ﬂæ  ∂J+   ·J#   ‰æ	  æ  æ  w ﬂ“æ  ¶§•ö@`ˇˇˇ˙PN`*`†@
+`
+ˇˇˇÚPD`ë 	PH`ë 	PˇˇˇÎP(`ï P$`ê #ˇˇˇÿPD`ë 	PˇˇˇÎP(`ï P$`ï P$`O`ë 	PˇˇˇÎP(`ï P$`ï PD`ë '
+'ˇˇˇ∫PD `
+¢ F" `ë 	P(`ï P$`ê (ˇˇˇÏPD&`ñ ˇˇˇ˘PJ)`ë 	P(`ï 	P$`ê ˇˇˇÎPD-`ë 	P(`O?`ë 
+ˇˇˇËP%VÄÄl        	  ˇˇˇˇ     p       (  ºü•X(                           ﬁÕ  ﬂ   Õ   ﬂæ  ·J   ‰   s    öñ   ó   æ  J   ·J   ‰   s J   Õ   ﬂæ   ·J	   ‰l
+      s Õ   ﬂ   æ  J   J   &Õ  ﬂæ   ·J   ‰æ  s ö   ó   ô   ó   æ  æ   &Õ   ﬂó   æ   ¢•&`*`ê Pì `ï P-`
+ˇˇˇ¯P(`î `ˇˇˇ˜Pó0 `O`$Qî   |ÛÛ¥Ñ   F                      Ω  Œ   ﬂﬁÕ   ﬂ–   æ   J   ·J   ‰   s ≥   ﬂª    m   Ùw ﬂ—•%`ï P)`5CPEPÄî         1   ˇˇˇˇÄ  “'ÿ`  Û                        $´¡  ª   ú8   ó   ﬂ¡  J   
+ú    ó   ﬂ¡  ·J   ‰   s ó	   ö   ó
+      ¡  &Œ  ﬂó   ô   ó    §≠∞±   ﬂ±   ﬂ“ó   ¡   µ   ¡  M   ﬂ¡   ·J   ‰ª   Ä	   „  Å w ﬂ¡   ·J   ‰ª   Ä
+   „  Å w ﬂª    m   –w ﬂ•!`© ë Pì `û@ë `ï@`_ˇˇˇÚP$`_ˇˇˇÚP$`5C
+PDPÄ  p     v      ˇˇˇˇ           m   \   >ö 1\   (                          ¡   µ   ·J   ‰ª   Ä   „  Å w ﬂ• `ë _ˇˇˇÚP$PÄÄÄ¿   ky‹÷∞   b                       ﬁÕ   ﬂ–   æ   ≥   ﬂª   J    ö   ó   ¡   ¡   w ﬂô!   ó   ª    m   ‹s Œ  ﬂó   —•E`*`
+,`ˇˇˇˇP@	`5C	#POPÄÄ¿         V   ˇˇˇˇÄ   Ñˆ\sÄ   ?                          ª   J    ö-   ó   ¡   ¡   µ   w ﬂª    ¡  w ﬂó   • 	`
+,`
+ˇˇˇˇP$`ˇˇˇˇPIPÄ3ıÿ  `       ê   !     "    `P  $     P    '      "  (  )        +    !    `/  0    1  2  4  (  5  6  7    `  `  `	  
+                       @ó é                 p  p,  -    p8  (  )  9  P  :    p;  <    `  `?  A    @B  o  D  E  F  H    (  0  I  ç J  L       M  "  N  !  P  /  0  =        `„  R  S  T  U  W  X  Y  Z  
+  \  [  	    `?    `ê   9  )  -  	  
+    P  ⁄    P+  7  6      `d  e  -    `b  I    c    `P  d  e  <  -  :    p  `  `	  
+    :    p  `    i    `  `    h    p  `  `  p   Œ         	  `>  
+  `√    pR     p	  pP  
+  p  pf  j     `  pˇXÑæ                 ©                %   %                                #              .        $      n      ! v              "  J   ,   =      # x      ]      $  ò      `      %  ã      o      ! á      p      ! £      f      "  ü      q      ! ùH©¿      Î!      Î!                Ä§   ı  ú   ı     
+           ÄÛ  e  ”  e     !            -  ∫  %  ∫  '                Ô  @  Á  @  /                ñ  ß	  é  ß	  B   %             ¥
+  €
+  ¥
+  €
+  P               ß  ∑  ß  ∑  a   	           
+ `  Î  j  ™  j               ¯  ç  Ô  ç  ¨              Ç ú  S  ì  S  ª               Ï  H  Ï  H  Ω                ˚  8  ˚  8  «              Ç k  .  Z  .  Œ                é    é    ◊   $           5°›F–§5]”æ‘      g¯‚zg¯‚zH√g¯ÂR   c    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/juno-tags/juno-mobile-input.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:28 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|d5255ac0-205d-0217-001f-25bed087f513|
+Accept-Ranges: bytes
+ETag: W/"8683-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 8683
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:28 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|d5255ac0-205d-0217-001f-25bed087f513|
+Accept-Ranges: bytes
+ETag: W/"8683-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 8683
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=99
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 122 net-response-time-onstop 122 alt-data 1;8683,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1   n˙

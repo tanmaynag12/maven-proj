@@ -1,0 +1,1435 @@
+//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number
+
+if(window.juno==undefined) window.juno = {};
+
+function applyGemsPlugins() {	
+	$('.gems_integer').each(function() {
+		$(this).data('original_value', $(this).text());
+		if($.isNumeric(""+$(this).text()))
+			$(this).gems_integer();
+	});
+	
+	$('.gems_float').each(function() {
+		$(this).data('original_value', $(this).text());
+		if($.isNumeric(""+$(this).text()))
+			$(this).gems_float();
+	});
+	
+	$('.gems_currency').each(function() {
+		$(this).data('original_value', $(this).text());
+		if($.isNumeric(""+$(this).text())){
+			if($(this).hasClass('roundCurrency') &&  juno!=undefined && juno._isRoundCurrencyValue!=undefined && juno._isRoundCurrencyValue?true:false)
+				$(this).data('original_value', Math.round(eval($(this).text())));
+			$(this).gems_currency();
+		}
+	});
+	
+	$('.gems_percentage').each(function() {
+		$(this).data('original_value', $(this).text());
+		$(this).gems_float().gems_wrap({ postfix: '%' });
+	});
+		
+	$('.gems_currency_label').each(function() {
+		$(this).data('original_value', $(this).text());
+		$(this).gems_wrap({ postfix: ' (In <span class="gems_currency_symbol" currcode="'+($(this).attr('currcode')!=undefined ? $(this).attr('currcode') : '')+'"></span>)'});
+	});
+	
+	$('.gems_currency_symbol').each(function() {
+		$(this).gems_currency_symbol();
+	});
+	
+	$('.gems_cgpa').each(function() {
+		$(this).data('original_value', $(this).text());
+		if($.isNumeric(""+$(this).text()))
+			$(this).gems_cgpa();
+	});
+	
+}
+
+var gChosenMapArr = new Array();
+(function($) {
+	var _locale = 'en-IN';
+	var _currency = 'INR';
+	var oritext = $.fn.text;
+	var orihtml = $.fn.html;
+	var oriprop = $.fn.prop;
+	var oriappend = $.fn.append;
+	var oriattr = $.fn.attr;
+	var orival = $.fn.val;
+	
+	$.pincode = function(pinObj){
+		/*
+		 * author: Kiran Badave
+		 * Date: May 10, 2019*/
+		if(pinObj!=undefined && pinObj.pincode!=undefined && isNaN(pinObj.pincode)!=true){
+			try{
+			$.ajax({url:'getPincodeDeatilsByPincode.json',
+					data:{pincode:pinObj.pincode, limit:pinObj.limit},
+					dataType:'json',
+					success:function(jArray){
+						if(pinObj.success!=undefined)
+							pinObj.success(jArray);
+					},
+					error:function(e){console.log(e);}
+			});
+			}catch(e){}
+		}
+	}
+	$.tableToExcel = {
+		//@Kiran Badave
+		uri: 'data:application/vnd.ms-excel;base64,',
+		template: '<html xmlns:v="urn:schemas-microsoft-com:vml"xmlns:o="urn:schemas-microsoft-com:office:office"xmlns:x="urn:schemas-microsoft-com:office:excel"xmlns="http://www.w3.org/TR/REC-html40"><head><meta http-equiv=Content-Type content="text/html; charset=UTF-8"><meta name=ProgId content=Excel.Sheet><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Worksheet</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border=1>{table}</table></body></html>',
+		base64: function(s) { return window.btoa(unescape(encodeURIComponent(s))); },
+		format: function(s, c) { return s.replace(/{(\w+)}/g, function(m, p) { return c[p]; }); },
+	};
+	$.documentPreview = function(docObj){
+		/*
+		 * author: Kiran Badave
+		 * https://gist.github.com/tzmartin/1cf85dc3d975f94cfddc04bc0dd399be
+		 * Date: June 14, 2019*/ 
+		if(docObj!=undefined){
+
+			var downloadLink = (juno.label['url.download.json'].setIndexedArgs((docObj.documentId!=undefined?docObj.documentId:'0'), "UPLOADED", "NA"));
+			var _encodedPath = encodeURIComponent(window.location.origin+'/'
+					+(docObj.url!=undefined?docObj.url:downloadLink));
+			
+			if(docObj.viewer!=undefined && docObj.viewer=='office'){
+				window.open("https://view.officeapps.live.com/op/view.aspx?src="+_encodedPath);
+			}else{
+				window.open("https://docs.google.com/viewerng/viewer?url="+_encodedPath);
+				//https://docs.google.com/viewer?embedded=true&url=http%3A%2F%2Fhomepages.inf.ed.ac.uk%2Fneilb%2FTestWordDoc.doc
+			}
+			
+		}
+	};
+	
+	$.fn.extend({
+		serverTableToExcel: function(options){
+			/* ------------------------------
+			 * Ticket No. #169613 Author: Kiran Badave
+			 * Date: Aug 23, 2019
+			 * Use: Common For Server side Excel with Images and accurate Data and Alignments 
+			 * E.g.
+			 * $('#tableID').serverTableToExcel({title:"Sheet Title", heading:true, trustid:1, instituteid:2});
+			 * ------------------------------ */
+			const domSrc = this; 
+			var convertImageDOM_To_Base64 = (img) => {
+				var canvas = document.createElement("canvas");
+				canvas.width = img.width+7;
+				canvas.height = img.height+7;
+				var ctx = canvas.getContext("2d");
+				ctx.drawImage(img, 0, 0);
+				var dataURL = canvas.toDataURL("image/png");
+				return dataURL.replace(/^data:image\/(png|jpg);base64,/, "");
+			};
+			var bindExcelJson = (selcetor, part) =>{
+			  var jArr = new Array();
+			  $(selcetor).find(part).find('tr:visible').each(function(){
+			    var jArrTdTh = new Array();
+			    $(this).find('td, th').each(function(){
+			    	if($(this).is(':visible')){
+			    		if($(this).find('img').length>0){
+			    			try{
+			    				var imgDom = $(this).find('img')[0];
+			    				jArrTdTh.push({
+			    					["base64"]:convertImageDOM_To_Base64(imgDom),
+			    					["3"]:imgDom.height,
+			    					["4"]:imgDom.width,
+			    					["5"]:$(this)[0].tagName
+			    				});
+			    			}catch(e){}
+			    		}else{
+			    			if(part=='thead'){
+				    			jArrTdTh.push({
+				    				["0"]:$(this).text(), 
+				    				["1"]:$(this).attr('colspan'),
+				    				["2"]:$(this).attr('rowspan'),
+				    				["3"]:$(this).height(), 
+				    				["4"]:$(this).width(),
+				    				["5"]:$(this)[0].tagName
+				    			});
+			    			}else{
+			    				jArrTdTh.push({
+				    				["0"]:$(this).text(), 
+				    				["1"]:$(this).attr('colspan'),
+				    				["2"]:$(this).attr('rowspan'),
+				    				["5"]:$(this)[0].tagName
+				    			});
+			    			}
+			    		}
+			    	}
+			    });
+			    jArr.push(jArrTdTh);
+			  });
+			  return jArr;
+			};
+			const jsonObj = {
+			    thead:bindExcelJson(domSrc,'thead'),
+			    tbody:bindExcelJson(domSrc,'tbody'),
+			    options:options
+			};
+			console.log(jsonObj);
+			/*$.ajax({url:"setParametersInSession.json",
+				data:{excelData:JSON.stringify(jsonObj)},
+				type:"POST",
+				success:function(res){
+					window.open('serverSideTableToExcelKrn.json',"excel");
+			}});*/
+			
+			let f = $('<form></form>').attr({method:'POST', action:'downloadExcel_fromServerTableToExcel.json', target:"_blank"}).appendTo(document.body);
+			$('<input>').attr({type:'hidden',name:'jsonObj',value: JSON.stringify(jsonObj)}).appendTo(f);
+			f[0].submit();
+			f.remove();
+		},
+		tableToExcel: function(options) {
+			if(typeof options == "string"){options = {name:options};}
+			options = $.extend({ name: 'Worksheet.xls' }, options);
+			
+			//~~~~~~~~~~~~~
+			var thisHtml = $(this).html();
+			if(options.removeClass!=undefined){
+				var tables_html_multiple = '';
+				if($(this).length>1){
+					$(this).each(function(){
+						if($(this)[0].tagName == 'TABLE'){
+							tables_html_multiple+= '<table>'+$(this).html()+'</table>';
+						}
+					});
+				}else{
+					if($(this)[0].tagName != 'TABLE'){
+						$(this).find('table').each(function(){
+							tables_html_multiple+= '<table>'+$(this).html()+'</table>';
+						});
+					}else{
+						tables_html_multiple+= `<table>${thisHtml}</table>`;
+					}
+				}
+				var printWin = window.open('', '','left=0,top=0,width=1,height=1,toolbar=0,scrollbars=2,status=0');
+				printWin.document.write(tables_html_multiple);
+				if(options.removeClass!=undefined){
+					var elements = printWin.document.getElementsByClassName(options.removeClass);
+					while(elements.length > 0){
+						elements[0].parentNode.removeChild(elements[0]);
+					}
+				}
+
+				const showAllTr = function(docObj, tagName){
+					for(let domObj of docObj.getElementsByTagName(tagName)) domObj.style.display = "initial";
+				}
+				try{
+					showAllTr(printWin.document, 'tr');showAllTr(printWin.document, 'th');showAllTr(printWin.document, 'td');
+				}catch(e){}
+				var tblDoms = printWin.document.getElementsByTagName('table');
+				thisHtml = "";
+				for(var tblDom of tblDoms) thisHtml += tblDom.innerHTML;
+				printWin.document.close();
+				printWin.focus();
+				printWin.close();
+			}
+			//~~~~~~~~~~~~~
+			var ctx = { worksheet: options.name, table: thisHtml };
+			//window.location.href = $.tableToExcel.uri + $.tableToExcel.base64($.tableToExcel.format($.tableToExcel.template, ctx));
+			//$('#displayStudentCount').tableToExcel({name:"Student Statistics.xls"});
+			var link = document.createElement("A");
+			link.href = $.tableToExcel.uri + $.tableToExcel.base64($.tableToExcel.format($.tableToExcel.template, ctx));
+			link.download = options.name || 'Workbook.xls';
+			link.target = '_blank';
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			return $(this);
+		},
+		text : function(txt) {			
+			if(arguments == undefined || arguments.length == 0) {
+				var value = $(this).data('original_value');
+				if(value == undefined) {
+					return oritext.apply(this);
+				}
+				return value;
+			}
+			if(txt!=undefined){
+                if($(this).hasClass('gems_currency')){
+                    if($.isNumeric(""+txt)){
+                        $(this).data('original_value', txt);
+                        $(this).gems_currency();
+                        return this;
+                    }       
+                }
+            }
+			
+			//Set
+			return oritext.apply(this, arguments);
+		},
+		html: function(){
+			$(this).each(function(){
+				if($(this).data('gems_chzn_done')!=undefined){chosenLisztUpdateCall($(this),'html');}
+				/*if(window.location.toString().indexOf("shareLink")!=-1){
+					$(this).prop('id')!=undefined && $(this).prop('id') 
+					
+				}*/
+			});
+			return orihtml.apply(this, arguments);
+		},
+		prop: function(){
+			$(this).each(function(){if($(this).data('gems_chzn_done')!=undefined)chosenLisztUpdateCall($(this));});
+			return oriprop.apply(this, arguments);
+		},
+		append: function(){
+			$(this).each(function(){if($(this).data('gems_chzn_done')!=undefined)chosenLisztUpdateCall($(this));});
+			return oriappend.apply(this, arguments);
+		},
+		attr: function(){
+			$(this).each(function(){if($(this).data('gems_chzn_done')!=undefined)chosenLisztUpdateCall($(this));});
+			return oriattr.apply(this, arguments);
+		},
+		val: function(){
+			$(this).each(function(){if($(this).data('gems_chzn_done')!=undefined)chosenLisztUpdateCall($(this));});
+			return orival.apply(this, arguments);
+		},
+		gems_wrap : function(options) {
+			var settings = $.extend({
+				prefix: '',
+				postfix: ''
+	        }, options );
+			
+			var element = this;
+			//$(element).html(settings.prefix + $(element).text() + settings.postfix);
+			if($(element).data('gems_currency_flag') == undefined || $(element).data('gems_currency_flag') == false){
+				$(element).html(settings.prefix + $(element).html() + settings.postfix);
+				$(element).data('gems_currency_flag',true);
+				$(element).attr('currCode',($(element).attr('currCode')!=undefined && $(element).attr('currCode')!='' ? $(element).attr('currCode') : (juno!=undefined?juno._currency_code:_currency)) );
+			}
+			return this;
+		},
+		
+		gems_currency_symbol : function(options) {
+			var element = this;
+			$(element).data('original_value', '0');
+			$(element).gems_currency({minimumFractionDigits: 0,	minimumIntegerDigits: 1, maximumFractionDigits: 0, currency:($(element).attr('currCode')!=undefined && $(element).attr('currCode')!='' ? $(element).attr('currCode') : (juno!=undefined?juno._currency_code:_currency))});
+			$(element).text(oritext.apply(element).replace('0', '').trim());
+			return this;
+		},
+		
+		gems_integer : function(options) {
+			var settings = $.extend({
+				align: 'right',
+				locale: _locale,
+				useGrouping: false,
+				minimumFractionDigits: 0,
+				minimumIntegerDigits: 1,
+				maximumFractionDigits: 0
+	        }, options );
+			
+			var element = this;
+			$(element).css('text-align', settings.align);
+			$(element).text(
+				new Number($(element).data('original_value')).toLocaleString(
+					settings.locale,
+					{
+						style: 'decimal',
+						useGrouping: settings.useGrouping,
+						minimumFractionDigits: settings.minimumFractionDigits,
+						minimumIntegerDigits: settings.minimumIntegerDigits,
+						maximumFractionDigits: settings.maximumFractionDigits
+					})
+			);
+			return this;
+		},
+		
+		gems_float : function(options) {
+			var settings = $.extend({
+				align: 'right',
+				locale: _locale,
+				useGrouping: false,
+				minimumFractionDigits: 2,
+				minimumIntegerDigits: 1,
+				maximumFractionDigits: 2
+	        }, options );
+			
+			var element = this;
+			$(element).css('text-align', settings.align);
+			$(element).text(
+				new Number($(element).data('original_value')).toLocaleString(
+					settings.locale,
+					{
+						style: 'decimal',
+						useGrouping: settings.useGrouping,
+						minimumFractionDigits: settings.minimumFractionDigits,
+						minimumIntegerDigits: settings.minimumIntegerDigits,
+						maximumFractionDigits: settings.maximumFractionDigits
+					})
+			);
+			return this;
+		},
+		
+		gems_cgpa : function(options) {
+			var settings = $.extend({
+				align: 'right',
+				locale: _locale,
+				useGrouping: false,
+				minimumFractionDigits: 1,
+				minimumIntegerDigits: 1,
+				maximumFractionDigits: 1
+	        }, options );
+			
+			var element = this;
+			$(element).css('text-align', settings.align);
+			$(element).text(
+				new Number($(element).data('original_value')).toLocaleString(
+					settings.locale,
+					{
+						style: 'decimal',
+						useGrouping: settings.useGrouping,
+						minimumFractionDigits: settings.minimumFractionDigits,
+						minimumIntegerDigits: settings.minimumIntegerDigits,
+						maximumFractionDigits: settings.maximumFractionDigits
+					})
+			);
+			return this;
+		},
+		
+		gems_currency : function(options) {
+			var settings = $.extend({
+				align: 'right',
+				locale: _locale,
+				currency: (juno!=undefined?juno._currency_code:_currency),
+				useGrouping: true,
+				minimumFractionDigits: 2,
+				minimumIntegerDigits: 1,
+				maximumFractionDigits: 2
+	        }, options );
+			
+			var element = this;
+			$(element).css('text-align', settings.align);
+			var original_value = $(element).data('original_value'); 
+			var preFix = '';
+			if(!isNaN(parseFloat(original_value))){
+				original_value = parseFloat(original_value);
+				if(original_value<0){
+					original_value = Math.abs(original_value);
+					preFix = '(-)';	
+				}
+			}
+			try{
+			var curr_val = preFix+ new Number(original_value).toLocaleString(
+				settings.locale,
+				{
+					style: 'currency',
+					currency: ($(element).attr('currCode')!=undefined && $(element).attr('currCode')!='' ? $(element).attr('currCode') : settings.currency),
+					currencyDisplay: 'symbol',
+					useGrouping: settings.useGrouping,
+					minimumFractionDigits: settings.minimumFractionDigits,
+					minimumIntegerDigits: settings.minimumIntegerDigits,
+					maximumFractionDigits: settings.maximumFractionDigits
+				});
+			
+			//if('AED'==settings.currency) curr_val = curr_val.replace("AED", '&#1583;.&#1573;');
+			
+			$(element).text(curr_val);
+			}catch(e){
+				$(element).text(original_value);
+			}
+			return this;
+		},
+		
+
+		gems_date_filters : function(fromDateId,toDateId,defaultClick,autoSelect,isTerm,isHistory) {
+			var element = this;
+			if($.type(fromDateId)=='object'){return gems_date_filters_object(fromDateId,element);}else{var selectorVar = $(this).selector;var autoSelect2 = $(this).attr('autoSelected');
+			var isTermStr = $(this).attr('isTerm')==undefined||$(this).attr('isTerm')=="false"?"none;":";";
+			var isHistoryStr = $(this).attr('isHistory')==undefined||$(this).attr('isHistory')=="false"?"none;":";";
+			if(fromDateId!=undefined && toDateId!=undefined){
+				$(this).data('fromDateId',fromDateId);$(this).data('toDateId',toDateId);$(this).data('defaultClick',defaultClick);autoSelect2 = autoSelect;
+				isTermStr = isTerm==undefined||isTerm==false?"none;":";";isHistoryStr = isHistory==undefined||isHistory==false?"none;":";";
+			}
+			var boilerGemsDateFilters = '<table class="table table-bordered table-condensed">'+'<tr>'+
+			'<td><label><span class="badge badge-info"><input type="radio" name="gems_date_filter_radio" value="today" onclick="getGemsDateFilter(this,\''+selectorVar+'\');$(\'.gems_date_filter_typesCls\').hide();$(\'[name=gems_date_filter_types]\').attr(\'checked\',false);"> Today </span></label>'+'</td><td>'+
+			'<label><span class="badge badge-info"><input type="radio" name="gems_date_filter_types" onclick="setDefaultClickGemsDateFilters(this,\''+selectorVar+'\');" value="week"> Weeks</span></label>'+'</td><td>'+
+			'<label><span class="badge badge-info"><input type="radio" name="gems_date_filter_types" onclick="setDefaultClickGemsDateFilters(this,\''+selectorVar+'\');" value="month"> Month</span></label>'+
+			'</td><td style="display:'+(isTermStr)+'">'+
+			'<label><span class="badge badge-info"><input type="radio" name="gems_date_filter_types" onclick="setDefaultClickGemsDateFilters(this,\''+selectorVar+'\');" value="term"> Term </span></label>'+
+			'</td><td style="display:'+(isHistoryStr)+';">'+
+			'<label><span class="badge badge-info"><input type="radio" name="gems_date_filter_types"  value="history" onclick="getGemsDateFilter(this,\''+selectorVar+'\');$(\'.gems_date_filter_typesCls\').hide();$(\'[name=gems_date_filter_radio]\').attr(\'checked\',false);"> History </span></label>'+'</td>'+'</tr>'+
+			'<tr id="" class="gems_date_filter_typesCls alert alert-warning gems_date_filter_radio_week" style="display:none;">'+'<td></td>'+
+			'<td><label><span class="" style="font-weight:bold;color:black;"><input type="radio" name="gems_date_filter_radio" value="thisweek" class="gems_date_filter_radio_week_default" onclick="getGemsDateFilter(this,\''+selectorVar+'\');">Current Week </span></label>'+
+			'</td><td><label><span class="" style="font-weight:bold;color:black;"><input type="radio" name="gems_date_filter_radio" value="lastweek" onclick="getGemsDateFilter(this,\''+selectorVar+'\');"> Previous Week </span></label>'+
+			'</td><td colspan="2"><label><span class="" style="font-weight:bold;color:black;"><input type="radio" name="gems_date_filter_radio" value="nextweek" onclick="getGemsDateFilter(this,\''+selectorVar+'\');"> Next Week </span></label>'+'</tr>'+
+			'<tr id="" class="gems_date_filter_typesCls alert alert-warning gems_date_filter_radio_months" style="display:none;">'+'<td></td>'+
+			'<td><label><span class="" style="font-weight:bold;color:black;"><input type="radio" name="gems_date_filter_radio" value="thismonth" class="gems_date_filter_radio_months_default" onclick="getGemsDateFilter(this,\''+selectorVar+'\');"> Current Month </span></label>'+
+			'</td><td><label><span class="" style="font-weight:bold;color:black;"><input type="radio" name="gems_date_filter_radio" value="lastmonth" style="font-weight:bold;color:black;" onclick="getGemsDateFilter(this,\''+selectorVar+'\');"> Previous Month </span></label>'+
+			'</td><td colspan="2"><label><span class="" style="font-weight:bold;color:black;"><input type="radio" name="gems_date_filter_radio" value="nextmonth" style="font-weight:bold;color:black;" onclick="getGemsDateFilter(this,\''+selectorVar+'\');"> Next Month </span></label>'+'</tr>'+
+			'<tr id="" class="gems_date_filter_typesCls alert alert-warning gems_date_filter_radio_terms" style="display:none;">'+'<td></td>'+
+			'<td><label><span class="" style="font-weight:bold;color:black;"><input type="radio" name="gems_date_filter_radio" value="thisterm" class="gems_date_filter_radio_term_default" onclick="getGemsDateFilter(this,\''+selectorVar+'\');"> Current Term </span></label>'+
+			'</td><td colspan="3"><span class="" style="font-weight:bold;color:black;"><label><input type="radio" name="gems_date_filter_radio" value="lastterm" onclick="getGemsDateFilter(this,\''+selectorVar+'\');"> Previous Term </span></label>'+'</tr>'+'</table>';
+			$(element).html(boilerGemsDateFilters);
+			setTimeout(function(){if(autoSelect2==undefined){$(selectorVar==""?element:selectorVar).find('[name=gems_date_filter_radio]').first().trigger('click');}else{
+					switch (autoSelect2) {
+					case "today":$(selectorVar==""?element:selectorVar).find('[name=gems_date_filter_radio]').first().trigger('click');break;
+					case "week": $(selectorVar==""?element:selectorVar).find('[name=gems_date_filter_types]').eq(0).trigger('click');break;
+					case "month":$(selectorVar==""?element:selectorVar).find('[name=gems_date_filter_types]').eq(1).trigger('click');break;
+					case "term":$(selectorVar==""?element:selectorVar).find('[name=gems_date_filter_types]').eq(2).trigger('click');break;
+					case "history":$(selectorVar==""?element:selectorVar).find('[name=gems_date_filter_types]').eq(3).trigger('click');break;
+					case "none":break;
+					default:$(selectorVar==""?element:selectorVar).find('[name=gems_date_filter_radio]').first().trigger('click');
+					}}},500);
+			return this;}},
+			
+		gems_chosen: function(objects){
+			/****************@Kiran Badave*************/
+			try{
+				var objectCzn = $.extend({no_results_text:'Oops, nothing found!'}, (objects!=undefined?objects:null));
+				$(this).each(function(){
+					var element = $(this);
+					element.chosen(objectCzn);
+					element.data("gems_chzn_done",true);
+					if(element.prop('id')!=undefined){
+						var element_chzn = $('#'+element.prop('id')+'_chzn');
+						gChosenMapArr.push({ ele:element, eleChzn:element_chzn });
+						element_chzn.css({'width':(objectCzn.cssWidth==undefined?'260px':objectCzn.cssWidth)});element_chzn.find('.chzn-results').css('height','680px');
+						element_chzn.find('.chzn-search').find('input[type="text"]').css('height','25px');
+					}
+				});
+				if($(this).length==0){
+					if(objectCzn.definedCzn==undefined || objectCzn.definedCzn==true){
+						gChosenMapArr.push({ ele:$(this).selector, eleChzn:undefined, objectCzn:objectCzn});
+					}
+				}
+			}catch(e){}
+		}
+	});
+}( jQuery ));
+
+/*
+ * Developed By Kiran Badave
+ * */
+function getGemsDateFilter(src,selectorVar){
+	var today = new Date();var filterName = $(src).val();
+	var fromDateId = (selectorVar==""?$(src).parents('.gems_date_filters').attr('fromDateId'):$(selectorVar).data('fromDateId'));
+	var toDateId = (selectorVar==""?$(src).parents('.gems_date_filters').attr('toDateId'):$(selectorVar).data('toDateId'));
+	var defaultClick = (selectorVar==""?$(src).parents('.gems_date_filters').attr('defaultClick'):$(selectorVar).data('defaultClick'));
+	var help = $(src).parents('.gems_date_filters').attr('help');
+	var warning ='<b>Syntax:</b>, \n'+'$(\'#gemsDateFilters\').gems_date_filters({ \n'+'	fromDateId:"fromdateTxt",                \n'+'	toDateId:"todateTxt",                    \n'+'	autoSelected:"month",                    \n'+'	onSelect:function(){                     \n'+'		fun();                               \n'+'	},                                       \n'+'    sequence:{								 \n'+'    	today:\'today\',					 \n'+'    	week:     [\'curr\', \'pre\',\'next\'],\n'+'    	month:    [\'curr\', \'pre\',\'next\'],\n'+'    	year :    [\'curr\', \'pre\', \'next\'],\n'+'    	quarter:  [\'curr\', \'pre\', \'next\'],\n'+'    	halfYear: [\'curr\', \'pre\', \'next\']\n'+'    },										 \n'+'	help:true                                \n'+'});                                         \n'+'<b>Note:-</b><i>This alert message ony for developer.</i>'; 
+	if(fromDateId==undefined || toDateId==undefined || help!=undefined){jAlert(warning);if(help==undefined){return;}}
+	fromDateId = "#" +fromDateId;toDateId = "#" + toDateId; 
+	var monthNames = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul","Aug", "Sep", "Oct", "Nov", "Dec" ];
+	var today = new Date();var yyyy = today.getFullYear();var mm = monthNames[today.getMonth()];var dd = today.getDate();if (dd < 10) {dd = '0' + dd}
+	var dateToday = mm + ' ' + dd + ',' + yyyy;
+	$(fromDateId).datepicker({dateFormat : "M dd,yy",showWeek: true,changeMonth: true,changeYear: true});
+	$(toDateId).datepicker({dateFormat : "M dd,yy",showWeek: true,changeMonth: true,changeYear: true});
+	$(fromDateId).datepicker("option","onSelect",function(selected) {$(toDateId).datepicker("option","minDate", selected);});	
+	if (filterName == "today") {$(fromDateId).val(dateToday);$(toDateId).val(dateToday);$(toDateId).datepicker("option","minDate", today);}
+	if (filterName == "thisweek" || filterName == "lastweek" || filterName == "nextweek") {
+		var dFrom = new Date();var dTo = new Date();
+		if (filterName == "lastweek") {dFrom.setDate(dFrom.getDate() - 7);dTo.setDate(dTo.getDate() - 7);}
+		if (filterName == "nextweek") {dFrom.setDate(dFrom.getDate() + 7);dTo.setDate(dTo.getDate() + 7);}
+		if (today.getDay() == 6) {dFrom.setDate(dFrom.getDate() - 6);} else if (today.getDay() < 6) {dFrom.setDate(dFrom.getDate() - today.getDay());}
+		if (today.getDay() == 6) {dTo.setDate(dTo.getDate());} else if (today.getDay() < 6) {dTo.setDate(dTo.getDate() + (6 - today.getDay()));}
+		yyyy = dFrom.getFullYear();mm = monthNames[dFrom.getMonth()];dd = dFrom.getDate();dateToday = mm + ' ' + (dd) + ',' + yyyy;
+		$(fromDateId).val(dateToday);
+		yyyy = dTo.getFullYear();mm = monthNames[dTo.getMonth()];dd = dTo.getDate();dateToday = mm + ' ' + (dd) + ',' + yyyy;$(toDateId).val(dateToday);
+		$(toDateId).datepicker("option","minDate", dFrom);
+	}
+	if (filterName == "thismonth" || filterName == "lastmonth"|| filterName == "nextmonth") {
+		var date = new Date();date.setDate('01',date.getMonth(),date.getFullYear());
+		if (filterName == "lastmonth") {date.setMonth(date.getMonth() - 1);}
+		if (filterName == "nextmonth") {date.setMonth(date.getMonth() + 1);}
+		var firstDay = new Date(date.getFullYear(), date.getMonth(), 1);var lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+		yyyy = firstDay.getFullYear();mm = monthNames[firstDay.getMonth()];dd = firstDay.getDate();dateToday = mm + ' ' + (dd) + ',' + yyyy;$(fromDateId).val(dateToday);
+		yyyy = lastDay.getFullYear();mm = monthNames[lastDay.getMonth()];dd = lastDay.getDate();
+		dateToday = mm + ' ' + (dd) + ',' + yyyy;$(toDateId).val(dateToday);
+	    if(filterName != "nextmonth")
+		   $(toDateId).datepicker("option","minDate", firstDay);
+		
+	}
+	if (filterName == "thisterm") {if (typeof getDataForCurrentTerm_gemsDateFilter !== 'undefined'&& $.isFunction(getDataForCurrentTerm_gemsDateFilter)) {getDataForCurrentTerm_gemsDateFilter(fromDateId,toDateId);} else {
+			jAlert("<b>getDataForCurrentTerm_gemsDateFilter(fromDateId,toDateId)</b> function is not defined. "+"<br><b>Note:</b> Define function with this name in your js file, It's will be called automatically by click.(Only For Developers)");}}
+	if (filterName == "lastterm") {if (typeof getDataForPreviousTerm_gemsDateFilter !== 'undefined'&& $.isFunction(getDataForPreviousTerm_gemsDateFilter)) {getDataForPreviousTerm_gemsDateFilter(fromDateId,toDateId);} else {
+			jAlert("<b>getDataForPreviousTerm_gemsDateFilter(fromDateId,toDateId)</b> function is not defined."+" <br><b>Note:</b> Define function with this name in your js file, It's will be called automatically by click.(Only For Developers)");}}
+	if (filterName == "history") {if (typeof getDataForHistory_gemsDateFilter !== 'undefined'&& $.isFunction(getDataForHistory_gemsDateFilter)) {getDataForHistory_gemsDateFilter(fromDateId,toDateId);} else {
+			jAlert("<b>getDataForHistory_gemsDateFilter(fromDateId,toDateId)</b> function is not defined."+" <br><b>Note:</b> Define function with this name in your js file, It's will be called automatically by click.(Only For Developers)");}}
+	if (filterName != "thisterm" && filterName != "lastterm"&& filterName != "history") {if (defaultClick != undefined) {if(defaultClick.indexOf('(')!=-1?true:false){eval(defaultClick);}else{$('#' + defaultClick).trigger('click');}}}	
+}
+
+function setDefaultClickGemsDateFilters(element,selectorVar){
+	$('.gems_date_filter_typesCls').hide();var type="";
+	if($(element).val()=="week")
+		type='.gems_date_filter_radio_week';
+	else if($(element).val()=="month")
+		type='.gems_date_filter_radio_months';
+	else if($(element).val()=="term")
+		type='.gems_date_filter_radio_terms';
+	$(element).parents(selectorVar==""?'.gems_date_filters':selectorVar).find(type).show().find('input').first().attr('checked',true).trigger('click');
+}
+
+function autoSelected_GemsDateFilters(){
+	setTimeout(function(){
+		$('.gems_date_filters').each(function() {
+			$(this).gems_date_filters();
+		});
+	},500);
+}
+
+function gems_date_filters_object(arrayObj,element){
+	var selectorVar = $(element).selector;
+	var selectorAppend = selectorVar.replace(/#/g,'').replace('.','');
+	var boilerGemsDateFilters = '<table class="table table-bordered table-condensed"><tr>';var colspan = 0;
+	if(arrayObj.sequence!=undefined){
+		for(var i in arrayObj.sequence){ 
+			switch(i){
+			case "today":boilerGemsDateFilters +='<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_radio_'+selectorAppend+'" value="today"> Today </span></label></td>';break;
+			case "week":boilerGemsDateFilters +='<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_types_'+selectorAppend+'" value="week"> Weeks</span></label></td>';break;
+			case "month":boilerGemsDateFilters +='<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_types_'+selectorAppend+'" value="month"> Month</span></label></td>';break;
+			case "year":boilerGemsDateFilters +='<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_types_'+selectorAppend+'" value="year"> Year</span></label></td>';break;
+			case "halfYear":boilerGemsDateFilters +='<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_types_'+selectorAppend+'" value="halfYear"> Half Year</span></label></td>';break;
+			case "quarter":boilerGemsDateFilters +='<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_types_'+selectorAppend+'" value="quarter"> Quarterly</span></label></td>';break;
+			}
+			colspan++;
+		}
+	}else{
+		arrayObj.sequence = {
+				today:'today',
+				week:['curr', 'pre', 'next'],
+				month:['curr', 'pre']
+		}
+		boilerGemsDateFilters +='<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_radio_'+selectorAppend+'" value="today"> Today </span></label></td>'+
+		'<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_types_'+selectorAppend+'" value="week"> Weeks</span></label></td>'+
+		'<td><label><span class="badge badge-info"><input type="radio" class="gems_date_filter_types_'+selectorAppend+'" value="month"> Month</span></label></td>';
+	}
+	boilerGemsDateFilters +='</tr>';
+	//week row
+	boilerGemsDateFilters +='<tr class="gems_date_filter_radio_week_'+selectorAppend+' gems_date_filter_typesCls_'+selectorAppend+'"><td></td>';
+	for(var i in arrayObj.sequence.week){
+		switch($.trim(arrayObj.sequence.week[i])){
+		case "curr":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio"  value="thisweek" class="gems_date_filter_radio_'+selectorAppend+'">Current Week </span></label></td>';break;
+		case "pre":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="lastweek" class="gems_date_filter_radio_'+selectorAppend+'"> Previous Week </span></label></td>';break;
+		case "next":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="nextweek" class="gems_date_filter_radio_'+selectorAppend+'"> Next Week </span></label></td>';break;
+		}
+		if(i==arrayObj.sequence.week.length-1){boilerGemsDateFilters +='<td colspan="10"></td>';}
+	}
+	boilerGemsDateFilters +='</tr>';
+	//month row
+	boilerGemsDateFilters +='<tr class="gems_date_filter_radio_month_'+selectorAppend+' gems_date_filter_typesCls_'+selectorAppend+'"><td></td>';
+	for(var i in arrayObj.sequence.month){
+		switch($.trim(arrayObj.sequence.month[i])){
+		case "curr":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="thismonth" class="gems_date_filter_radio_'+selectorAppend+'"> Current Month </span></label></td>';break;
+		case "pre":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="lastmonth" class="gems_date_filter_radio_'+selectorAppend+'"> Previous Month </span></label></td>';break;
+		case "next":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="nextmonth" class="gems_date_filter_radio_'+selectorAppend+'"> Next Month </span></label></td>';break;
+		}
+		if(i==arrayObj.sequence.month.length-1){boilerGemsDateFilters +='<td colspan="10"></td>';}
+	}
+	boilerGemsDateFilters +='</tr>';
+	//Year row
+		boilerGemsDateFilters +='<tr class="gems_date_filter_radio_year_'+selectorAppend+' gems_date_filter_typesCls_'+selectorAppend+'"><td></td>';
+		for(var i in arrayObj.sequence.year){
+			switch($.trim(arrayObj.sequence.year[i])){
+			case "curr":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="thisyear" class="gems_date_filter_radio_'+selectorAppend+'"> Current Year </span></label></td>';break;
+			case "pre":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="lastyear" class="gems_date_filter_radio_'+selectorAppend+'"> Previous Year </span></label></td>';break;
+			case "next":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="nextyear" class="gems_date_filter_radio_'+selectorAppend+'"> Next Year </span></label></td>';break;
+			}
+			if(i==arrayObj.sequence.year.length-1){boilerGemsDateFilters +='<td colspan="10"></td>';}
+		}
+		boilerGemsDateFilters +='</tr>';
+	//quarter row
+		boilerGemsDateFilters +='<tr class="gems_date_filter_radio_quarter_'+selectorAppend+' gems_date_filter_typesCls_'+selectorAppend+'"><td></td>';
+		for(var i in arrayObj.sequence.quarter){
+			switch($.trim(arrayObj.sequence.quarter[i])){
+			case "curr":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="thisquarter" class="gems_date_filter_radio_'+selectorAppend+'"> Current Quarter </span></label></td>';break;
+			case "pre":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="lastquarter" class="gems_date_filter_radio_'+selectorAppend+'"> Previous Quarter </span></label></td>';break;
+			case "next":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="nextquarter" class="gems_date_filter_radio_'+selectorAppend+'"> Next Quarter </span></label></td>';break;
+			}
+			if(i==arrayObj.sequence.quarter.length-1){boilerGemsDateFilters +='<td colspan="10"></td>';}
+		}
+		boilerGemsDateFilters +='</tr>';
+		//Half Year row
+		boilerGemsDateFilters +='<tr class="gems_date_filter_radio_halfYear_'+selectorAppend+' gems_date_filter_typesCls_'+selectorAppend+'"><td></td>';
+		for(var i in arrayObj.sequence.halfYear){
+			switch($.trim(arrayObj.sequence.halfYear[i])){
+			case "curr":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="thishalfYear" class="gems_date_filter_radio_'+selectorAppend+'"> Current Half Year </span></label></td>';break;
+			case "pre":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="lasthalfYear" class="gems_date_filter_radio_'+selectorAppend+'"> Previous Half Year </span></label></td>';break;
+			case "next":boilerGemsDateFilters +='<td><label><span class="gems_date_filter_radio_css"><input type="radio" value="nexthalfYear" class="gems_date_filter_radio_'+selectorAppend+'"> Next Half Year </span></label></td>';break;
+			}
+			if(i==arrayObj.sequence.halfYear.length-1){boilerGemsDateFilters +='<td colspan="10"></td>';}
+		}
+		boilerGemsDateFilters +='</tr>';
+	boilerGemsDateFilters +='</table>';
+	$(element).html(boilerGemsDateFilters);
+	
+	$('.gems_date_filter_radio_css').css('font-weight','bold').css('color','black');
+	$('.gems_date_filter_typesCls_'+selectorAppend).addClass("alert alert-warning").hide();
+	$('.gems_date_filter_radio_'+selectorAppend).attr('name','gems_date_filter_NameRadio_'+selectorAppend);
+	$('.gems_date_filter_types_'+selectorAppend).attr('name','gems_date_filter_NameTypes_'+selectorAppend);
+	$('.gems_date_filter_radio_'+selectorAppend).click(function(){
+		if($(this).val()=="today"){
+			$('.gems_date_filter_typesCls_'+selectorAppend).hide();
+			$('.gems_date_filter_types_'+selectorAppend).attr('checked',false);
+		}
+		setDateFormatsGemsDateFilter(arrayObj,element,$(this).val());
+	});
+	$('.gems_date_filter_types_'+selectorAppend).click(function(){
+		$('.gems_date_filter_typesCls_'+selectorAppend).hide();
+		$('.gems_date_filter_radio_'+$(this).val()+'_'+selectorAppend).show().find('input').first().attr('checked',true).trigger('click');
+	});
+	setTimeout(function(){
+		if(arrayObj.autoSelected==undefined){
+			$(selectorVar).find('input').first().attr('checked',true).trigger('click');
+		}else{
+			$('.gems_date_filter_types_'+selectorAppend+'[value="'+arrayObj.autoSelected+'"]').attr('checked',true).trigger('click');
+			$('.gems_date_filter_radio_'+selectorAppend+'[value="'+arrayObj.autoSelected+'"]').attr('checked',true).trigger('click');
+		}
+	},1000);
+	return element;
+}
+
+function setDateFormatsGemsDateFilter(arrayObj,element,filterName){
+	var fromDateId = $.trim(arrayObj.fromDateId);
+	var toDateId = $.trim(arrayObj.toDateId);
+	var warning ='<b>Syntax:</b>, \n'+'$(\'#gemsDateFilters\').gems_date_filters({ \n'+'	fromDateId:"fromdateTxt",                \n'+'	toDateId:"todateTxt",                    \n'+'	autoSelected:"month",                    \n'+'	onSelect:function(){                     \n'+'		fun();                               \n'+'	},                                       \n'+'    sequence:{								 \n'+'    	today:\'today\',					 \n'+'    	week:     [\'curr\', \'pre\',\'next\'],\n'+'    	month:    [\'curr\', \'pre\',\'next\'],\n'+'    	year :    [\'curr\', \'pre\', \'next\'],\n'+'    	quarter:  [\'curr\', \'pre\', \'next\'],\n'+'    	halfYear: [\'curr\', \'pre\', \'next\']\n'+'    },										 \n'+'	help:true                                \n'+'});                                         \n'+'<b>Note:-</b><i>This alert message ony for developer.</i>'; 
+	if(fromDateId==undefined || fromDateId=='' || toDateId==undefined || toDateId=='' || arrayObj.help!=undefined){jAlert(warning);if(arrayObj.help==undefined){}}
+	fromDateId = "#" +fromDateId;toDateId = "#" + toDateId; 
+	var monthNames = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul","Aug", "Sep", "Oct", "Nov", "Dec" ];
+	var today = new Date();var yyyy = today.getFullYear();var mm = monthNames[today.getMonth()];var dd = today.getDate();
+	if (dd < 10) {dd = '0' + dd}
+	$(fromDateId).datepicker({dateFormat : "M dd,yy",showWeek: true,changeMonth: true,changeYear: true});
+	$(toDateId).datepicker({dateFormat : "M dd,yy",showWeek: true,changeMonth: true,changeYear: true});
+	$(fromDateId).datepicker("option","onSelect",function(selected) {$(toDateId).datepicker("option","minDate", selected);});
+	
+	if (filterName == "today") {
+		$(fromDateId).val(mm + ' ' + dd + ',' + yyyy);
+		$(toDateId).val(mm + ' ' + dd + ',' + yyyy);
+		$(toDateId).datepicker("option","minDate", today);
+	}
+	//Week
+	if (filterName == "thisweek" || filterName == "lastweek" || filterName == "nextweek") {
+		var dFrom = new Date();var dTo = new Date();
+		switch(filterName){
+		case "lastweek":dFrom.setDate(dFrom.getDate() - 7);dTo.setDate(dTo.getDate() - 7);break;
+		case "nextweek":dFrom.setDate(dFrom.getDate() + 7);dTo.setDate(dTo.getDate() + 7);break;
+		}
+		if (today.getDay() == 6) {dFrom.setDate(dFrom.getDate() - 6);} else if (today.getDay() < 6) {dFrom.setDate(dFrom.getDate() - today.getDay());}
+		if (today.getDay() == 6) {dTo.setDate(dTo.getDate());} else if (today.getDay() < 6) {dTo.setDate(dTo.getDate() + (6 - today.getDay()));}
+		yyyy = dFrom.getFullYear();mm = monthNames[dFrom.getMonth()];dd = dFrom.getDate();if (dd < 10) {dd = '0' + dd}
+		$(fromDateId).val(mm + ' ' + (dd) + ',' + yyyy);
+
+		yyyy = dTo.getFullYear();mm = monthNames[dTo.getMonth()];dd = dTo.getDate();if (dd < 10) {dd = '0' + dd}
+		$(toDateId).val(mm + ' ' + (dd) + ',' + yyyy);$(toDateId).datepicker("option","minDate", dFrom);
+	}
+	//Month
+	if (filterName == "thismonth" || filterName == "lastmonth" || filterName == "nextmonth") {
+		var date = new Date();date.setDate('01',date.getMonth(),date.getFullYear());
+		switch(filterName){
+		case "lastmonth":date.setMonth(date.getMonth() - 1);break;
+		case "nextmonth":date.setMonth(date.getMonth() + 1);break;
+		}
+		var firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+		var lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+		yyyy = firstDay.getFullYear();mm = monthNames[firstDay.getMonth()];dd = firstDay.getDate();if (dd < 10) {dd = '0' + dd}
+		$(fromDateId).val(mm + ' ' + (dd) + ',' + yyyy);
+
+		yyyy = lastDay.getFullYear();mm = monthNames[lastDay.getMonth()];dd = lastDay.getDate();if (dd < 10) {dd = '0' + dd}
+		$(toDateId).val(mm + ' ' + (dd) + ',' + yyyy);
+		$(toDateId).datepicker("option","minDate", firstDay);
+	}
+	//Year
+	if (filterName == "thisyear" || filterName == "lastyear" || filterName == "nextyear") {
+		var date = new Date();date.setDate('01',date.getMonth(),date.getFullYear());
+		switch(filterName){
+		case "lastyear":date.setFullYear(date.getFullYear() - 1);break;
+		case "nextyear":date.setFullYear(date.getFullYear() + 1);;break;
+		}
+		
+		yyyy = date.getFullYear();mm = monthNames[0];dd ='01';
+		$(fromDateId).val(mm + ' ' + (dd) + ',' + yyyy);
+
+		mm = monthNames[11];dd = 31;
+		$(toDateId).val(mm + ' ' + (dd) + ',' + yyyy);
+		$(toDateId).datepicker("option","minDate", firstDay);
+	}
+	//halfYear
+	if (filterName == "thishalfYear" || filterName == "lasthalfYear" || filterName == "nexthalfYear") {
+		var date = new Date();date.setDate('01',date.getMonth(),date.getFullYear());
+		var lastDayOfMonth = new Date(); 
+		var halfIndex=0;
+		switch(date.getMonth()){
+		case 3:case 4: case 5:case 6:case 7:case 8:halfIndex=0;break;//Apr - Sep
+		case 9:case 10: case 11:case 0:case 1: case 2:halfIndex=1;break;//Oct - Mar
+		}
+		var flg = false;
+		var flg2 = true;
+		var flg3 = false;
+		switch(filterName){
+		case "lasthalfYear":{if(halfIndex==0){halfIndex = 1;flg=true;flg2=false;}else{halfIndex = 0;flg=false;}}break;
+		case "nexthalfYear":{if(halfIndex==1){halfIndex = 0;flg=false;flg3=true;}else{halfIndex = 1;flg=false;flg2=true;}}break;
+		}
+		var fromDateStr = '';var toDateStr = '';
+		//alert(flg+" - "+flg2+" - "+halfIndex);
+		switch(halfIndex){
+		case 0:{yyyy = (flg==true?date.getFullYear()-1:flg3==true?date.getFullYear()+1:date.getFullYear());mm = monthNames[3];}break;
+		case 1:{yyyy = (flg==true?date.getFullYear()-1:date.getFullYear());mm = monthNames[9];}break;
+		}
+		fromDateStr = mm + ' ' + ("01") + ',' + yyyy;
+		switch(halfIndex){
+		case 0:{lastDayOfMonth.setMonth(9);lastDayOfMonth.setDate('0',date.getFullYear());yyyy = (flg==true?date.getFullYear()-1:flg3==true?date.getFullYear()+1:date.getFullYear());}break;
+		case 1:{lastDayOfMonth.setMonth(3);lastDayOfMonth.setDate('0',date.getFullYear());yyyy = (flg2==true?date.getFullYear()+1:date.getFullYear());}break;
+		}
+		mm = monthNames[lastDayOfMonth.getMonth()];dd = lastDayOfMonth.getDate();if (dd < 10) {dd = '0' + dd}
+		toDateStr = mm + ' ' + (dd) + ',' + yyyy;
+		$(fromDateId).val(fromDateStr);
+		$(toDateId).val(toDateStr);
+		$(toDateId).datepicker("option","minDate", new Date(fromDateStr));
+		
+	}
+	//quarter
+	if (filterName == "thisquarter" || filterName == "lastquarter" || filterName == "nextquarter") {
+		var date = new Date();date.setDate('01',date.getMonth(),date.getFullYear());
+		var lastDayOfMonth = new Date(); 
+		var qurIndex=0;
+		switch(date.getMonth()){
+		case 0:case 1: case 2:qurIndex=0;break;
+		case 3:case 4: case 5:qurIndex=1;break;
+		case 6:case 7: case 8:qurIndex=2;break;
+		case 9:case 10: case 11:qurIndex=3;break;
+		}
+		var flg = false; 
+		switch(filterName){
+		case "lastquarter":{if(qurIndex!=0){qurIndex -= 1;}else{qurIndex = 3;flg = true;}}break;
+		case "nextquarter":{if(qurIndex!=3){qurIndex += 1;}else{qurIndex = 0;flg = true;}}break;
+		}
+		var fromDateStr = '';var toDateStr = '';
+		switch(qurIndex){
+		case 0: {yyyy = (flg==true?date.getFullYear()+1:date.getFullYear());mm = monthNames[0];}break;
+		case 1: {yyyy = date.getFullYear();mm = monthNames[3];}break;
+		case 2:{yyyy = date.getFullYear();mm = monthNames[6];}break;
+		case 3:{yyyy = (flg==true?date.getFullYear()-1:date.getFullYear());mm = monthNames[9];}break;
+		}
+		fromDateStr = mm + ' ' + ("01") + ',' + yyyy;
+		switch(qurIndex){
+		case 0:{lastDayOfMonth.setMonth(3);lastDayOfMonth.setDate('0',date.getFullYear());yyyy = (flg==true?date.getFullYear()+1:date.getFullYear());}break;
+		case 1:{lastDayOfMonth.setMonth(6);lastDayOfMonth.setDate('0',date.getFullYear());yyyy = date.getFullYear();}break;
+		case 2:{lastDayOfMonth.setMonth(9);lastDayOfMonth.setDate('0',date.getFullYear());yyyy = date.getFullYear();}break;
+		case 3:{lastDayOfMonth.setMonth(0);lastDayOfMonth.setDate('0',date.getFullYear());yyyy = (flg==true?date.getFullYear()-1:date.getFullYear());}break;
+		}
+		mm = monthNames[lastDayOfMonth.getMonth()];dd = lastDayOfMonth.getDate();if (dd < 10) {dd = '0' + dd}
+		toDateStr = mm + ' ' + (dd) + ',' + yyyy;
+		$(fromDateId).val(fromDateStr);
+		$(toDateId).val(toDateStr);
+		$(toDateId).datepicker("option","minDate", new Date(fromDateStr));
+	}
+	setTimeout(function(){if(arrayObj.onSelect!=undefined){arrayObj.onSelect()}},200);
+	
+}
+
+function gemsCommonPopupModalCssLayout(modelId, widthofModel, zIndex){
+	if(widthofModel!=undefined){
+		if(typeof widthofModel == 'number')
+			widthofModel = widthofModel+'px';
+		$(modelId).modal({
+			keyboard: false,
+			show: false
+		}).css({
+			width: widthofModel,
+			'margin-left': function () {
+				return -($(this).width() / 2);
+			},
+			'z-index':(zIndex!=undefined?zIndex:'2000')
+		});
+	}else{
+		for(var i=0;i<modelId.length;i++){
+			$(modelId[i]['id']).modal({
+				keyboard: false,
+				show: false
+			}).css({
+				width: modelId[i]['width']+"px",
+				'margin-left': function () {
+					return -($(this).width() / 2);
+				},
+				'z-index':(zIndex!=undefined?zIndex:'2000')
+			});	
+		}
+
+	}
+}
+
+/*
+ * Developed By Kiran Badave and Vishnu Kalyankar
+ * */
+var gemsAuthTimeDistanceX;
+function gems_authentication(authObj){
+	if(authObj.customerHelper!=undefined){
+		var cust = $('#customerHelper').val()!=undefined?$('#customerHelper').val():"";
+		if(authObj.customerHelper.indexOf(cust)==-1){
+			if(authObj.onVerify!=undefined)
+				authObj.onVerify();
+			return;
+		}
+	}
+	
+	$('.gemsCommonAuthenticationShowLogsBody').hide();
+	$('.gemsCommonAuthenticationSentOtpInfo').html('');
+	var url = window.location.toString().split('/');
+	var pageName = url[url.length-1];var filterType="",smsBody ="",emailBody = "",captcha ="", employeeId="";
+	if(authObj.smsBody!=undefined)
+		smsBody=authObj.smsBody;
+	
+	if(authObj.emailBody!=undefined)
+		emailBody=authObj.emailBody;
+	
+	if(authObj.captcha!=undefined)
+		captcha = authObj.captcha;
+	 
+	if(authObj.filterType!=undefined)
+		filterType = authObj.filterType;
+	if(authObj.employeeId!=undefined){
+		employeeId=authObj.employeeId;
+	}
+	
+	if(authObj.showLogs!=undefined){
+		$('.gems_authentication_logs_btn').show();
+	}
+	$('.gems_authentication_logs_btn').removeClass('btn-inverse').addClass('btn-default').html('View Logs');
+	gemsCommonPopupModalCssLayout([{'id' : '#gemsCommonAuthenticationModal', 'width' : 500}]);
+	$('.gemsCommonAuthenticationShowLogsBody').fadeOut();
+	$('.gemsCommonAuthenticationSentOtpBody').fadeIn();
+	$('#gemsCommonAuthenticationModal').modal('show');
+	$('.gems_authentication_logs_btn').off('click').click(function(){
+		if($(this).html()!='Back'){
+			$(this).removeClass('btn-default').addClass('btn-inverse').html('Back');
+			gemsCommonPopupModalCssLayout([{'id' : '#gemsCommonAuthenticationModal', 'width' : 800}]);
+			$('.gemsCommonAuthenticationShowLogsBody').fadeIn();$('.gemsCommonAuthenticationSentOtpBody').fadeOut();
+			$.ajax({url:'viewGEMSAuthenticationLogsByFilterTypeAndPageUrl.json',data:{filterType:filterType,pageName:pageName},dataType:'json',type:'POST',async:false,
+				success:function(jArray){$('.gemsCommonAuthenticationShowLogsBody').html(authObj.showLogs(jArray));}
+			});
+		}else{
+			$(this).removeClass('btn-inverse').addClass('btn-default').html('View Logs');
+			gemsCommonPopupModalCssLayout([{'id' : '#gemsCommonAuthenticationModal', 'width' : 500}]);
+			$('.gemsCommonAuthenticationShowLogsBody').fadeOut();$('.gemsCommonAuthenticationSentOtpBody').fadeIn();
+		}
+	});
+	var exprTime = 15;
+	var authType = ["mobile","email"];
+	if(authObj.type!=undefined)
+		authType=authObj.type;
+	if(authObj.expireTime!=undefined)
+		exprTime = authObj.expireTime;
+	$('.gemsCommonAuthenticationSentOtpBtn').off('click').click(function(){
+		clearInterval(gemsAuthTimeDistanceX);
+		$('.gemsCommonAuthenticationSentOtpInfo').html('');
+		$.ajax({
+			url:'sendOTPforGemsCommonSecurityAuthentication.json',
+			data:{expireTime:exprTime,authTypes:authType.toString(),smsBody:smsBody,emailBody:emailBody,emailOrMob:authObj.email+"~"+authObj.mobile,employeeId:employeeId},dataType:'json',type:'POST',async:false,
+			beforeSend: function() {$('.gemsCommonAuthenticationSentOtpBtn').html("Resend Verification Code").attr('disabled',true);$('.gemsCommonAuthenticationloader').show();},
+			complete: function() {$('.gemsCommonAuthenticationloader').hide();setTimeout(function(){$('.gemsCommonAuthenticationSentOtpBtn').html("Send Verification Code").attr('disabled',false);},15000);},
+			success:function(jArray)
+			{
+				if(jArray.mobileEmail!=undefined){
+					var authId = jArray.mobileEmail.split('_')[2];
+					var boiler='';
+					if(authType.indexOf("email")!=-1 || authType.indexOf("mobile")!=-1){
+						boiler += '<p style="color: green">'+'<i class="icon icon-info-sign"></i> &nbsp;Six(6) digit One time password (OTP) has been sent to your registered mobile and email. '+ 
+						'Please enter in the text box given below. (This OTP is only valid for '+exprTime+' minutes)'+'</p>'+
+						'<span class="pull-right countDownGems" style="font-size:10px;font-family:comic sans ms;"></span>';
+					}
+					boiler +='<table class="table table-condenced table-bordered">';
+					if(authType.indexOf("mobile")!=-1){
+						boiler +='<tr><th>Confirm via SMS</th><td>'+jArray.mobileEmail.split('_')[0]+'</td><td> <input type="text" class ="gemsAuthTxtFields" id="SmsAuthTxtField_'+authId+'" placeholder="OTP on SMS" style="width:100px;height:10px;"> </td></tr>';
+					}
+					if(authType.indexOf("email")!=-1){
+						boiler +='<tr><th>Confirm via Email</th><td>'+jArray.mobileEmail.split('_')[1]+'</td><td> <input type="text" class ="gemsAuthTxtFields" id="EmailAuthTxtField_'+authId+'"  placeholder="OTP on Email" style="width:100px;height:10px;"> </td></tr>';
+					}
+					if(authType.indexOf("masterPassword")!=-1){
+						boiler +='<tr><th>Master Password </th>'+
+						'<td  colspan="2"><input type="password" style="width:130px;height:10px;" id="txtMasterPwd_'+authId+'" class ="gemsAuthTxtFields" placeholder="High Security Password"/></td></tr>';
+					}
+					if(authType.indexOf("captcha")!=-1){
+						boiler +='<tr><td style="vertical-align:middle;text-align:center;" colspan="3">'
+							+ '<img src="imageCaptcha.jpg" id="gemsAuthCaptchaImage_'+authId+'" style="width:100px;border: 1px solid;padding: 3px;border-color:#b3ccff;"/><span><strong>'
+							+ '<a href="javascript:void(0);" id="gemsAuthRefreshCaptcha_'+authId+'" style="margin-left: 10px;"><i class="icon icon-refresh"></i></a></strong></span>'
+							+'<input type="text" id="txtCapecha_'+authId+'" class ="gemsAuthTxtFields" style="width:100px;height:10px;margin-left: 35px;" placeholder="Captcha"></td></tr>';
+					}
+					boiler +='<tr><td style="text-align:center;" colspan="4" class="gems_authentication_verify_td_'+authId+'"> <a class="btn btn-success btn-mini verifyOTPforGemsCommonSecurity_'+authId+'" href="javascript:void(0);"> Verify </a> </td></tr>'+
+					'</table>';
+					$('.gemsCommonAuthenticationSentOtpInfo').html(boiler);
+					if($("#productionServer").val()=="false"){
+						$('#SmsAuthTxtField_'+authId).val('123456');
+						$('#EmailAuthTxtField_'+authId).val('123456');
+					}
+					$('.verifyOTPforGemsCommonSecurity_'+authId).off('click').click(function(){
+						verifyOTPforGemsCommonSecurityAuthenticationGEMS__(authId,authObj);
+					});
+					$('#gemsAuthRefreshCaptcha_'+authId).off('click').click(function(){
+						$("#gemsAuthCaptchaImage_"+authId).attr("src", "imageCaptcha.jpg?" + new Date().getTime());
+					});
+					if(authType.indexOf("email")!=-1 || authType.indexOf("mobile")!=-1){
+						var countDownDateGEMS__ = new Date();
+						countDownDateGEMS__.setMinutes(countDownDateGEMS__.getMinutes() + exprTime);
+						gemsAuthTimeDistanceX = setInterval(function() {
+							var nowGEMS__ = new Date().getTime();var distanceGEMS__ = countDownDateGEMS__ - nowGEMS__;
+							$('.countDownGems').html("<table><td>OTP Expires in &nbsp;</td><td><label class='label label-inverse'>"+(Math.floor((distanceGEMS__ % (1000 * 60 * 60)) / (1000 * 60))) + "m " + (Math.floor((distanceGEMS__ % (1000 * 60)) / 1000)) + "s </label></td></table>");
+							if (distanceGEMS__ < 0) {clearInterval(gemsAuthTimeDistanceX);$('.countDownGems').html("<p style='color:red'>EXPIRED</p>");}
+						}, 1000);
+					}
+				}
+			}
+		});
+		
+	});
+	if((authType.indexOf("captcha")!=-1 || authType.indexOf("masterPassword")!=-1) && (authType.indexOf("mobile")==-1 && authType.indexOf("email")==-1)){
+		$('.gemsCommonAuthenticationSentOtpBtn').hide().trigger('click');
+	}
+}
+
+function verifyOTPforGemsCommonSecurityAuthenticationGEMS__(authenticationId, authObj){
+	var url = window.location.toString().split('/');
+	var pageName = url[url.length-1];var filterType= '';var gLogs ="";var employeeId="";
+	if(authObj.logs!=undefined)
+		gLogs = authObj.logs;
+	if(authObj.filterType!=undefined)
+		filterType = authObj.filterType;
+	var authType = ["mobile","email"];	
+	if(authObj.type!=undefined)
+		authType=authObj.type; //captcha
+	var otpnumberSms = $.trim($('#SmsAuthTxtField_'+authenticationId).val());
+	var otpnumberEmail = $.trim($('#EmailAuthTxtField_'+authenticationId).val());
+	var masterPassWord = $.trim($('#txtMasterPwd_'+authenticationId).val());
+	var verifycaptcha = $.trim($('#txtCapecha_'+authenticationId).val());        //
+	if(authObj.employeeId!=undefined){
+		employeeId=authObj.employeeId;
+	}
+	var errorName = new Array();
+	if(otpnumberEmail==''&& authType.indexOf("email")!=-1)
+	{errorName.push("Email OTP");$('#EmailAuthTxtField_'+authenticationId).css("border", "1px solid red").focus();}
+	if(otpnumberSms==''&& authType.indexOf("mobile")!=-1)
+	{errorName.push("Mobile OTP");$('#SmsAuthTxtField_'+authenticationId).css("border", "1px solid red").focus();}
+	if(masterPassWord==''&& authType.indexOf("masterPassword")!=-1)
+	{errorName.push("Master Password");$('#txtMasterPwd_'+authenticationId).css("border", "1px solid red").focus();}
+	if(verifycaptcha =='' && authType.indexOf("captcha")!=-1){errorName.push("Captcha");$('#txtCapecha_'+authenticationId).css("border", "1px solid red").focus();}
+	if(errorName.length>0){
+		$('.gemsCommonAuthenticationError').html('<strong>Please Enter Valid '+errorName.toString()+'!</strong>').removeClass('alert-success').addClass('alert-danger').show();
+	}else{
+		$.ajax({
+			url:'verifyOTPforGemsCommonSecurityAuthentication.json?authenticationId='+authenticationId+'&otpnumberSms='+otpnumberSms+'&otpnumberEmail='+otpnumberEmail,
+			data:{authLogs:gLogs,pageName:pageName,filterType:filterType,authTypes:authType.toString(),verifycaptcha:verifycaptcha,masterPassWord:masterPassWord,employeeId:employeeId},
+			dataType:'json',type:'POST',async:false,
+			success:function(jObj){
+				if(jObj.responseFlag == 1 && jObj.validated){
+					$('.gemsCommonAuthenticationError').html('<strong>Verified!</strong>').removeClass('alert-danger').addClass('alert-success').show();
+					setTimeout(function(){
+						if(authObj.onVerify!=undefined)
+							authObj.onVerify();
+						$('#gemsCommonAuthenticationModal').modal('hide');$('.gemsCommonAuthenticationSentOtpInfo').html('');
+					},1500);
+
+				}else{
+					errorName= new Array();
+					if(jObj.validated!=true){errorName.push("OTP Number");$('#EmailAuthTxtField_'+authenticationId+', #SmsAuthTxtField_'+authenticationId).css("border", "1px solid red").focus();}
+					if(jObj.responseFlag.toString().indexOf('~')!=-1){
+						if(jObj.responseFlag.split('~')[0]=="false"){errorName.push("Captcha");$('#txtCapecha_'+authenticationId).css("border", "1px solid red").focus();}
+						if(jObj.responseFlag.split('~')[1]=="false"){errorName.push("Master Password");$('#txtMasterPwd_'+authenticationId).css("border", "1px solid red").focus();}
+						$('#gemsAuthRefreshCaptcha_'+authenticationId).off('click').click(function(){$("#gemsAuthCaptchaImage_"+authenticationId).attr("src", "imageCaptcha.jpg?" + new Date().getTime());});
+					}
+					$('.gemsCommonAuthenticationError').html('<strong>Please Enter Valid '+errorName.toString()+'!</strong>').removeClass('alert-success').addClass('alert-danger').show();
+				}
+
+			}
+		});
+	}
+	setTimeout(function(){$('.gemsCommonAuthenticationError').hide();$('.gemsAuthTxtFields').css("border", "");},8000);
+}
+
+setTimeout(function(){
+	setInterval(function() {
+		try{
+			for(var i=0;i<gChosenMapArr.length;i++){
+				if(gChosenMapArr[i].objectCzn!=undefined){
+					if($(gChosenMapArr[i].ele).find('option').length == 2){
+						$(gChosenMapArr[i].ele).removeAttr('selected').find('option').eq(1).attr('selected', 'selected');
+					}
+					$(gChosenMapArr[i].ele).gems_chosen($.extend(gChosenMapArr[i].objectCzn, {definedCzn:false}));
+				}
+			}
+			
+			$('.gems_decode').each(function() {
+				var gmstxt = $(this).text();
+				var gmstxtDec = gmstxt.gemsDecode();
+				$(this).data('original_value', gmstxt);
+				if(gmstxt != gmstxtDec){
+					$(this).text(gmstxtDec);
+				}
+				$(this).removeClass('gems_decode');
+			});
+		}catch(e){}
+	}, 2000);
+},1500);
+
+function chosenLisztUpdateCall(htmlEle, callType){
+	try{
+		if($(htmlEle).data('gems_chzn_done')!=undefined){
+			if($(htmlEle).data('gems_chzn_done')==true){
+				setTimeout(function(){
+					if((callType!=undefined && callType=='html') && (!htmlEle.hasClass('doNotSelect')) && htmlEle.find('option').length == 2)
+						htmlEle.removeAttr('selected').find('option').eq(1).attr('selected', 'selected').trigger('change');
+					$(htmlEle).trigger("liszt:updated");
+				},300);
+			}
+		}
+	}catch(e){}
+}
+
+if(window.juno==undefined) window.juno = {};
+
+
+	try{
+		
+		if(window.juno!=undefined){
+			juno.modal = function(obj, cmModalId = 'gemsCommonDialogModal' ){
+				/* Auth: Kiran Badave
+				 * Date: Jul 30, 2019
+				  juno.modal({
+				  		id:'uniqueId',(Optional)
+				  		header:'Info',
+				  		body:'Test',
+				  		footer:'Submit'
+				  });
+				 * */
+				if(obj!=undefined){
+					if(typeof obj == 'object'){
+						let {header='', body='', footer='', backdrop, dismissModalBtn=true} = obj;
+						
+						var modalId = 'gemsCommonDialogModal';
+						if(obj.id!=undefined){
+							modalId = obj.id;
+							if($('#'+modalId).length==0){
+								$('body').append(`<div id="${modalId}" class="modal hide fade" style="z-index:2000;">
+							    	<div class="modal-header"><i class="pull-right fa fa-times fa-lg" style="color:red;cursor:pointer;" data-dismiss="modal"></i><h1 class="juno-modal-header"></h1></div>
+							    	<div class="modal-body"></div>
+							    	<div class="modal-footer"><span class="juno-modal-footer" style="margin-right:5px"></span><span class="btn btn-danger btn-mini j-fa fa-times" data-dismiss="modal">Close</span></div>
+							    </div>`);
+							}
+						}
+						$('#'+modalId+' .juno-modal-header').html(header);
+						$('#'+modalId+' .modal-body').css({'height':'unset',maxHeight:'400px'}).html(body);	
+						$('#'+modalId+' .juno-modal-footer').html(footer);
+						$('#'+modalId).modal({backdrop: backdrop, show:true});
+						
+						
+						if(dismissModalBtn != true){
+							$('#'+modalId).find('[data-dismiss="modal"]').hide();
+						}else{
+							$('#'+modalId).find('[data-dismiss="modal"]').show();
+						}
+						
+						
+						if(obj.width==null)
+							obj.width = 600; 
+						gemsCommonPopupModalCssLayout('#'+modalId, obj.width);
+						
+						if(obj.height!=null){
+							$('#'+modalId+' .modal-body').css({'height':obj.height,maxHeight:obj.height});
+						}
+						if(obj.maxHeight!=null){
+							$('#'+modalId+' .modal-body').css('max-height', obj.maxHeight);
+						}
+						if(obj.bodyOverflow!=null){
+							$('#'+modalId+' .modal-body').css('overflow', obj.bodyOverflow);
+						}
+					}else{
+						$('#'+cmModalId+' .juno-modal-header, #'+cmModalId+' .modal-body, #'+cmModalId+' .juno-modal-footer').html('');
+						$('#'+cmModalId).modal(obj);
+					}
+				}else{
+					throw 'Mention Header/Body/Footer! e.g. juno.modal({header:"Something", body:"Test", footer:"close"})';
+				}
+			};
+			
+			juno.documentPreview = function(link, fileType, isViewOnContainer=false){
+				var frame_width = (($(document).width())-100)+'px';
+				var frame_height = '500px';
+				var imgFilesArr = ['jpg','png', 'gif', 'jpeg'];
+				var officeFilesArr = ['xls','xlsx', 'doc', 'docx','ppt', 'pptx'];
+				
+				var _encLink = encodeURIComponent(window.location.origin+'/'+link);
+				var boiler = '';
+				if(fileType != undefined && (imgFilesArr.indexOf(fileType.toLowerCase())!=-1)){
+					boiler = '<img src="'+link+'"/>';
+				}else if(fileType != undefined && (officeFilesArr.indexOf(fileType.toLowerCase())!=-1)){
+					boiler = '<iframe src="https://view.officeapps.live.com/op/embed.aspx?src='+_encLink+'" style="width:100%; height:800px;" frameborder="0"></iframe>';
+				}else if(fileType != undefined && fileType.toLowerCase()=="pdf"){
+					
+					var boiler ='<iframe id="pdfframe" src="viewPdfFileSystem.json?filePath=' +_encLink+ '#toolbar=false" class="row-fluid" style="height:800px">'
+							   +   '<strong><h3>Sorry, Your Browser Does Not Support PDF View ! <br/> Please Install Upgraded Browser. </h3></strong>'
+							   + '</iframe>';
+				
+				}else{
+					boiler = '<iframe src="https://docs.google.com/gview?url='+_encLink+'&embedded=true" style="width:100%; height:800px;" frameborder="0"></iframe>';
+				}
+				
+				
+				//<iframe src='https://view.officeapps.live.com/op/embed.aspx?src=http%3A%2F%2Fieee802%2Eorg%3A80%2Fsecmail%2FdocIZSEwEqHFr%2Edoc' width='100%' height='100%' frameborder='0'>This is an embedded <a target='_blank' href='http://office.com'>Microsoft Office</a> document, powered by <a target='_blank' href='http://office.com/webapps'>Office Online</a>.</iframe>
+				if(!isViewOnContainer){
+					juno.modal({
+						id:"commonDocumentPreviewJunoTemp",
+						header:'Document Preview',
+						body:boiler,
+						width:frame_width,
+						height: '400px'
+					});
+				}else{
+					juno.createDynamicBlock({
+						divId : '#container',
+						boiler : '<div style="margin:5px;"><div class="label label-info">Document Preview</div>'+boiler+'</div>',
+						buttonLabel : '<i class="fa fa-times"></i> Close',
+						buttonColorClass : 'btn-danger'
+					});
+				}
+			}
+		
+			
+			/*juno.bindSpinner = function(selector){
+				const boiler =`<div style="background-color: lightgray;opacity: 0.5;padding-left:50%;">
+					${$('#spinner').html()}
+					</div>`;
+				$(selector).html(boiler);
+				$(selector).find('.flipper').css('width', '50px');
+			}*/
+			
+			juno.capitalizeInput = function(selector){
+				if($(selector).data('capitalizeInput')!=true){
+					$(selector).data('capitalizeInput', true);
+					$(selector).keyup(function(e){
+						$(this).val($(this).val().replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); }));
+					});
+				}
+			}
+			
+			juno.customerHelper = $('#customerHelper').val();
+			
+			juno.labelByCustomer = function(propName){
+				var lbl = juno.label[juno.customerHelper+'.'+propName];
+				if(lbl==undefined){
+					lbl = juno.label[juno.customerHelperKey+'.'+propName];
+				}
+				if(lbl==undefined){
+				  lbl = juno.label[propName];
+				}
+				if(lbl==undefined){
+					lbl = '';
+				}
+				return lbl;
+			}
+			
+			juno.isCurrentCustomer = function(){
+				for(const arg of arguments){
+					if(juno.customerHelper == arg){
+						return true;
+					}
+				}
+				return false;
+			}
+			/** @SHIVAJI_AND_KIRAN_SIR Date : 01.06.2020 */
+			//Purpose : Use global function anyWhere and select all check boxes .Ex. onclick="juno.isSelectAllCheckBox(this,'.ClsName')"...
+			juno.isSelectAllCheckBox=(selectAllChkObj,selectChkClsName)=>{$(selectChkClsName).attr('checked',$(selectAllChkObj).is(':checked'));};
+			
+			juno.searchFileds = function(domSrc, selectorCls){
+				//console.log($(this).val());
+				var srchTxt = $(domSrc).val().toLowerCase();
+				
+				$(selectorCls).each(function(){
+					if(srchTxt=='' || $(this).text().toLowerCase().indexOf(srchTxt)!=-1){
+						$(this).show();
+					}else{
+						$(this).hide();
+					}
+				});
+			};
+			
+			
+			juno.viewExcelUploadLogs = function(uploadUrl){
+
+				$.ajax({
+					url:'getExcelUplodLogsByUserAndUi.json',
+					dataType:'json',
+					data:{uploadUrl:uploadUrl},
+					junoSpinner:true,
+					success:function(jArray){
+						var type = 'xls';
+						var j=jArray.length;
+						var Boiler='<table class="table table-bordered"><thead><tr><th>Sr.No</th><th>Employee Name</th><th>Date</th><th>File Name</th><th>View File</th></tr></thead></tbody>';
+						for (var i = 0 ; i < j ; i ++){
+							Boiler+='<tr><td style="text-align:right">'+eval(i+1)+'</td><td>'+jArray[i]['username']+'</td><td>'+jArray[i]['date']+'</td><td>'+jArray[i]['fileName']+'</td>';
+							Boiler+='<td><a class="btn btn-mini" target="_blank" title="Download" href = "downloadWithPath.json?id='+jArray[i]['fileId']+'&n='+jArray[i]['fileName']+'&t='+type+'"><i class="fa fa-download fa-lg"></i></a></td></tr>';
+						}
+						Boiler+='</tbody></table>';
+						juno.modal({
+							header:'<h3><b>Excel Upload Logs</b></h3>',
+							body:Boiler,
+							width:'1000px'
+						});
+					
+					},
+				});
+			};
+
+
+			juno.createDynamicBlock = function(optionsOrBoiler){
+				var src_div = '', bind_boiler = '' , c_style='', btn_label='<i class="fa fa-arrow-circle-left"></i> Back', btn_color_class='btn-inverse', back_BtnFun ='';
+				
+				if(typeof optionsOrBoiler == 'object'){
+					const {divId='', boiler='',style='', buttonLabel, buttonColorClass, backBtnFun=''} = optionsOrBoiler;
+					src_div=divId;
+					bind_boiler = boiler;
+					c_style = style;
+					back_BtnFun = backBtnFun;
+					if(buttonLabel) btn_label = buttonLabel; 
+					if(buttonColorClass) btn_color_class = buttonColorClass; 
+				}else{
+					bind_boiler = optionsOrBoiler;
+				}
+				
+				if(src_div==''){
+					src_div = '#'+$('.common_transaction_list_view_bind_cls:visible').parent().attr('id');
+				}
+				
+				
+				var divCount = 0;
+				$(src_div).hide();
+				while($('#common_transaction_list_view_'+divCount).length!=0){
+					$('#common_transaction_list_view_'+divCount).hide();//Kiran
+					divCount++;
+				}
+				
+				var div_selector = "#common_transaction_list_view_bind_"+divCount;
+				var backBtnTemplate =`<span class="btn ${btn_color_class} btn-mini pull-right commonTransBackCls" onclick="juno.dynamicBlock_back_fun(${divCount}, '${src_div}');${back_BtnFun}" style="margin:15px;">${btn_label}</span>`;
+				var boiler = `<div id="common_transaction_list_view_${divCount}" style="${c_style}">
+					${backBtnTemplate}<br>
+					<div id="common_transaction_list_view_bind_${divCount}" class="common_transaction_list_view_bind_cls" style="margin-top: 35px;">${bind_boiler}</div>
+					</div>`;
+				$(boiler).insertAfter(src_div);
+				
+				return `common_transaction_list_view_bind_${divCount}`;
+			};
+
+
+			juno.clearAllInnerOpenedDynamicBlock = function(){
+				$('.commonTransBackCls').trigger('click');
+				if($('.commonTransBackCls').length>0) {
+					var inVarObj = setInterval(function(){
+						$('.commonTransBackCls').trigger('click');
+						if($('.commonTransBackCls').length==0){
+							console.log('Cleared all trans Details!');
+							clearInterval(inVarObj);
+						}
+					},1000);
+				}
+			}
+
+
+			juno.dynamicBlock_back_fun = function(divCnt, prvDiv){
+				$('#common_transaction_list_view_'+divCnt).remove();//Kiran
+				if(prvDiv!=undefined){
+					$(prvDiv).show();
+				}
+			}
+			
+			juno.windowOpenWithPostData = function(obj){
+				/* Kiran Badave
+				*  Date: Nov 7, 2020
+				*/
+
+				const {url='', data={}} = obj;
+				var f = $('<form></form>').attr({method:'post', action:url, target:'_blank'}).appendTo(document.body);
+
+				
+				for(var key of Object.keys(data)){
+					var value = data[key];
+					$('<input>').attr({type:'hidden',name:key,value:value}).appendTo(f);  
+				}
+				f[0].submit();
+				f.remove();  
+			
+			}
+			
+			if(!juno.label){
+				$.ajax({
+					url:'restApi/labelProperties.js',
+					success: function(resData){
+						try{
+							eval(resData);
+						}catch(e){console.log(e);}
+					}
+				});
+			}		
+			
+			
+		}
+}catch(e){console.log(e);}
+	
+var JunoCurrency = function(num){
+	if(num==undefined){
+		num = this;
+	}
+	try{
+		if(!isNaN(num)){
+			num = eval(num);
+			var prefix = '';
+			if(num!=undefined && num<0){
+				num = Math.abs(num);
+				prefix ='(-)';
+			}
+			return prefix+(new Intl.NumberFormat('en-IN', { style: 'currency', currency: (juno!=undefined?juno._currency_code:_currency) }).format(eval(num)));
+		}else{
+			return num;
+		}
+	}catch(e){
+		return num;
+	}
+};
+Number.prototype.JunoCurr = JunoCurrency; 
+String.prototype.JunoCurr = JunoCurrency;
+
+$( document ).ajaxSend(function( event, jqxhr, settings ) {
+	if ( settings.junoSpinner == true) {
+		startCommonAjaxSpinner();
+	}else if( (typeof settings.junoSpinner) == 'object' ){
+		startCommonAjaxSpinner(settings.junoSpinner);
+	}
+});
+
+$( document ).ajaxComplete(function( event, jqxhr, settings ) {
+	if ( settings.junoSpinner == true || (typeof settings.junoSpinner) == 'object' ) {
+		stopCommonAjaxSpinner();
+	}
+});
+;†¸eº      gøÍegøÍeH\Šgøäî   R    O^partitionKey=%28https%2Ccmr.edu.in%29,:https://erp.cmr.edu.in/js/gems_plugins.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:05:56 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|5505f84c-e6f6-9b7f-001f-25a979b80a33|
+Accept-Ranges: bytes
+ETag: W/"70005-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 70005
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:05:56 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|5505f84c-e6f6-9b7f-001f-25a979b80a33|
+Accept-Ranges: bytes
+ETag: W/"70005-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 70005
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=97
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 249 net-response-time-onstop 279  u

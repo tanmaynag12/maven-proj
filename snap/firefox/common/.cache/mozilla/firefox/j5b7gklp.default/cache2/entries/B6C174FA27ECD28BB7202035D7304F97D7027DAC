@@ -1,0 +1,1621 @@
+/*-------------------------------------------------------------------- 
+Scripts for creating and manipulating custom menus based on standard <ul> markup
+Version: 3.0, 03.31.2009
+
+By: Maggie Costello Wachs (maggie@filamentgroup.com) and Scott Jehl (scott@filamentgroup.com)
+	http://www.filamentgroup.com
+	* reference articles: http://www.filamentgroup.com/lab/jquery_ipod_style_drilldown_menu/
+		
+Copyright (c) 2009 Filament Group
+Dual licensed under the MIT (filamentgroup.com/examples/mit-license.txt) and GPL (filamentgroup.com/examples/gpl-license.txt) licenses.
+--------------------------------------------------------------------*/
+
+
+var allUIMenus = [];
+
+$.fn.menu = function(options){
+	var caller = this;
+	var options = options;
+	var m = new Menu(caller, options);	
+	allUIMenus.push(m);
+	
+	$(this)
+	.mousedown(function(){
+		if (!m.menuOpen) { m.showLoading(); };
+	})	
+	.click(function(){
+		if (m.menuOpen == false) { m.showMenu(); }
+		else { m.kill(); };
+		return false;
+	});	
+};
+
+function Menu(caller, options){
+	var menu = this;
+	var caller = $(caller);
+	var container = $('<div class="fg-menu-container ui-widget ui-widget-content ui-corner-all">'+options.content+'</div>');
+	
+	this.menuOpen = false;
+	this.menuExists = false;
+	
+	var options = jQuery.extend({
+		content: null,
+		width: 180, // width of menu container, must be set or passed in to calculate widths of child menus
+		maxHeight: 180, // max height of menu (if a drilldown: height does not include breadcrumb)
+		positionOpts: {
+			posX: 'left', 
+			posY: 'bottom',
+			offsetX: 0,
+			offsetY: 0,
+			directionH: 'right',
+			directionV: 'down', 
+			detectH: true, // do horizontal collision detection  
+			detectV: true, // do vertical collision detection
+			linkToFront: false
+		},
+		showSpeed: 200, // show/hide speed in milliseconds
+		callerOnState: 'ui-state-active', // class to change the appearance of the link/button when the menu is showing
+		loadingState: 'ui-state-loading', // class added to the link/button while the menu is created
+		linkHover: 'ui-state-hover', // class for menu option hover state
+		linkHoverSecondary: 'li-hover', // alternate class, may be used for multi-level menus		
+	// ----- multi-level menu defaults -----
+		crossSpeed: 200, // cross-fade speed for multi-level menus
+		crumbDefaultText: 'Choose an option:',
+		backLink: true, // in the ipod-style menu: instead of breadcrumbs, show only a 'back' link
+		backLinkText: 'Back',
+		flyOut: false, // multi-level menus are ipod-style by default; this parameter overrides to make a flyout instead
+		flyOutOnState: 'ui-state-default',
+		nextMenuLink: 'ui-icon-triangle-1-e', // class to style the link (specifically, a span within the link) used in the multi-level menu to show the next level
+		topLinkText: 'All',
+		nextCrumbLink: 'ui-icon-carat-1-e'	
+	}, options);
+	
+	var killAllMenus = function(){
+		$.each(allUIMenus, function(i){
+			if (allUIMenus[i].menuOpen) { allUIMenus[i].kill(); };	
+		});
+	};
+	
+	this.kill = function(){
+		caller
+			.removeClass(options.loadingState)
+			.removeClass('fg-menu-open')
+			.removeClass(options.callerOnState);	
+		container.find('li').removeClass(options.linkHoverSecondary).find('a').removeClass(options.linkHover);		
+		if (options.flyOutOnState) { container.find('li a').removeClass(options.flyOutOnState); };	
+		if (options.callerOnState) { 	caller.removeClass(options.callerOnState); };			
+		if (container.is('.fg-menu-ipod')) { menu.resetDrilldownMenu(); };
+		if (container.is('.fg-menu-flyout')) { menu.resetFlyoutMenu(); };	
+		container.parent().hide();	
+		menu.menuOpen = false;
+		$(document).unbind('click', killAllMenus);
+		$(document).unbind('keydown');
+	};
+	
+	this.showLoading = function(){
+		caller.addClass(options.loadingState);
+	};
+
+	this.showMenu = function(){
+		killAllMenus();
+		if (!menu.menuExists) { menu.create() };
+		caller
+			.addClass('fg-menu-open')
+			.addClass(options.callerOnState);
+		container.parent().show().click(function(){ menu.kill(); return false; });
+		container.hide().slideDown(options.showSpeed).find('.fg-menu:eq(0)');
+		menu.menuOpen = true;
+		caller.removeClass(options.loadingState);
+		$(document).click(killAllMenus);
+		
+		// assign key events
+		$(document).keydown(function(event){
+			var e;
+			if (event.which !="") { e = event.which; }
+			else if (event.charCode != "") { e = event.charCode; }
+			else if (event.keyCode != "") { e = event.keyCode; }
+			
+			var menuType = ($(event.target).parents('div').is('.fg-menu-flyout')) ? 'flyout' : 'ipod' ;
+			
+			switch(e) {
+				case 37: // left arrow 
+					if (menuType == 'flyout') {
+						$(event.target).trigger('mouseout');
+						if ($('.'+options.flyOutOnState).size() > 0) { $('.'+options.flyOutOnState).trigger('mouseover'); };
+					};
+					
+					if (menuType == 'ipod') {
+						$(event.target).trigger('mouseout');
+						if ($('.fg-menu-footer').find('a').size() > 0) { $('.fg-menu-footer').find('a').trigger('click'); };
+						if ($('.fg-menu-header').find('a').size() > 0) { $('.fg-menu-current-crumb').prev().find('a').trigger('click'); };
+						if ($('.fg-menu-current').prev().is('.fg-menu-indicator')) {
+							$('.fg-menu-current').prev().trigger('mouseover');							
+						};						
+					};
+					return false;
+					break;
+					
+				case 38: // up arrow 
+					if ($(event.target).is('.' + options.linkHover)) {	
+						var prevLink = $(event.target).parent().prev().find('a:eq(0)');						
+						if (prevLink.size() > 0) {
+							$(event.target).trigger('mouseout');
+							prevLink.trigger('mouseover');
+						};						
+					}
+					else { container.find('a:eq(0)').trigger('mouseover'); }
+					return false;
+					break;
+					
+				case 39: // right arrow 
+					if ($(event.target).is('.fg-menu-indicator')) {						
+						if (menuType == 'flyout') {
+							$(event.target).next().find('a:eq(0)').trigger('mouseover');
+						}
+						else if (menuType == 'ipod') {
+							$(event.target).trigger('click');						
+							setTimeout(function(){
+								$(event.target).next().find('a:eq(0)').trigger('mouseover');
+							}, options.crossSpeed);
+						};				
+					}; 
+					return false;
+					break;
+					
+				case 40: // down arrow 
+					if ($(event.target).is('.' + options.linkHover)) {
+						var nextLink = $(event.target).parent().next().find('a:eq(0)');						
+						if (nextLink.size() > 0) {							
+							$(event.target).trigger('mouseout');
+							nextLink.trigger('mouseover');
+						};				
+					}
+					else { container.find('a:eq(0)').trigger('mouseover'); }		
+					return false;						
+					break;
+					
+				case 27: // escape
+					killAllMenus();
+					break;
+					
+				case 13: // enter
+					if ($(event.target).is('.fg-menu-indicator') && menuType == 'ipod') {							
+						$(event.target).trigger('click');						
+						setTimeout(function(){
+							$(event.target).next().find('a:eq(0)').trigger('mouseover');
+						}, options.crossSpeed);					
+					}; 
+					break;
+			};			
+		});
+	};
+	
+	this.create = function(){	
+		container.css({ width: options.width }).appendTo('body').find('ul:first').not('.fg-menu-breadcrumb').addClass('fg-menu');
+		container.find('ul, li a').addClass('ui-corner-all');
+		
+		// aria roles & attributes
+		container.find('ul').attr('role', 'menu').eq(0).attr('aria-activedescendant','active-menuitem').attr('aria-labelledby', caller.attr('id'));
+		container.find('li').attr('role', 'menuitem');
+		container.find('li:has(ul)').attr('aria-haspopup', 'true').find('ul').attr('aria-expanded', 'false');
+		container.find('a').attr('tabindex', '-1');
+		
+		// when there are multiple levels of hierarchy, create flyout or drilldown menu
+		if (container.find('ul').size() > 1) {
+			if (options.flyOut) { menu.flyout(container, options); }
+			else { menu.drilldown(container, options); }	
+		}
+		else {
+			container.find('a').click(function(){
+				menu.chooseItem(this);
+				return false;
+			});
+		};	
+		
+		if (options.linkHover) {
+			var allLinks = container.find('.fg-menu li a');
+			allLinks.hover(
+				function(){
+					var menuitem = $(this);
+					$('.'+options.linkHover).removeClass(options.linkHover).blur().parent().removeAttr('id');
+					$(this).addClass(options.linkHover).focus().parent().attr('id','active-menuitem');
+				},
+				function(){
+					$(this).removeClass(options.linkHover).blur().parent().removeAttr('id');
+				}
+			);
+		};
+		
+		if (options.linkHoverSecondary) {
+			container.find('.fg-menu li').hover(
+				function(){
+					$(this).siblings('li').removeClass(options.linkHoverSecondary);
+					if (options.flyOutOnState) { $(this).siblings('li').find('a').removeClass(options.flyOutOnState); }
+					$(this).addClass(options.linkHoverSecondary);
+				},
+				function(){ $(this).removeClass(options.linkHoverSecondary); }
+			);
+		};	
+		
+		menu.setPosition(container, caller, options);
+		menu.menuExists = true;
+	};
+	
+	this.chooseItem = function(item){
+		menu.kill();
+		// edit this for your own custom function/callback:
+		$('#menuSelection').text($(item).text());	
+		location.href = $(item).attr('href');
+	};
+};
+
+Menu.prototype.flyout = function(container, options) {
+	var menu = this;
+	
+	this.resetFlyoutMenu = function(){
+		var allLists = container.find('ul ul');
+		allLists.removeClass('ui-widget-content').hide();	
+	};
+	
+	container.addClass('fg-menu-flyout').find('li:has(ul)').each(function(){
+		var linkWidth = container.width();
+		var showTimer, hideTimer;
+		var allSubLists = $(this).find('ul');		
+		
+		allSubLists.css({ left: linkWidth, width: linkWidth }).hide();
+			
+		$(this).find('a:eq(0)').addClass('fg-menu-indicator').html('<span>' + $(this).find('a:eq(0)').text() + '</span><span class="ui-icon '+options.nextMenuLink+'"></span>').hover(
+			function(){
+				clearTimeout(hideTimer);
+				var subList = $(this).next();
+				if (!fitVertical(subList, $(this).offset().top)) { subList.css({ top: 'auto', bottom: 0 }); };
+				if (!fitHorizontal(subList, $(this).offset().left + 100)) { subList.css({ left: 'auto', right: linkWidth, 'z-index': 999 }); };
+				showTimer = setTimeout(function(){
+					subList.addClass('ui-widget-content').show(options.showSpeed).attr('aria-expanded', 'true');	
+				}, 300);	
+			},
+			function(){
+				clearTimeout(showTimer);
+				var subList = $(this).next();
+				hideTimer = setTimeout(function(){
+					subList.removeClass('ui-widget-content').hide(options.showSpeed).attr('aria-expanded', 'false');
+				}, 400);	
+			}
+		);
+
+		$(this).find('ul a').hover(
+			function(){
+				clearTimeout(hideTimer);
+				if ($(this).parents('ul').prev().is('a.fg-menu-indicator')) {
+					$(this).parents('ul').prev().addClass(options.flyOutOnState);
+				}
+			},
+			function(){
+				hideTimer = setTimeout(function(){
+					allSubLists.hide(options.showSpeed);
+					container.find(options.flyOutOnState).removeClass(options.flyOutOnState);
+				}, 500);	
+			}
+		);	
+	});
+	
+	container.find('a').click(function(){
+		menu.chooseItem(this);
+		return false;
+	});
+};
+
+
+Menu.prototype.drilldown = function(container, options) {
+	var menu = this;	
+	var topList = container.find('.fg-menu');	
+	var breadcrumb = $('<ul class="fg-menu-breadcrumb ui-widget-header ui-corner-all ui-helper-clearfix"></ul>');
+	var crumbDefaultHeader = $('<li class="fg-menu-breadcrumb-text">'+options.crumbDefaultText+'</li>');
+	var firstCrumbText = (options.backLink) ? options.backLinkText : options.topLinkText;
+	var firstCrumbClass = (options.backLink) ? 'fg-menu-prev-list' : 'fg-menu-all-lists';
+	var firstCrumbLinkClass = (options.backLink) ? 'ui-state-default ui-corner-all' : '';
+	var firstCrumbIcon = (options.backLink) ? '<span class="ui-icon ui-icon-triangle-1-w"></span>' : '';
+	var firstCrumb = $('<li class="'+firstCrumbClass+'"><a href="#" class="'+firstCrumbLinkClass+'">'+firstCrumbIcon+firstCrumbText+'</a></li>');
+	
+	container.addClass('fg-menu-ipod');
+	
+	if (options.backLink) { breadcrumb.addClass('fg-menu-footer').appendTo(container).hide(); }
+	else { breadcrumb.addClass('fg-menu-header').prependTo(container); };
+	breadcrumb.append(crumbDefaultHeader);
+	
+	var checkMenuHeight = function(el){
+		if (el.height() > options.maxHeight) { el.addClass('fg-menu-scroll') };	
+		el.css({ height: options.maxHeight });
+	};
+	
+	var resetChildMenu = function(el){ el.removeClass('fg-menu-scroll').removeClass('fg-menu-current').height('auto'); };
+	
+	this.resetDrilldownMenu = function(){
+		$('.fg-menu-current').removeClass('fg-menu-current');
+		topList.animate({ left: 0 }, options.crossSpeed, function(){
+			$(this).find('ul').each(function(){
+				$(this).hide();
+				resetChildMenu($(this));				
+			});
+			topList.addClass('fg-menu-current');			
+		});		
+		$('.fg-menu-all-lists').find('span').remove();	
+		breadcrumb.empty().append(crumbDefaultHeader);		
+		$('.fg-menu-footer').empty().hide();	
+		checkMenuHeight(topList);		
+	};
+	
+	topList
+		.addClass('fg-menu-content fg-menu-current ui-widget-content ui-helper-clearfix')
+		.css({ width: container.width() })
+		.find('ul')
+			.css({ width: container.width(), left: container.width() })
+			.addClass('ui-widget-content')
+			.hide();		
+	checkMenuHeight(topList);	
+	
+	topList.find('a').each(function(){
+		// if the link opens a child menu:
+		if ($(this).next().is('ul')) {
+			$(this)
+				.addClass('fg-menu-indicator')
+				.each(function(){ $(this).html('<span>' + $(this).text() + '</span><span class="ui-icon '+options.nextMenuLink+'"></span>'); })
+				.click(function(){ // ----- show the next menu			
+					var nextList = $(this).next();
+		    		var parentUl = $(this).parents('ul:eq(0)');   		
+		    		var parentLeft = (parentUl.is('.fg-menu-content')) ? 0 : parseFloat(topList.css('left'));    		
+		    		var nextLeftVal = Math.round(parentLeft - parseFloat(container.width()));
+		    		var footer = $('.fg-menu-footer');
+		    		
+		    		// show next menu   		
+		    		resetChildMenu(parentUl);
+		    		checkMenuHeight(nextList);
+					topList.animate({ left: nextLeftVal }, options.crossSpeed);						
+		    		nextList.show().addClass('fg-menu-current').attr('aria-expanded', 'true');    
+		    		
+		    		var setPrevMenu = function(backlink){
+		    			var b = backlink;
+		    			var c = $('.fg-menu-current');
+			    		var prevList = c.parents('ul:eq(0)');
+			    		c.hide().attr('aria-expanded', 'false');
+		    			resetChildMenu(c);
+		    			checkMenuHeight(prevList);
+			    		prevList.addClass('fg-menu-current').attr('aria-expanded', 'true');
+			    		if (prevList.hasClass('fg-menu-content')) { b.remove(); footer.hide(); };
+		    		};		
+		
+					// initialize "back" link
+					if (options.backLink) {
+						if (footer.find('a').size() == 0) {
+							footer.show();
+							$('<a href="#"><span class="ui-icon ui-icon-triangle-1-w"></span> <span>Back</span></a>')
+								.appendTo(footer)
+								.click(function(){ // ----- show the previous menu
+									var b = $(this);
+						    		var prevLeftVal = parseFloat(topList.css('left')) + container.width();		    						    		
+						    		topList.animate({ left: prevLeftVal },  options.crossSpeed, function(){
+						    			setPrevMenu(b);
+						    		});			
+									return false;
+								});
+						}
+					}
+					// or initialize top breadcrumb
+		    		else { 
+		    			if (breadcrumb.find('li').size() == 1){				
+							breadcrumb.empty().append(firstCrumb);
+							firstCrumb.find('a').click(function(){
+								menu.resetDrilldownMenu();
+								return false;
+							});
+						}
+						$('.fg-menu-current-crumb').removeClass('fg-menu-current-crumb');
+						var crumbText = $(this).find('span:eq(0)').text();
+						var newCrumb = $('<li class="fg-menu-current-crumb"><a href="javascript://" class="fg-menu-crumb">'+crumbText+'</a></li>');	
+						newCrumb
+							.appendTo(breadcrumb)
+							.find('a').click(function(){
+								if ($(this).parent().is('.fg-menu-current-crumb')){
+									menu.chooseItem(this);
+								}
+								else {
+									var newLeftVal = - ($('.fg-menu-current').parents('ul').size() - 1) * 180;
+									topList.animate({ left: newLeftVal }, options.crossSpeed, function(){
+										setPrevMenu();
+									});
+								
+									// make this the current crumb, delete all breadcrumbs after this one, and navigate to the relevant menu
+									$(this).parent().addClass('fg-menu-current-crumb').find('span').remove();
+									$(this).parent().nextAll().remove();									
+								};
+								return false;
+							});
+						newCrumb.prev().append(' <span class="ui-icon '+options.nextCrumbLink+'"></span>');
+		    		};			
+		    		return false;    		
+    			});
+		}
+		// if the link is a leaf node (doesn't open a child menu)
+		else {
+			$(this).click(function(){
+				menu.chooseItem(this);
+				return false;
+			});
+		};
+	});
+};
+
+
+/* Menu.prototype.setPosition parameters (defaults noted with *):
+	referrer = the link (or other element) used to show the overlaid object 
+	settings = can override the defaults:
+		- posX/Y: where the top left corner of the object should be positioned in relation to its referrer.
+				X: left*, center, right
+				Y: top, center, bottom*
+		- offsetX/Y: the number of pixels to be offset from the x or y position.  Can be a positive or negative number.
+		- directionH/V: where the entire menu should appear in relation to its referrer.
+				Horizontal: left*, right
+				Vertical: up, down*
+		- detectH/V: detect the viewport horizontally / vertically
+		- linkToFront: copy the menu link and place it on top of the menu (visual effect to make it look like it overlaps the object) */
+
+Menu.prototype.setPosition = function(widget, caller, options) { 
+	var el = widget;
+	var referrer = caller;
+	var dims = {
+		refX: referrer.offset().left,
+		refY: referrer.offset().top,
+		refW: referrer.getTotalWidth(),
+		refH: referrer.getTotalHeight()
+	};	
+	var options = options;
+	var xVal, yVal;
+	
+	var helper = $('<div class="positionHelper"></div>');
+	helper.css({ position: 'absolute', left: dims.refX, top: dims.refY, width: dims.refW, height: dims.refH });
+	el.wrap(helper);
+	
+	// get X pos
+	switch(options.positionOpts.posX) {
+		case 'left': 	xVal = 0; 
+			break;				
+		case 'center': xVal = dims.refW / 2;
+			break;				
+		case 'right': xVal = dims.refW;
+			break;
+	};
+	
+	// get Y pos
+	switch(options.positionOpts.posY) {
+		case 'top': 	yVal = 0;
+			break;				
+		case 'center': yVal = dims.refH / 2;
+			break;				
+		case 'bottom': yVal = dims.refH;
+			break;
+	};
+	
+	// add the offsets (zero by default)
+	xVal += options.positionOpts.offsetX;
+	yVal += options.positionOpts.offsetY;
+	
+	// position the object vertically
+	if (options.positionOpts.directionV == 'up') {
+		el.css({ top: 'auto', bottom: yVal });
+		if (options.positionOpts.detectV && !fitVertical(el)) {
+			el.css({ bottom: 'auto', top: yVal });
+		}
+	} 
+	else {
+		el.css({ bottom: 'auto', top: yVal });
+		if (options.positionOpts.detectV && !fitVertical(el)) {
+			el.css({ top: 'auto', bottom: yVal });
+		}
+	};
+	
+	// and horizontally
+	if (options.positionOpts.directionH == 'left') {
+		el.css({ left: 'auto', right: xVal });
+		if (options.positionOpts.detectH && !fitHorizontal(el)) {
+			el.css({ right: 'auto', left: xVal });
+		}
+	} 
+	else {
+		el.css({ right: 'auto', left: xVal });
+		if (options.positionOpts.detectH && !fitHorizontal(el)) {
+			el.css({ left: 'auto', right: xVal });
+		}
+	};
+	
+	// if specified, clone the referring element and position it so that it appears on top of the menu
+	if (options.positionOpts.linkToFront) {
+		referrer.clone().addClass('linkClone').css({
+			position: 'absolute', 
+			top: 0, 
+			right: 'auto', 
+			bottom: 'auto', 
+			left: 0, 
+			width: referrer.width(), 
+			height: referrer.height()
+		}).insertAfter(el);
+	};
+};
+
+
+/* Utilities to sort and find viewport dimensions */
+
+function sortBigToSmall(a, b) { return b - a; };
+
+jQuery.fn.getTotalWidth = function(){
+	return $(this).width() + parseInt($(this).css('paddingRight')) + parseInt($(this).css('paddingLeft')) + parseInt($(this).css('borderRightWidth')) + parseInt($(this).css('borderLeftWidth'));
+};
+
+jQuery.fn.getTotalHeight = function(){
+	return $(this).height() + parseInt($(this).css('paddingTop')) + parseInt($(this).css('paddingBottom')) + parseInt($(this).css('borderTopWidth')) + parseInt($(this).css('borderBottomWidth'));
+};
+
+function getScrollTop(){
+	return self.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+};
+
+function getScrollLeft(){
+	return self.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft;
+};
+
+function getWindowHeight(){
+	var de = document.documentElement;
+	return self.innerHeight || (de && de.clientHeight) || document.body.clientHeight;
+};
+
+function getWindowWidth(){
+	var de = document.documentElement;
+	return self.innerWidth || (de && de.clientWidth) || document.body.clientWidth;
+};
+
+/* Utilities to test whether an element will fit in the viewport
+	Parameters:
+	el = element to position, required
+	leftOffset / topOffset = optional parameter if the offset cannot be calculated (i.e., if the object is in the DOM but is set to display: 'none') */
+	
+function fitHorizontal(el, leftOffset){
+	var leftVal = parseInt(leftOffset) || $(el).offset().left;
+	return (leftVal + $(el).width() <= getWindowWidth() + getScrollLeft() && leftVal - getScrollLeft() >= 0);
+};
+
+function fitVertical(el, topOffset){
+	var topVal = parseInt(topOffset) || $(el).offset().top;
+	return (topVal + $(el).height() <= getWindowHeight() + getScrollTop() && topVal - getScrollTop() >= 0);
+};
+
+/*-------------------------------------------------------------------- 
+ * javascript method: "pxToEm"
+ * by:
+   Scott Jehl (scott@filamentgroup.com) 
+   Maggie Wachs (maggie@filamentgroup.com)
+   http://www.filamentgroup.com
+ *
+ * Copyright (c) 2008 Filament Group
+ * Dual licensed under the MIT (filamentgroup.com/examples/mit-license.txt) and GPL (filamentgroup.com/examples/gpl-license.txt) licenses.
+ *
+ * Description: Extends the native Number and String objects with pxToEm method. pxToEm converts a pixel value to ems depending on inherited font size.  
+ * Article: http://www.filamentgroup.com/lab/retaining_scalable_interfaces_with_pixel_to_em_conversion/
+ * Demo: http://www.filamentgroup.com/examples/pxToEm/	 	
+ *							
+ * Options:  	 								
+ 		scope: string or jQuery selector for font-size scoping
+ 		reverse: Boolean, true reverses the conversion to em-px
+ * Dependencies: jQuery library						  
+ * Usage Example: myPixelValue.pxToEm(); or myPixelValue.pxToEm({'scope':'#navigation', reverse: true});
+ *
+ * Version: 2.0, 08.01.2008 
+ * Changelog:
+ *		08.02.2007 initial Version 1.0
+ *		08.01.2008 - fixed font-size calculation for IE
+--------------------------------------------------------------------*/
+
+Number.prototype.pxToEm = String.prototype.pxToEm = function(settings){
+	//set defaults
+	settings = jQuery.extend({
+		scope: 'body',
+		reverse: false
+	}, settings);
+	
+	var pxVal = (this == '') ? 0 : parseFloat(this);
+	var scopeVal;
+	var getWindowWidth = function(){
+		var de = document.documentElement;
+		return self.innerWidth || (de && de.clientWidth) || document.body.clientWidth;
+	};	
+	
+	/* When a percentage-based font-size is set on the body, IE returns that percent of the window width as the font-size. 
+		For example, if the body font-size is 62.5% and the window width is 1000px, IE will return 625px as the font-size. 	
+		When this happens, we calculate the correct body font-size (%) and multiply it by 16 (the standard browser font size) 
+		to get an accurate em value. */
+				
+	if (settings.scope == 'body' && $.browser.msie && (parseFloat($('body').css('font-size')) / getWindowWidth()).toFixed(1) > 0.0) {
+		var calcFontSize = function(){		
+			return (parseFloat($('body').css('font-size'))/getWindowWidth()).toFixed(3) * 16;
+		};
+		scopeVal = calcFontSize();
+	}
+	else { scopeVal = parseFloat(jQuery(settings.scope).css("font-size")); };
+			
+	var result = (settings.reverse == true) ? (pxVal * scopeVal).toFixed(2) + 'px' : (pxVal / scopeVal).toFixed(2) + 'em';
+	return result;
+};        ÄÒ  xÄÒ   20250331133932-8lcÒ  ü Í%%   https://erp.cmrit.ac.in/js/fg.menu.js      ≥\  /*-------------------------------------------------------------------- 
+Scripts for creating and manipulating custom menus based on standard <ul> markup
+Version: 3.0, 03.31.2009
+
+By: Maggie Costello Wachs (maggie@filamentgroup.com) and Scott Jehl (scott@filamentgroup.com)
+	http://www.filamentgroup.com
+	* reference articles: http://www.filamentgroup.com/lab/jquery_ipod_style_drilldown_menu/
+		
+Copyright (c) 2009 Filament Group
+Dual licensed under the MIT (filamentgroup.com/examples/mit-license.txt) and GPL (filamentgroup.com/examples/gpl-license.txt) licenses.
+--------------------------------------------------------------------*/
+
+
+var allUIMenus = [];
+
+$.fn.menu = function(options){
+	var caller = this;
+	var options = options;
+	var m = new Menu(caller, options);	
+	allUIMenus.push(m);
+	
+	$(this)
+	.mousedown(function(){
+		if (!m.menuOpen) { m.showLoading(); };
+	})	
+	.click(function(){
+		if (m.menuOpen == false) { m.showMenu(); }
+		else { m.kill(); };
+		return false;
+	});	
+};
+
+function Menu(caller, options){
+	var menu = this;
+	var caller = $(caller);
+	var container = $('<div class="fg-menu-container ui-widget ui-widget-content ui-corner-all">'+options.content+'</div>');
+	
+	this.menuOpen = false;
+	this.menuExists = false;
+	
+	var options = jQuery.extend({
+		content: null,
+		width: 180, // width of menu container, must be set or passed in to calculate widths of child menus
+		maxHeight: 180, // max height of menu (if a drilldown: height does not include breadcrumb)
+		positionOpts: {
+			posX: 'left', 
+			posY: 'bottom',
+			offsetX: 0,
+			offsetY: 0,
+			directionH: 'right',
+			directionV: 'down', 
+			detectH: true, // do horizontal collision detection  
+			detectV: true, // do vertical collision detection
+			linkToFront: false
+		},
+		showSpeed: 200, // show/hide speed in milliseconds
+		callerOnState: 'ui-state-active', // class to change the appearance of the link/button when the menu is showing
+		loadingState: 'ui-state-loading', // class added to the link/button while the menu is created
+		linkHover: 'ui-state-hover', // class for menu option hover state
+		linkHoverSecondary: 'li-hover', // alternate class, may be used for multi-level menus		
+	// ----- multi-level menu defaults -----
+		crossSpeed: 200, // cross-fade speed for multi-level menus
+		crumbDefaultText: 'Choose an option:',
+		backLink: true, // in the ipod-style menu: instead of breadcrumbs, show only a 'back' link
+		backLinkText: 'Back',
+		flyOut: false, // multi-level menus are ipod-style by default; this parameter overrides to make a flyout instead
+		flyOutOnState: 'ui-state-default',
+		nextMenuLink: 'ui-icon-triangle-1-e', // class to style the link (specifically, a span within the link) used in the multi-level menu to show the next level
+		topLinkText: 'All',
+		nextCrumbLink: 'ui-icon-carat-1-e'	
+	}, options);
+	
+	var killAllMenus = function(){
+		$.each(allUIMenus, function(i){
+			if (allUIMenus[i].menuOpen) { allUIMenus[i].kill(); };	
+		});
+	};
+	
+	this.kill = function(){
+		caller
+			.removeClass(options.loadingState)
+			.removeClass('fg-menu-open')
+			.removeClass(options.callerOnState);	
+		container.find('li').removeClass(options.linkHoverSecondary).find('a').removeClass(options.linkHover);		
+		if (options.flyOutOnState) { container.find('li a').removeClass(options.flyOutOnState); };	
+		if (options.callerOnState) { 	caller.removeClass(options.callerOnState); };			
+		if (container.is('.fg-menu-ipod')) { menu.resetDrilldownMenu(); };
+		if (container.is('.fg-menu-flyout')) { menu.resetFlyoutMenu(); };	
+		container.parent().hide();	
+		menu.menuOpen = false;
+		$(document).unbind('click', killAllMenus);
+		$(document).unbind('keydown');
+	};
+	
+	this.showLoading = function(){
+		caller.addClass(options.loadingState);
+	};
+
+	this.showMenu = function(){
+		killAllMenus();
+		if (!menu.menuExists) { menu.create() };
+		caller
+			.addClass('fg-menu-open')
+			.addClass(options.callerOnState);
+		container.parent().show().click(function(){ menu.kill(); return false; });
+		container.hide().slideDown(options.showSpeed).find('.fg-menu:eq(0)');
+		menu.menuOpen = true;
+		caller.removeClass(options.loadingState);
+		$(document).click(killAllMenus);
+		
+		// assign key events
+		$(document).keydown(function(event){
+			var e;
+			if (event.which !="") { e = event.which; }
+			else if (event.charCode != "") { e = event.charCode; }
+			else if (event.keyCode != "") { e = event.keyCode; }
+			
+			var menuType = ($(event.target).parents('div').is('.fg-menu-flyout')) ? 'flyout' : 'ipod' ;
+			
+			switch(e) {
+				case 37: // left arrow 
+					if (menuType == 'flyout') {
+						$(event.target).trigger('mouseout');
+						if ($('.'+options.flyOutOnState).size() > 0) { $('.'+options.flyOutOnState).trigger('mouseover'); };
+					};
+					
+					if (menuType == 'ipod') {
+						$(event.target).trigger('mouseout');
+						if ($('.fg-menu-footer').find('a').size() > 0) { $('.fg-menu-footer').find('a').trigger('click'); };
+						if ($('.fg-menu-header').find('a').size() > 0) { $('.fg-menu-current-crumb').prev().find('a').trigger('click'); };
+						if ($('.fg-menu-current').prev().is('.fg-menu-indicator')) {
+							$('.fg-menu-current').prev().trigger('mouseover');							
+						};						
+					};
+					return false;
+					break;
+					
+				case 38: // up arrow 
+					if ($(event.target).is('.' + options.linkHover)) {	
+						var prevLink = $(event.target).parent().prev().find('a:eq(0)');						
+						if (prevLink.size() > 0) {
+							$(event.target).trigger('mouseout');
+							prevLink.trigger('mouseover');
+						};						
+					}
+					else { container.find('a:eq(0)').trigger('mouseover'); }
+					return false;
+					break;
+					
+				case 39: // right arrow 
+					if ($(event.target).is('.fg-menu-indicator')) {						
+						if (menuType == 'flyout') {
+							$(event.target).next().find('a:eq(0)').trigger('mouseover');
+						}
+						else if (menuType == 'ipod') {
+							$(event.target).trigger('click');						
+							setTimeout(function(){
+								$(event.target).next().find('a:eq(0)').trigger('mouseover');
+							}, options.crossSpeed);
+						};				
+					}; 
+					return false;
+					break;
+					
+				case 40: // down arrow 
+					if ($(event.target).is('.' + options.linkHover)) {
+						var nextLink = $(event.target).parent().next().find('a:eq(0)');						
+						if (nextLink.size() > 0) {							
+							$(event.target).trigger('mouseout');
+							nextLink.trigger('mouseover');
+						};				
+					}
+					else { container.find('a:eq(0)').trigger('mouseover'); }		
+					return false;						
+					break;
+					
+				case 27: // escape
+					killAllMenus();
+					break;
+					
+				case 13: // enter
+					if ($(event.target).is('.fg-menu-indicator') && menuType == 'ipod') {							
+						$(event.target).trigger('click');						
+						setTimeout(function(){
+							$(event.target).next().find('a:eq(0)').trigger('mouseover');
+						}, options.crossSpeed);					
+					}; 
+					break;
+			};			
+		});
+	};
+	
+	this.create = function(){	
+		container.css({ width: options.width }).appendTo('body').find('ul:first').not('.fg-menu-breadcrumb').addClass('fg-menu');
+		container.find('ul, li a').addClass('ui-corner-all');
+		
+		// aria roles & attributes
+		container.find('ul').attr('role', 'menu').eq(0).attr('aria-activedescendant','active-menuitem').attr('aria-labelledby', caller.attr('id'));
+		container.find('li').attr('role', 'menuitem');
+		container.find('li:has(ul)').attr('aria-haspopup', 'true').find('ul').attr('aria-expanded', 'false');
+		container.find('a').attr('tabindex', '-1');
+		
+		// when there are multiple levels of hierarchy, create flyout or drilldown menu
+		if (container.find('ul').size() > 1) {
+			if (options.flyOut) { menu.flyout(container, options); }
+			else { menu.drilldown(container, options); }	
+		}
+		else {
+			container.find('a').click(function(){
+				menu.chooseItem(this);
+				return false;
+			});
+		};	
+		
+		if (options.linkHover) {
+			var allLinks = container.find('.fg-menu li a');
+			allLinks.hover(
+				function(){
+					var menuitem = $(this);
+					$('.'+options.linkHover).removeClass(options.linkHover).blur().parent().removeAttr('id');
+					$(this).addClass(options.linkHover).focus().parent().attr('id','active-menuitem');
+				},
+				function(){
+					$(this).removeClass(options.linkHover).blur().parent().removeAttr('id');
+				}
+			);
+		};
+		
+		if (options.linkHoverSecondary) {
+			container.find('.fg-menu li').hover(
+				function(){
+					$(this).siblings('li').removeClass(options.linkHoverSecondary);
+					if (options.flyOutOnState) { $(this).siblings('li').find('a').removeClass(options.flyOutOnState); }
+					$(this).addClass(options.linkHoverSecondary);
+				},
+				function(){ $(this).removeClass(options.linkHoverSecondary); }
+			);
+		};	
+		
+		menu.setPosition(container, caller, options);
+		menu.menuExists = true;
+	};
+	
+	this.chooseItem = function(item){
+		menu.kill();
+		// edit this for your own custom function/callback:
+		$('#menuSelection').text($(item).text());	
+		location.href = $(item).attr('href');
+	};
+};
+
+Menu.prototype.flyout = function(container, options) {
+	var menu = this;
+	
+	this.resetFlyoutMenu = function(){
+		var allLists = container.find('ul ul');
+		allLists.removeClass('ui-widget-content').hide();	
+	};
+	
+	container.addClass('fg-menu-flyout').find('li:has(ul)').each(function(){
+		var linkWidth = container.width();
+		var showTimer, hideTimer;
+		var allSubLists = $(this).find('ul');		
+		
+		allSubLists.css({ left: linkWidth, width: linkWidth }).hide();
+			
+		$(this).find('a:eq(0)').addClass('fg-menu-indicator').html('<span>' + $(this).find('a:eq(0)').text() + '</span><span class="ui-icon '+options.nextMenuLink+'"></span>').hover(
+			function(){
+				clearTimeout(hideTimer);
+				var subList = $(this).next();
+				if (!fitVertical(subList, $(this).offset().top)) { subList.css({ top: 'auto', bottom: 0 }); };
+				if (!fitHorizontal(subList, $(this).offset().left + 100)) { subList.css({ left: 'auto', right: linkWidth, 'z-index': 999 }); };
+				showTimer = setTimeout(function(){
+					subList.addClass('ui-widget-content').show(options.showSpeed).attr('aria-expanded', 'true');	
+				}, 300);	
+			},
+			function(){
+				clearTimeout(showTimer);
+				var subList = $(this).next();
+				hideTimer = setTimeout(function(){
+					subList.removeClass('ui-widget-content').hide(options.showSpeed).attr('aria-expanded', 'false');
+				}, 400);	
+			}
+		);
+
+		$(this).find('ul a').hover(
+			function(){
+				clearTimeout(hideTimer);
+				if ($(this).parents('ul').prev().is('a.fg-menu-indicator')) {
+					$(this).parents('ul').prev().addClass(options.flyOutOnState);
+				}
+			},
+			function(){
+				hideTimer = setTimeout(function(){
+					allSubLists.hide(options.showSpeed);
+					container.find(options.flyOutOnState).removeClass(options.flyOutOnState);
+				}, 500);	
+			}
+		);	
+	});
+	
+	container.find('a').click(function(){
+		menu.chooseItem(this);
+		return false;
+	});
+};
+
+
+Menu.prototype.drilldown = function(container, options) {
+	var menu = this;	
+	var topList = container.find('.fg-menu');	
+	var breadcrumb = $('<ul class="fg-menu-breadcrumb ui-widget-header ui-corner-all ui-helper-clearfix"></ul>');
+	var crumbDefaultHeader = $('<li class="fg-menu-breadcrumb-text">'+options.crumbDefaultText+'</li>');
+	var firstCrumbText = (options.backLink) ? options.backLinkText : options.topLinkText;
+	var firstCrumbClass = (options.backLink) ? 'fg-menu-prev-list' : 'fg-menu-all-lists';
+	var firstCrumbLinkClass = (options.backLink) ? 'ui-state-default ui-corner-all' : '';
+	var firstCrumbIcon = (options.backLink) ? '<span class="ui-icon ui-icon-triangle-1-w"></span>' : '';
+	var firstCrumb = $('<li class="'+firstCrumbClass+'"><a href="#" class="'+firstCrumbLinkClass+'">'+firstCrumbIcon+firstCrumbText+'</a></li>');
+	
+	container.addClass('fg-menu-ipod');
+	
+	if (options.backLink) { breadcrumb.addClass('fg-menu-footer').appendTo(container).hide(); }
+	else { breadcrumb.addClass('fg-menu-header').prependTo(container); };
+	breadcrumb.append(crumbDefaultHeader);
+	
+	var checkMenuHeight = function(el){
+		if (el.height() > options.maxHeight) { el.addClass('fg-menu-scroll') };	
+		el.css({ height: options.maxHeight });
+	};
+	
+	var resetChildMenu = function(el){ el.removeClass('fg-menu-scroll').removeClass('fg-menu-current').height('auto'); };
+	
+	this.resetDrilldownMenu = function(){
+		$('.fg-menu-current').removeClass('fg-menu-current');
+		topList.animate({ left: 0 }, options.crossSpeed, function(){
+			$(this).find('ul').each(function(){
+				$(this).hide();
+				resetChildMenu($(this));				
+			});
+			topList.addClass('fg-menu-current');			
+		});		
+		$('.fg-menu-all-lists').find('span').remove();	
+		breadcrumb.empty().append(crumbDefaultHeader);		
+		$('.fg-menu-footer').empty().hide();	
+		checkMenuHeight(topList);		
+	};
+	
+	topList
+		.addClass('fg-menu-content fg-menu-current ui-widget-content ui-helper-clearfix')
+		.css({ width: container.width() })
+		.find('ul')
+			.css({ width: container.width(), left: container.width() })
+			.addClass('ui-widget-content')
+			.hide();		
+	checkMenuHeight(topList);	
+	
+	topList.find('a').each(function(){
+		// if the link opens a child menu:
+		if ($(this).next().is('ul')) {
+			$(this)
+				.addClass('fg-menu-indicator')
+				.each(function(){ $(this).html('<span>' + $(this).text() + '</span><span class="ui-icon '+options.nextMenuLink+'"></span>'); })
+				.click(function(){ // ----- show the next menu			
+					var nextList = $(this).next();
+		    		var parentUl = $(this).parents('ul:eq(0)');   		
+		    		var parentLeft = (parentUl.is('.fg-menu-content')) ? 0 : parseFloat(topList.css('left'));    		
+		    		var nextLeftVal = Math.round(parentLeft - parseFloat(container.width()));
+		    		var footer = $('.fg-menu-footer');
+		    		
+		    		// show next menu   		
+		    		resetChildMenu(parentUl);
+		    		checkMenuHeight(nextList);
+					topList.animate({ left: nextLeftVal }, options.crossSpeed);						
+		    		nextList.show().addClass('fg-menu-current').attr('aria-expanded', 'true');    
+		    		
+		    		var setPrevMenu = function(backlink){
+		    			var b = backlink;
+		    			var c = $('.fg-menu-current');
+			    		var prevList = c.parents('ul:eq(0)');
+			    		c.hide().attr('aria-expanded', 'false');
+		    			resetChildMenu(c);
+		    			checkMenuHeight(prevList);
+			    		prevList.addClass('fg-menu-current').attr('aria-expanded', 'true');
+			    		if (prevList.hasClass('fg-menu-content')) { b.remove(); footer.hide(); };
+		    		};		
+		
+					// initialize "back" link
+					if (options.backLink) {
+						if (footer.find('a').size() == 0) {
+							footer.show();
+							$('<a href="#"><span class="ui-icon ui-icon-triangle-1-w"></span> <span>Back</span></a>')
+								.appendTo(footer)
+								.click(function(){ // ----- show the previous menu
+									var b = $(this);
+						    		var prevLeftVal = parseFloat(topList.css('left')) + container.width();		    						    		
+						    		topList.animate({ left: prevLeftVal },  options.crossSpeed, function(){
+						    			setPrevMenu(b);
+						    		});			
+									return false;
+								});
+						}
+					}
+					// or initialize top breadcrumb
+		    		else { 
+		    			if (breadcrumb.find('li').size() == 1){				
+							breadcrumb.empty().append(firstCrumb);
+							firstCrumb.find('a').click(function(){
+								menu.resetDrilldownMenu();
+								return false;
+							});
+						}
+						$('.fg-menu-current-crumb').removeClass('fg-menu-current-crumb');
+						var crumbText = $(this).find('span:eq(0)').text();
+						var newCrumb = $('<li class="fg-menu-current-crumb"><a href="javascript://" class="fg-menu-crumb">'+crumbText+'</a></li>');	
+						newCrumb
+							.appendTo(breadcrumb)
+							.find('a').click(function(){
+								if ($(this).parent().is('.fg-menu-current-crumb')){
+									menu.chooseItem(this);
+								}
+								else {
+									var newLeftVal = - ($('.fg-menu-current').parents('ul').size() - 1) * 180;
+									topList.animate({ left: newLeftVal }, options.crossSpeed, function(){
+										setPrevMenu();
+									});
+								
+									// make this the current crumb, delete all breadcrumbs after this one, and navigate to the relevant menu
+									$(this).parent().addClass('fg-menu-current-crumb').find('span').remove();
+									$(this).parent().nextAll().remove();									
+								};
+								return false;
+							});
+						newCrumb.prev().append(' <span class="ui-icon '+options.nextCrumbLink+'"></span>');
+		    		};			
+		    		return false;    		
+    			});
+		}
+		// if the link is a leaf node (doesn't open a child menu)
+		else {
+			$(this).click(function(){
+				menu.chooseItem(this);
+				return false;
+			});
+		};
+	});
+};
+
+
+/* Menu.prototype.setPosition parameters (defaults noted with *):
+	referrer = the link (or other element) used to show the overlaid object 
+	settings = can override the defaults:
+		- posX/Y: where the top left corner of the object should be positioned in relation to its referrer.
+				X: left*, center, right
+				Y: top, center, bottom*
+		- offsetX/Y: the number of pixels to be offset from the x or y position.  Can be a positive or negative number.
+		- directionH/V: where the entire menu should appear in relation to its referrer.
+				Horizontal: left*, right
+				Vertical: up, down*
+		- detectH/V: detect the viewport horizontally / vertically
+		- linkToFront: copy the menu link and place it on top of the menu (visual effect to make it look like it overlaps the object) */
+
+Menu.prototype.setPosition = function(widget, caller, options) { 
+	var el = widget;
+	var referrer = caller;
+	var dims = {
+		refX: referrer.offset().left,
+		refY: referrer.offset().top,
+		refW: referrer.getTotalWidth(),
+		refH: referrer.getTotalHeight()
+	};	
+	var options = options;
+	var xVal, yVal;
+	
+	var helper = $('<div class="positionHelper"></div>');
+	helper.css({ position: 'absolute', left: dims.refX, top: dims.refY, width: dims.refW, height: dims.refH });
+	el.wrap(helper);
+	
+	// get X pos
+	switch(options.positionOpts.posX) {
+		case 'left': 	xVal = 0; 
+			break;				
+		case 'center': xVal = dims.refW / 2;
+			break;				
+		case 'right': xVal = dims.refW;
+			break;
+	};
+	
+	// get Y pos
+	switch(options.positionOpts.posY) {
+		case 'top': 	yVal = 0;
+			break;				
+		case 'center': yVal = dims.refH / 2;
+			break;				
+		case 'bottom': yVal = dims.refH;
+			break;
+	};
+	
+	// add the offsets (zero by default)
+	xVal += options.positionOpts.offsetX;
+	yVal += options.positionOpts.offsetY;
+	
+	// position the object vertically
+	if (options.positionOpts.directionV == 'up') {
+		el.css({ top: 'auto', bottom: yVal });
+		if (options.positionOpts.detectV && !fitVertical(el)) {
+			el.css({ bottom: 'auto', top: yVal });
+		}
+	} 
+	else {
+		el.css({ bottom: 'auto', top: yVal });
+		if (options.positionOpts.detectV && !fitVertical(el)) {
+			el.css({ top: 'auto', bottom: yVal });
+		}
+	};
+	
+	// and horizontally
+	if (options.positionOpts.directionH == 'left') {
+		el.css({ left: 'auto', right: xVal });
+		if (options.positionOpts.detectH && !fitHorizontal(el)) {
+			el.css({ right: 'auto', left: xVal });
+		}
+	} 
+	else {
+		el.css({ right: 'auto', left: xVal });
+		if (options.positionOpts.detectH && !fitHorizontal(el)) {
+			el.css({ left: 'auto', right: xVal });
+		}
+	};
+	
+	// if specified, clone the referring element and position it so that it appears on top of the menu
+	if (options.positionOpts.linkToFront) {
+		referrer.clone().addClass('linkClone').css({
+			position: 'absolute', 
+			top: 0, 
+			right: 'auto', 
+			bottom: 'auto', 
+			left: 0, 
+			width: referrer.width(), 
+			height: referrer.height()
+		}).insertAfter(el);
+	};
+};
+
+
+/* Utilities to sort and find viewport dimensions */
+
+function sortBigToSmall(a, b) { return b - a; };
+
+jQuery.fn.getTotalWidth = function(){
+	return $(this).width() + parseInt($(this).css('paddingRight')) + parseInt($(this).css('paddingLeft')) + parseInt($(this).css('borderRightWidth')) + parseInt($(this).css('borderLeftWidth'));
+};
+
+jQuery.fn.getTotalHeight = function(){
+	return $(this).height() + parseInt($(this).css('paddingTop')) + parseInt($(this).css('paddingBottom')) + parseInt($(this).css('borderTopWidth')) + parseInt($(this).css('borderBottomWidth'));
+};
+
+function getScrollTop(){
+	return self.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+};
+
+function getScrollLeft(){
+	return self.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft;
+};
+
+function getWindowHeight(){
+	var de = document.documentElement;
+	return self.innerHeight || (de && de.clientHeight) || document.body.clientHeight;
+};
+
+function getWindowWidth(){
+	var de = document.documentElement;
+	return self.innerWidth || (de && de.clientWidth) || document.body.clientWidth;
+};
+
+/* Utilities to test whether an element will fit in the viewport
+	Parameters:
+	el = element to position, required
+	leftOffset / topOffset = optional parameter if the offset cannot be calculated (i.e., if the object is in the DOM but is set to display: 'none') */
+	
+function fitHorizontal(el, leftOffset){
+	var leftVal = parseInt(leftOffset) || $(el).offset().left;
+	return (leftVal + $(el).width() <= getWindowWidth() + getScrollLeft() && leftVal - getScrollLeft() >= 0);
+};
+
+function fitVertical(el, topOffset){
+	var topVal = parseInt(topOffset) || $(el).offset().top;
+	return (topVal + $(el).height() <= getWindowHeight() + getScrollTop() && topVal - getScrollTop() >= 0);
+};
+
+/*-------------------------------------------------------------------- 
+ * javascript method: "pxToEm"
+ * by:
+   Scott Jehl (scott@filamentgroup.com) 
+   Maggie Wachs (maggie@filamentgroup.com)
+   http://www.filamentgroup.com
+ *
+ * Copyright (c) 2008 Filament Group
+ * Dual licensed under the MIT (filamentgroup.com/examples/mit-license.txt) and GPL (filamentgroup.com/examples/gpl-license.txt) licenses.
+ *
+ * Description: Extends the native Number and String objects with pxToEm method. pxToEm converts a pixel value to ems depending on inherited font size.  
+ * Article: http://www.filamentgroup.com/lab/retaining_scalable_interfaces_with_pixel_to_em_conversion/
+ * Demo: http://www.filamentgroup.com/examples/pxToEm/	 	
+ *							
+ * Options:  	 								
+ 		scope: string or jQuery selector for font-size scoping
+ 		reverse: Boolean, true reverses the conversion to em-px
+ * Dependencies: jQuery library						  
+ * Usage Example: myPixelValue.pxToEm(); or myPixelValue.pxToEm({'scope':'#navigation', reverse: true});
+ *
+ * Version: 2.0, 08.01.2008 
+ * Changelog:
+ *		08.02.2007 initial Version 1.0
+ *		08.01.2008 - fixed font-size calculation for IE
+--------------------------------------------------------------------*/
+
+Number.prototype.pxToEm = String.prototype.pxToEm = function(settings){
+	//set defaults
+	settings = jQuery.extend({
+		scope: 'body',
+		reverse: false
+	}, settings);
+	
+	var pxVal = (this == '') ? 0 : parseFloat(this);
+	var scopeVal;
+	var getWindowWidth = function(){
+		var de = document.documentElement;
+		return self.innerWidth || (de && de.clientWidth) || document.body.clientWidth;
+	};	
+	
+	/* When a percentage-based font-size is set on the body, IE returns that percent of the window width as the font-size. 
+		For example, if the body font-size is 62.5% and the window width is 1000px, IE will return 625px as the font-size. 	
+		When this happens, we calculate the correct body font-size (%) and multiply it by 16 (the standard browser font size) 
+		to get an accurate em value. */
+				
+	if (settings.scope == 'body' && $.browser.msie && (parseFloat($('body').css('font-size')) / getWindowWidth()).toFixed(1) > 0.0) {
+		var calcFontSize = function(){		
+			return (parseFloat($('body').css('font-size'))/getWindowWidth()).toFixed(3) * 16;
+		};
+		scopeVal = calcFontSize();
+	}
+	else { scopeVal = parseFloat(jQuery(settings.scope).css("font-size")); };
+			
+	var result = (settings.reverse == true) ? (pxVal * scopeVal).toFixed(2) + 'px' : (pxVal / scopeVal).toFixed(2) + 'em';
+	return result;
+};”ò¿Ÿ4  .       ≠„Ú
+      allUIMenus     ™€q      menu    :yã      options    ¨ayô      Menu   Ñu2      push   ◊Dô	      mousedown      Ÿ©ºh      menuOpen   a+àN      showLoading    ü™‚X      click	      `∂'      showMenu
+   Hƒ;      kill   -‚
+Ë	      container      F¸BI      <div class="fg-menu-container ui-widget ui-widget-content ui-corner-all">      4W»      content    ©è^      </div>     ´s†
+      menuExists     >Â/      jQuery     ªl‡Ù      extend     ÎƒJ˚      width      Ç⁄Œá	      maxHeight      ée2_      positionOpts   ˝/k      posX   ı]á      left   ”vg	      posY   @»ˇ~      bottom     ≥ê      offsetX    À,»      offsetY    äI Z
+      directionH      ë∏.      right      §”¬
+      directionV     ÅŒV      down   p‚÷›      detectH     ˛Óg°      detectV!    ∫q¿»      linkToFront"    e‹∆	      showSpeed#      1n•      callerOnState$      Â	Ö8      ui-state-active%    [8‡[      loadingState&   	`p      ui-state-loading'   ä§€ù	      linkHover(      ;¥>      ui-state-hover)     h:ŒÌ      linkHoverSecondary*     *À      li-hover+   ≥/ì
+      crossSpeed,     [∞Ù/      crumbDefaultText-   !eÔ      Choose an option:.      sY      backLink/   zÍ`„      backLinkText0   DÀB˜      Back1   ™rt¥      flyOut2     _ôÀ      flyOutOnState3      @©Å'      ui-state-default4   ‰‘ù      nextMenuLink5   $Ê*Ä      ui-icon-triangle-1-e6   %|
+s      topLinkText7    
+£≠æ      All8    ek      nextCrumbLink9      _]
+C      ui-icon-carat-1-e:      AÿÊ†      killAllMenus;   ˆ+      removeClass<    ßªÊÎ      fg-menu-open=   π„_Ñ      li a>   ÷Ω¢      .fg-menu-ipod?      Yê^µ      resetDrilldownMenu@     ORT      .fg-menu-flyoutA    Ç°ˆ⁄      resetFlyoutMenuB    ˛Ë˘2      parentC     üvÙ}      hideD   ∏OÄ      documentE   ı˛«Æ      unbindF     ù∫”      keydownG    Bå|      addClassH   :	∂#      createI     HáíK      showJ   #+≈ò	      slideDownK      .J‡ó      .fg-menu:eq(0)L     II∑P      eventM      ≈∏0      whichN      ∏Ëﬁè      charCodeO   ≠5      keyCodeP    ¥•¯k      menuTypeQ   Õv=      parentsR    ú≥ÊŸ      divS    ]/I™      flyoutT     ˜“≥      ipodU   ˘!p¬      triggerV    †©˝c      mouseoutW   y˜ãÑ	      mouseoverX      m$      .fg-menu-footerY    Ï9≈œ      .fg-menu-headerZ    ‚üÔ      .fg-menu-current-crumb[     >∆ß"      prev\   Ûb6      .fg-menu-current]   x›y≈      .fg-menu-indicator^     Óèk<      prevLink_   [¢!X      a:eq(0)`    3AtŸ
+      setTimeouta     nBFL      nextLinkb   >ü      cssc    †Á„V      appendTod   òh;      bodye   ª‡◊Õ      ul:firstf   qûÅÄ      notg    } ﬁ6      .fg-menu-breadcrumbh    Rò      fg-menui    ! ™<      ul, li aj   ˝É ﬁ      ui-corner-allk      A¢Ωê      attrl   Ù·î¨      rolem   z¸≥      aria-activedescendantn      +tLÌ      active-menuitemo    πSŸK      aria-labelledbyp    ⁄Ã3      menuitemq   ÍíÌ–
+      li:has(ul)r     w≈€Ü      aria-haspopups      tId      aria-expandedt      ≤Rz‘      tabindexu   H⁄”      -1v     ≥	      drilldownw      ±N$ª
+      chooseItemx     9ïNá      allLinksy   ÉD2      .fg-menu li az      d®§˙      hover{      ƒ∫·%      blur|   Ûûí
+      removeAttr}     KÃÌ      focus~      8û‹      .fg-menu li    Ã–òs      siblingsÄ   è>n      setPositionÅ    ˝ÑÃ∫      itemÇ   ≈[≠§      #menuSelectionÉ     à3¿µ      textÑ   0+QA      locationÖ   ª©`X      hrefÜ   ¯§      allListsá   '∞C      ul ulà      ≠C—‘      ui-widget-contentâ      Ú7∂      fg-menu-flyoutä     gà 	      linkWidthã      ø9m"	      showTimerå      Íbk	      hideTimerç      ∏¢¡∏      allSubListsé    x˚	»      fg-menu-indicatorè      ‘„X      htmlê   º’$L      <span>ë     6Ì9      </span><span class="ui-icon í   +(XÍ	      "></span>ì      QÔ8u      clearTimeoutî   ÜéDR      subListï    §0∑      fitVerticalñ    $√Á      topó    z¡≤S      autoò   ZäÕ‘      fitHorizontalô      å/Í      z-indexö    ôgóB      ul aõ   Mtõÿ      a.fg-menu-indicatorú    óù¶      topListù    X®.±      .fg-menuû   ¸3ÖK
+      breadcrumbü     ˙ƒH†V      <ul class="fg-menu-breadcrumb ui-widget-header ui-corner-all ui-helper-clearfix"></ul>†     çüé      crumbDefaultHeader°     ¯‹=˜$      <li class="fg-menu-breadcrumb-text">¢   ˜Ó’∂      </li>£      É◊ﬂ      firstCrumbText§     T—+      firstCrumbClass•    @Ï      fg-menu-prev-list¶      ntV      fg-menu-all-listsß      ≠ô°Ω      firstCrumbLinkClass®    H(≈9      ui-state-default ui-corner-all©     RXÚ      firstCrumbIcon™     ïJJû2      <span class="ui-icon ui-icon-triangle-1-w"></span>´     Ä∆ﬁ:
+      firstCrumb¨     &€,>      <li class="≠    ;-      "><a href="#" class="Æ      +®¢      ">Ø     #—\≥	      </a></li>∞      MËá¨      fg-menu-ipod±   å‘õ      fg-menu-footer≤     d;UÁ      fg-menu-header≥     ©8GR	      prependTo¥      ‹B-      appendµ     ”0ò¥      checkMenuHeight∂    ∑…≈      height∑     ⁄}*∏      fg-menu-scroll∏     .]∞      resetChildMenuπ      Ú9∫      fg-menu-current∫    ÷q1º      animateª    Ïá„      .fg-menu-all-listsº     ±4PB      spanΩ   *N∑∆      removeæ     ∏™˝      emptyø      OæUD      fg-menu-content fg-menu-current ui-widget-content ui-helper-clearfix¿   ˝Ø ™      nextList¡   Û…≥µ      parentUl¬   ÀÀ∑      ul:eq(0)√   ‚z>©
+      parentLeftƒ     ŒôA$      .fg-menu-content≈   °w%V      nextLeftVal∆    &9!Ï      round«      â>Ç˚      footer»     Ëó±…      setPrevMenu…    ~*Jç      backlink    R}h§      prevListÀ   7ÑÉz      hasClassÃ   M–¶F      fg-menu-contentÕ    n¥ú	T      <a href="#"><span class="ui-icon ui-icon-triangle-1-w"></span> <span>Back</span></a>Œ   ‚	ùö      prevLeftValœ    «ÆÀ      fg-menu-current-crumb–      ÇpÑb	      crumbText—      º◊∑*
+      span:eq(0)“     ®{¥h      newCrumb”   ÔnËüP      <li class="fg-menu-current-crumb"><a href="javascript://" class="fg-menu-crumb">‘   Ø?ï
+      newLeftVal’     ›¿©      nextAll÷    ≥é8‰       <span class="ui-icon ◊     ÷Áì      widgetÿ     	NH      referrerŸ   HÔ.È      dims⁄   ºÊ‰Ω      refX€   u`\      refY‹   ;üÒ-      refW›   æÕæ%      getTotalWidthﬁ      ,Km⁄      refHﬂ   smk      getTotalHeight‡     Åw•       xVal·   ›púñ      yVal‚   ¨e“®      helper„     æuLÔ"      <div class="positionHelper"></div>‰     »Åí      positionÂ   H<*ê      absoluteÊ   —Íc      wrapÁ   rLtö      centerË     ±4çÆ      cloneÈ      #FÅ≈	      linkCloneÍ      ää≥(      insertAfterÎ    m…0ß      sortBigToSmallÏ     }™Ô      paddingRightÌ   wö9      paddingLeftÓ    ˇ”<      borderRightWidthÔ   Ù=n      borderLeftWidth    lâçµ
+      paddingTopÒ     ˙ûÍC      paddingBottomÚ      ¿xve      borderTopWidthÛ      ;‚      borderBottomWidthÙ      ∞G8      getScrollTopı   ¡§\l      selfˆ   ≥Õ€d      pageYOffset˜    ï,Øp      documentElement¯    ìGÎ	      scrollTop˘      ØÒ8≈      getScrollLeft˙      {˛n,      pageXOffset˚    |c…r
+      scrollLeft¸     4ÍÅ      getWindowHeight˝    0Uó      innerHeight˛    À˙∏      clientHeightˇ   WO      getWindowWidth     Uü
+      innerWidth    ïß˘G      clientWidth   Iu"2
+      leftOffset    ≤Î@y      leftVal   É·'Í	      topOffset     ;s;¨      topVal    £JÜÁ      pxToEm    —ôKö      settings  ƒ›·	      scope	     ∆e=?      reverse
+   ‹¯G      pxVal     ØÇ      scopeVal  “ßf∞      browser   5∂™‰      msie  ~ a	      font-size     ÿ8ª      toFixed   7J%ï      calcFontSize  ÿﬂ|ﬂ	      $.fn.menu     â±√      $.fn.menu/<   ˙¬È›      Menu/killAllMenus/<     ˘      Menu/this.kill    ∏±ô      Menu/this.showLoading     fP]é      Menu/this.showMenu    G®ÃQ      Menu/this.showMenu/<  ,‰¥`      Menu/this.showMenu/</<    ∑.ˆ      Menu/this.create  ùŸ—ò      Menu/this.create/<    ˝øeU      Menu/this.chooseItem  'ˇ      Menu.prototype.flyout     «œ©§*      Menu.prototype.flyout/this.resetFlyoutMenu    xKH      Menu.prototype.flyout/<    ÒÇ…      Menu.prototype.flyout/</<!     e %$      Menu.prototype.flyout/</</showTimer<"  ^ÚÂ$      Menu.prototype.flyout/</</hideTimer<#  KOâA      Menu.prototype.drilldown&  πnµ≥0      Menu.prototype.drilldown/this.resetDrilldownMenu'  Zrù2      Menu.prototype.drilldown/this.resetDrilldownMenu/<(    !&oÙ4      Menu.prototype.drilldown/this.resetDrilldownMenu/</<)  4Æaí      Menu.prototype.drilldown/<*    ÷¨      Menu.prototype.drilldown/</<,  iËTˇ      Menu.prototype.drilldown/</</<-    "»ƒ=       Menu.prototype.drilldown/</</</<.  ïB¶      Menu.prototype.setPosition/    ›ì\$      jQuery.fn.getTotalWidth0   ¬*s      jQuery.fn.getTotalHeight1  ÏÔ‘      String.prototype.pxToEm     =     =   =              Ô%,â                                                                                                                      	                 
+                                                                                                                                                                                           1                  4                  5                  6                  7                  8                  9                                                                                                                                                            !                                                   $                                                    '           !      '           "      '           #      *           $      +           %      '           &      -           '      -          (      /           )      /          *      1           +      /           ,      /           -      4           .      -           /                  0                  2                  3                 :      :           ;      :           <      ≥Oåc	   	   	        êÎ  êÙ  ê˘  ê¸  êˇ  êò  êï  ê            9  `  P  P  P:  Pã                                i                                                                              L  Pe  P  ^  a                                                x                ã                 p  ã                 ã                 ã                 ã                Å               a  b                                                N               N             ï               ï                 9   m `ã                                                 P  P  Pã                 Ü                ä  Pã  På  Pç  Pã                 î  Pã                                 î  Pã                                 ã                                                 ã                 P  P  Pú  Pû  P†  P£  §  ß  ©  ´  Pµ  P∏  Pã                ï              ï                               ã                 ã                 ã                 ã   	              ¿  ¡  √  ≈  «  P»  P–  “  ã               …  b  c                   b `Œ  ã                                                 ‘  ã                                 ã   	            ◊  9     ï ÿ  Ÿ  ‡  ·  ‚                ã                 ã                
+  ˇ  P €  ã                 N                 Ø¬0∞IÙ$KEÆ˙ö   Z              "  #  %  '  )  +  ,  .  /  1  2  4  6  8  	   -                     !               
+            
+    ñ               ô        ∂                         
+                                              ⁄  €  ‹  ﬁ           ‰    ñ    ∂     
+     ñ       
+      ñ     
+      ñ     
+    ñ       
+           
+           
+           
+           #    ‰  ñ          ∂     
+    	 á&’™ç!´!=   4    ö‰ÁT4  ∏                 "        ⁄   ∑	   h     	   ﬂª
+   J   m   L   ﬂª   J   m   L   ﬂª   J   m   L   ﬂª   J   m   L   ﬂª   J   m   L   ﬂª   J   m   L   ﬂª   J   ª   J   m   L   L   ﬂ•Ee;`ï0Ä  ˘`ï0Ä 4`ï0Ä Õ`ï0Ä "`ï`ï0Ä .0Ä 70Ä <0Ä F0Ä K0Ä g`§@Ä ÑPÄÄ–   ˙i–   r                       ﬁÕ  ﬂæ  Õ   ﬂº  Ã  ﬂª   Äæ   º  „  Å Œ   ﬂª   ·J   ‰¡   w ﬂª    æ  s ·J   ‰m   s ·J   ‰m   w ﬂ•&`)`'
+`	ˇˇˇÔ)`ˇˇˇ˚PD`ˇˇˇˇP*ˇˇˇˆPJ
+	ˇˇˇ˙P4PX   „çX   *                          ¡   J   õ   ó   ¡   ·J   ‰w  ﬂó   • `î `P)PÄ   1PAÄ   H                          ¡   J   ö   ó   ¡   ·J   ‰w  ﬂô   ó   ¡   ·J   ‰w  ﬂó   ¢• `ñ `P.
+`P)`!QÄ|  ;∏˛ |  Õ               4      Ω  Œ   ﬂΩ Œ   ﬂﬁÕ   ﬂæ   Œ   ﬂª    ¡   s Œ   ﬂª       ¡   J   &   &s Œ   ﬂæ   L   ﬂæ   L   ﬂª   ·J   ‰9	   <   ¥ <
+   ¥ <   9      <      <   <   <      <      <   <   <   <   <   » <      <      <       <!   "   <#   » <$   %   <&   <'   (   <)   <*   +   <,   -   <.   /   <0   1   <2   ¡   s Œ   ﬂm3   Œ   ﬂæ   m4   L5   ﬂæ   m6   L7   ﬂæ   m8   L9   ﬂæ   m:   L;   ﬂæ   m<   L=   ﬂ•ò `*`ˇˇˇˇP)`Lë ˇˇˇ≥PI`+`K`%&((%**&&**&&K(***J(*&*&****EPI(`K.`O>`OB`OÄ  †`OÄ  ”`?Ä  ŸPÄÄP   “˜P                             ª   ·J   ‰ª   m   w ﬂ• `ˇˇˇÔPDPÄÄÄd   ∂xIöd   2                         ª   º  KJ   ö   ó   ª   º  K·J   ‰w  ﬂó   • `ò `ê P)PÄÄÄå  ﬁTΩBå  Ã                 7        ¡   ·J   ‰¡   J   s ·J   ‰   s ·J   ‰¡   J   w ﬂ¡   ·J   ‰   s ·J   ‰¡   J   s ·J   ‰   s ·J   ‰¡   J	   w ﬂ¡   J
+   ö3   ó   ¡   ·J   ‰   s ·J   ‰¡   J
+   w ﬂó   ¡   J   ö$   ó   ¡   ·J   ‰¡   J   w ﬂó   ¡   ·J   ‰   s ö   ó!   ¡   ·J   ‰w  ﬂó#   ¡   ·J   ‰   s ö   ó&   ¡   ·J   ‰w  ﬂó(   ¡   ·J   ‰s  ·J   ‰w  ﬂ¡   L   ﬂª    ª   s ·J   ‰   ¡   w ﬂª    ª   s ·J   ‰   w ﬂ• `,
+ˇˇˇÙP*U*
+ˇˇˇÙP$`ë 
+P
+
+ˇˇˇÙP(P
+
+ˇˇˇÙP$`î `ë 
+P
+
+ˇˇˇÙP)`î `
+ˇˇˇÙP)`ë 
+P`P)`ë 
+P`P)`
+P
+	P$`,`ˇˇˇˇPˇˇˇP$`ˇˇˇˇPP$PÄÄÄL   ÎÍΩ8L                             ¡   ·J   ‰¡   J   w ﬂ• `
+ˇˇˇ˜P$PÄÄ¥  Ö `¥                   '        ¡    w  ﬂ¡   J   õ   ó   ¡   ·J   ‰w  ﬂó   ¡   ·J   ‰   s ·J   ‰¡   J   w ﬂ¡   ·J   ‰s  ·J   ‰s  ·J   ‰m	   w ﬂ¡   ·J
+   ‰s  ·J   ‰¡   J   s ·J   ‰   w ﬂ¡   L   ﬂ¡   ·J   ‰¡   J   w ﬂª    ª   s ·J   ‰¡   w ﬂª    ª   s ·J   ‰m   w ﬂ• `*`î `P)`,U*
+ˇˇˇ˜P$`
+P
+	P
+ˇˇˇ˙P$`
+P
+
+ˇˇˇˆPP$`,`
+ˇˇˇÙP$`ˇˇˇˇP
+ˇˇˇ˙PD`ˇˇˇˇP
+ˇˇˇ¯PD\PÄÄ@   {≥@                             ¡   ·J   ‰w  ﬂ¢• `P`Q4	  ˜v„4	  ¸  	             œ       Ω  Œ   ﬂ¡   J      ö   ó   ¡   J   Õ   ﬂôf   ó   ¡   J      ö   ó   ¡   J   Õ   ﬂô3   ó   ¡   J      ö   ó   ¡   J   Õ   ﬂó   ª    ¡   J   s ·J   ‰   s ·J	   ‰
+   s ö   ó      ô   ó      ó   Õ  ﬂæ   ·%üU   ó   ·&üP  ó   ·'üI  ó   ·(ü"  ó   ·ü  ó   ·ü!  ó   †®  ó   æ     öÖ   ó   ª    ¡   J   s ·J   ‰   w ﬂª       ¡  J   &s ·J   ‰s  ö3   ó)   ª       ¡  J   &s ·J   ‰   w ﬂó/   æ     öZ  ó1   ª    ¡   J   s ·J   ‰   w ﬂª       s ·J   ‰   s ·J   ‰s  ö7   ó>   ª       s ·J   ‰   s ·J   ‰   w ﬂóD   ª       s ·J   ‰   s ·J   ‰s  öA   óL   ª       s ·J   ‰s  ·J   ‰   s ·J   ‰   w ﬂóT   ª       s ·J   ‰s  ·J	   ‰   s ö2   ó[   ª       s ·J   ‰s  ·J   ‰   w ﬂóa   ¢ôü  óa   ª    ¡   J   s ·J	   ‰   ¡  J   &s ö†   ói   ª    ¡   J   s ·J   ‰s  ·J   ‰s  ·J   ‰   s Õ  ﬂæ  ·J   ‰s  öA   óv   ª    ¡   J   s ·J   ‰   w ﬂæ  ·J   ‰   w ﬂó}   ô.   ó}   ¡  ·J   ‰   s ·J   ‰   w ﬂóÅ   ¢ôò  óÅ   ª    ¡   J   s ·J	   ‰   s ö¥   óá   æ     öK   óâ   ª    ¡   J   s ·J   ‰s  ·J   ‰   s ·J   ‰   w ﬂôZ   óí   æ     öF   óî   ª    ¡   J   s ·J   ‰   w ﬂª     m!   ¡  J"   w ﬂóù   ¢ô±  óù   ª    ¡   J   s ·J	   ‰   ¡  J   &s ö†   ó•   ª    ¡   J   s ·J   ‰s  ·J   ‰s  ·J   ‰   s Õ  ﬂæ  ·J   ‰s  öA   ó≤   ª    ¡   J   s ·J   ‰   w ﬂæ  ·J   ‰   w ﬂóπ   ô.   óπ   ¡  ·J   ‰   s ·J   ‰   w ﬂóΩ   ¢ô™   óΩ   ¡   w  ﬂôñ   óæ   ª    ¡   J   s ·J	   ‰   s ú   óƒ   ﬂæ     ó≈   öF   ó∆   ª    ¡   J   s ·J   ‰   w ﬂª     m#   ¡  J"   w ﬂóœ   ô   óœ   • `ö `ô `ö `ô `ö `î@`
+ˇˇˇˇPPP´@`‚ 
+`î `
+ˇˇˇˇPP$`ˇˇˇ˚P
+P`ˇˇˇ˚PP@
+`î `
+ˇˇˇˇPP$`PP
+
+P`PP
+P)`PP
+
+P`P
+PP
+P)`P
+PP-`P
+PP `ANA`: 
+`
+ˇˇˇˇP
+ˇˇˇ˜P-`
+ˇˇˇˇP
+P
+	PP(`	P/`
+ˇˇˇˇPP$`ê 	PJ"`ë 
+PP)`ANA$`:& 
+`
+ˇˇˇˇPP-`î `
+ˇˇˇˇP
+PPPN+`î `
+ˇˇˇˇPP$`E/J-P90 `ANA3`:5 
+`
+ˇˇˇˇP
+ˇˇˇ˜P-`
+ˇˇˇˇP
+P
+	PP(`	P/`
+ˇˇˇˇPP$`ê 	PJ=`ë 
+PP)`ANA?`:A `*`:E 
+`
+ˇˇˇˇPPß `
+ˇˇˇˇPP$`EJ
+JHP9K ` Px    ÷E◊x   =                  	        ª    ¡   J   s ·J   ‰s  ·J   ‰   s ·J   ‰   w ﬂ• 	`
+ˇˇˇˇP
+PPP$PÄÄÄx   Êœéx   =                  	        ª    ¡   J   s ·J   ‰s  ·J   ‰   s ·J   ‰   w ﬂ• `
+ˇˇˇˇP
+PPP$PÄÄÄ  ]tX°  ˙                Q        ¡   ·J   ‰9   ¡   J   <   s ·J   ‰   s ·J   ‰   s ·J   ‰	   s ·J
+   ‰   w ﬂ¡   ·J   ‰   s ·J
+   ‰   w ﬂ¡   ·J   ‰   s ·J   ‰      s ·J   ‰s ·J   ‰      s ·J   ‰   ¡   ·J   ‰   s w ﬂ¡   ·J   ‰   s ·J   ‰      w ﬂ¡   ·J   ‰   s ·J   ‰      s ·J   ‰   s ·J   ‰      w ﬂ¡   ·J   ‰   s ·J   ‰       w ﬂ¡   ·J   ‰   s ·J!   ‰s  öf   ó3   ¡   J"   ö)   ó5   ¡   ·J#   ‰¡   ¡   w ﬂô$   ó7   ¡   ·J$   ‰¡   ¡   w ﬂó9   ô.   ó9   ¡   ·J   ‰   s ·J%   ‰m&   w ﬂó>   ¡   J'   ö<   ó@   ¡   ·J   ‰(   s Õ   ﬂæ   ·J)   ‰m*   m+   w ﬂóF   ¡   J,   ö3   óH   ¡   ·J   ‰-   s ·J)   ‰m.   m/   w ﬂóN   ¡   ·J0   ‰¡   ¡   ¡   w ﬂ¡   L1   ﬂ• `ˇˇˇ˙PPPPP$`ë 
+PPD`ë 
+Pî PPî PHë Pˇˇˇ·P$`ë 
+Pî P$`ë 
+Pî PPî P$`ë 
+Pî 
+PD`ë 
+P
+P/`î `ˇˇˇÓP.`ˇˇˇÎPì0 `ë 
+P
+ˇˇˇ˙P9@`î `ë 
+P(`+EEP9"@$`î `ë 
+P*E+E%"P9-@/`ˇˇˇ·P$`,PÄÄÄP   oW√P                           ﬁÕ   ﬂ¡   ·J   ‰æ   w ﬂ¢•&`ˇˇˇıP$`!QÄ   ı”ù/   ¥                        ﬁÕ  ﬂª    æ  s Õ   ﬂª       ¡   J   &s ·J   ‰¡   J   s ·J   ‰s  ·J   ‰s  ·J   ‰   w ﬂª    æ  s ·J	   ‰¡   J   s ·J
+   ‰s  ·J   ‰s  ·J   ‰      w ﬂ•&`ˇˇˇˇP(`ˇˇˇ˚P
+$
+ˇˇˇÙP
+P
+P	P$`ˇˇˇˇP
+
+ˇˇˇ˜P
+P
+Pî 	P$PÄÄå   ˝˛s'å   L                        ﬁÕ   ﬂª    æ   s ·J   ‰¡   J   s ·J   ‰s  ·J   ‰s  ·J   ‰   w ﬂ•&`ˇˇˇˇP
+
+ˇˇˇÙP
+P
+P	P$P   ÚGª   ≥                        ﬁÕ   ﬂª    æ   s ·J   ‰   s ·J   ‰¡   J   w ﬂ¡   J   öJ   ó	   ª    æ   s ·J   ‰   s ·J   ‰   s ·J   ‰¡   J   w ﬂó   ª    æ   s ·J	   ‰¡   J   w ﬂ•&`ˇˇˇˇPP
+
+ˇˇˇÙP$
+`î `ˇˇˇˇPPP
+
+ˇˇˇÙP)`ˇˇˇˇP
+
+ˇˇˇ˜P$PÄÄÄ`   ßG“p`   )                        ﬁÕ   ﬂª    æ   s ·J   ‰¡   J   w ﬂ•`ˇˇˇˇP
+
+ˇˇˇÙP)P∏   q~∏Ú∏   f                         ¡   ·J   ‰w  ﬂª       s ·J   ‰ª    º  s ·J   ‰s  w ﬂª   ª    º  s ·J   ‰   s L   ﬂ• `PD`P
+ˇˇˇ˛P
+PˇˇˇÛP$`ˇˇˇ˛PP)Pÿ   ¯ÀÉÿ   â                      Ω  Œ   ﬂΩ Œ   ﬂﬁÕ   ﬂæ   Œ   ﬂæ   m   L   ﬂ¡   ·J   ‰   s ·J   ‰   s ·J   ‰m   w ﬂ¡   ·J   ‰	   s ·J
+   ‰m   w ﬂ•ò `J`O`ë 
+PP
+ˇˇˇ˚PD2`ë 
+P
+ˇˇˇ˙P46Pp   ‚Êop   8                         ¡   ·J   ‰   s Õ   ﬂæ   ·J   ‰   s ·J   ‰w  ﬂ• `ë 
+P(`ê 	P
+!P$PÄÄÄ–  ÚÀ4u–  /               ,        ﬁÕ   ﬂ¡  ·J   ‰s  Œ   ﬂª    æ   s ·J   ‰   s Œ   ﬂ¡   ·J   ‰9   ¡   <   ¡   <   s ·J   ‰w  ﬂª    æ   s ·J   ‰	   s ·J
+   ‰   s ·J   ‰   ª    æ   s ·J   ‰	   s ·J   ‰s  &   &¡  J   &   &s ·J   ‰m   m   w ﬂª    æ   s ·J   ‰   s ·J   ‰m   m   w ﬂ•&`
+P `ˇˇˇˇPPI`
+
+ˇˇˇÈP
++PD`ˇˇˇˇPPP
+#ˇˇˇ˛PP
+P
+(ë ˇˇˇ∞P*EEÄ  ´PD`ˇˇˇˇPP*E!EPD(PÄÄÄ∞  0bk∞                 %        ﬁÕ   ﬂª    ¡  w ﬂª    æ   s ·J   ‰s  Œ   ﬂª    ¡   ª    æ   s ·J   ‰s  J   s õ/   ó   ¡   ·J   ‰9   	   <   <
+   w ﬂó   ª    ¡   ª    æ   s ·J   ‰s  J   d&s õ;   ó   ¡   ·J   ‰9   	   <   ¡  <   Á<   w ﬂó"   ª    m   ,s Œ  ﬂ•&`ˇˇˇˇP$`ˇˇˇˇP
+P)	`	ˇˇˇ˛P
+Pˇˇˇ„P.`
+ˇˇˇÌP)	`	ˇˇˇ˛P
+Pˇˇˇ·P7`
+
+ˇˇˇ⁄P)`5CPIPÄÄx   ÇøÈx   >                          ¡   ·J   ‰   s ·J   ‰¡  J   s ·J   ‰      w ﬂ• `ë P
+#
+ˇˇˇ˚Pî P$PÄÄÄî   ˙1 î   J                	        ﬁÕ   ﬂª    ¡  w ﬂª    æ   s ·J   ‰s  Œ   ﬂª    m   ês Œ  ﬂ•&`ˇˇˇˇP$`ˇˇˇˇP
+P)`5CPIPÄx   wS“x   >                          ¡   ·J   ‰   s ·J   ‰¡  J   s ·J   ‰      w ﬂ• `ë P
+&
+ˇˇˇ˚Pî P$PÄÄÄÙ   i¶ÚÖÙ   ï                        ﬁÕ   ﬂª    ¡   w ﬂª    æ   s ·J   ‰   s ·J   ‰s  ·J   ‰   s öE   ó   ª    æ   s ·J   ‰   s ·J   ‰s  ·J   ‰¡  J	   w ﬂó   •&`ˇˇˇˇP$	`ˇˇˇˇPP
+PP-`ˇˇˇˇPP
+P
+
+ˇˇˇ˜PIPÄÄH   ÚùmæH                             ª    m   Ùs Œ   ﬂ• `5CPIPå   "È•√å   I                  	        ¡   ·J   ‰¡  J   w ﬂ¡  ·J   ‰¡  J   s ·J   ‰¡  J   w ﬂ• `
+ˇˇˇ˚P$`
+ˇˇˇ˚P
+(
+ˇˇˇÙP$PÄP   `g»≠P                           ﬁÕ   ﬂ¡   ·J   ‰æ   w ﬂ¢•&`ˇˇˇıP$`!QÄ  ÑÆ"é          
+       M      Ω  Œ   ﬂΩ Œ   ﬂﬁÕ  ﬂæ  Œ   ﬂ¡   ·J   ‰   s Œ   ﬂª       s Œ   ﬂª       ¡   J   &   &s Œ   ﬂ¡   J   ö   ó   ¡   J	   ô   ó   ¡   J
+   ó   Õ   ﬂ¡   J   ö   ó      ô   ó      ó   Õ  ﬂ¡   J   ö   ó      ô   ó      ó   Õ  ﬂ¡   J   ö   ó      ô   ó      ó   Õ  ﬂª       æ  &   &æ  &   &æ  &æ   &   &s Œ   ﬂ¡   ·J   ‰   w ﬂ¡   J   ö=   ó    ¡   ·J   ‰   s ·J   ‰¡   s ·J   ‰w  ﬂô.   ó&   ¡   ·J   ‰   s ·J   ‰¡   w ﬂó*   ¡   ·J   ‰¡   w ﬂm   Œ 	  ﬂm   Œ 
+  ﬂæ  m   L   ﬂ¡   ·J   ‰    s ·J!   ‰9"   ¡   ·J#   ‰s  <#   s ·J   ‰$   s ·J!   ‰9%   ¡   ·J#   ‰s  <#   ¡   ·J#   ‰s  <&   s ·J   ‰'   s ·J   ‰w  ﬂ¡ 	   ¡   w ﬂ¡   ·J   ‰(   s ·J)   ‰m*   w ﬂ•ò `*`ë 
+P)`P)`'ë ˇˇˇÿP)`º `≤ `≤ `≤ `(ˇˇˇ°PI`ë 
+PD`î `ë P
+$ˇˇˇ˜P
+P.	`ë P
+%ˇˇˇˆP)`ˇˇˇ˘PD`K`K`O'`,U*PˇˇˇÈP*U*	P	Pˇˇˇ–P*U*P$`ˇˇˇˇPD0`ë P
+ˇˇˇ˚P4Ä  âP†   R‰Q†   ]                         º  ·J   ‰s  ¡   J   ö   ó   º  ·J   ‰   w ﬂó   º  ·J   ‰9   ¡   J   <   w ﬂ• `
+Pï `P)`
+ˇˇˇ˙P$PÄÄÄd   #Õd   2                         º  ·J   ‰   s ·J   ‰   s ·J   ‰   w ﬂ• `PPPPÄÄ4  ˜ﬂg„4  ¬                          ª       s ·J   ‰   w ﬂ¡   ·J   ‰9   <   ¡   J   m	   w ﬂª    
+   s ·J   ‰   s ·J   ‰w  ﬂ¡   ·J   ‰s  ·J   ‰¡   w ﬂª       s ·J   ‰s  ·J   ‰w  ﬂ¡ 	   ¡   w ﬂ• `PP$`
+ˇˇˇ◊PD	`PP
+P$`P
+ˇˇˇ˘P$`P
+P
+P$`ˇˇˇˇP$PÄÄå   ‚Úeå   H                	        ﬁÕ   ﬂª    æ   s ·J   ‰   s ·J   ‰m   w ﬂ¡   ·J   ‰   w ﬂ•&`ˇˇˇˇPP
+ˇˇˇ˚PD`ë P$PÄÄ|   }8É	|   6                        ﬁÕ   ﬂª    æ   s ·J   ‰w  ﬂ¡ 
+   ª    æ   s w ﬂ•&`ˇˇˇˇP
+P$`ˇˇˇ˛PˇˇˇˇP$PÄ  m   û                        ﬁÕ   ﬂª    æ   s ·J   ‰s  ·J   ‰   s öJ   ó   ª    æ   s ·J   ‰   s ·J   ‰m   s ·J	   ‰m
+   w ﬂô'   ó   ª    æ   s ·J	   ‰m   w ﬂó   •F`ˇˇˇˇP
+PP-`ˇˇˇˇP*U*ˇˇˇ˚P*ˇˇˇ˙P>R `ˇˇˇˇP
+ˇˇˇ˙P9W PÄÄÄú   ©∞cú   S                        ﬁÕ   ﬂª    æ   s ·J   ‰   ª    æ   s ·J   ‰s  &   &¡   J   &   &w ﬂ•`ˇˇˇˇP
+ˇˇˇ˛P
+P
+(ë ˇˇˇ¿PcPÄÄx  tˆ∫ıx  $               c        ﬁÕ  ﬂª    æ  s ·J   ‰s  Õ   ﬂª    æ  s ·J   ‰   s Õ  ﬂæ  ·J   ‰   s ö   ó   ô'   ó   ª    ¡  ·J   ‰	   s s ó   Õ  ﬂª
+   ·J   ‰æ  ª    ¡  ·J   ‰s  s 's Õ  ﬂª       s Œ   ﬂ¡
+   æ  w ﬂ¡	   æ   w ﬂ¡  ·J   ‰9   æ  <	   ¡  J   w ﬂæ   ·J   ‰s  ·J   ‰   s ·J   ‰      w ﬂm   Œ   ﬂ¡  J   ö{   ó)   ¡   ·J   ‰   s ·J   ‰s  öG   ó/   ¡   ·J   ‰w  ﬂª       s ·J   ‰¡   s ·J   ‰m   w ﬂó8   ôD  ó8   ¡  ·J   ‰    s ·J   ‰s  öM   ó>   ¡  ·J!   ‰s  ·J"   ‰¡  w ﬂ¡  ·J   ‰   s ·J   ‰m#   w ﬂóG   ª    $   s ·J%   ‰&   w ﬂª    æ  s ·J   ‰'   s ·J(   ‰s  Õ  ﬂª    )   æ  &*   &s Õ  ﬂæ  ·J   ‰¡  s ·J   ‰   s ·J   ‰m+   w ﬂæ  ·J,   ‰s  ·J"   ‰-   ¡  J.   &/   &w ﬂóc   ¢•&`ˇˇˇˇP
+P(`ˇˇˇˇPP(`ê 	Pû )ë PˇˇˇÌP-`
+PˇˇˇÎPˇˇˇÌP(`PI	`ˇˇˇˇP$	`ˇˇˇˇP$`	
+ˇˇˇ·P$	`	PPî PD`K
+`î `ë P
+
+P/`P$`P*ˇˇˇ˜P*ˇˇˇ˙Pì0) `ë P
+P/`P
+ˇˇˇ˘P$`ë P
+ˇˇˇ˙PI1`PP$`ˇˇˇˇPP
+P(`Sˇˇˇ¨P(`+ˇˇˇ˜P*	U
+ˇˇˇ˙PDF`	P
+ë ˇˇˇ‡P 	`!QÄÄP  µi&&P  ‹                        º  Õ   ﬂª       s Õ  ﬂæ  ·J   ‰   s Õ  ﬂæ  ·J   ‰s  ·J   ‰      w ﬂ¡
+   æ  w ﬂ¡	   æ  w ﬂæ  ·J	   ‰
+   s ·J   ‰      w ﬂæ  ·J   ‰   s ö)   ó   æ   ·J   ‰w  ﬂ¡   ·J   ‰w  ﬂó   • `(`P(`ê P(
+`Pî P$
+`ˇˇˇˇP$
+`ˇˇˇˇP$
+`ê 	Pî P$`ê 	P`P
+`P)	PÄÄ‘   ÖR‘   {                        ﬁÕ  ﬂª    æ  s Œ   ﬂª    ¡  ·J   ‰   s s ¡  ·J   ‰s  &Õ   ﬂ¡  ·J   ‰9   æ   <   ¡  J   m	   w ﬂ¢•&`ˇˇˇˇP)`ë Pˇˇˇ˜P
+P)`	
+ˇˇˇÃPD
+`!	QÄ@   F•U‹@                             ¡   ¡   w ﬂ• `ˇˇˇˇP$PÄ@   Tm±†@                             ¡  ·J   ‰w  ﬂ¢• 	`P$	`!Q∏  ØEP÷∏  (               *        ﬁÕ  ﬂª    æ  s ·J   ‰s  ·J   ‰   s ö#   ó   ¡  ·J   ‰æ  w ﬂô÷   ó	   ª       s ·J   ‰   s ·J	   ‰s  '¥ *Õ   ﬂ¡  ·J
+   ‰9   æ   <   ¡  J   m   w ﬂª    æ  s ·J   ‰s  ·J   ‰   s ·J   ‰   s ·J   ‰w  ﬂª    æ  s ·J   ‰s  ·J   ‰s  ·J   ‰w  ﬂó*   ¢•&`ˇˇˇˇP
+P	P-
+`ˇˇˇıP> `PP
+P/
+`	
+ˇˇˇŒPD
+`ˇˇˇˇP
+P	P"P
+P$
+`ˇˇˇˇP
+P
+	P
+
+P 	`!QÄ4   Æ|rò4                             ¡    w  ﬂ• `*
+PÄÄP   oW√P                           ﬁÕ   ﬂ¡   ·J   ‰æ   w ﬂ¢•&`ˇˇˇıP$`!QÄÙ  -1ıÙ  S                ò       º  Õ   ﬂº Õ  ﬂ9   æ  ·J   ‰s  J   <   æ  ·J   ‰s  J   <   æ  ·J   ‰s  <   æ  ·J	   ‰s  <
+   Õ  ﬂº Ã ﬂª       s Õ  ﬂæ  ·J   ‰9      <   æ  J   <   æ  J   <   æ  J   <   æ  J
+   <   w ﬂæ   ·J   ‰æ  w ﬂº J   J   ·   ü1   ó"   ·   ü0   ó#   ·   ü:   ó$   †H   ó$   Õ  ﬂô8   ó$   æ  J   +Õ  ﬂô   ó&   æ  J   Õ  ﬂô   ó'   º J   J   ·   ü1   ó*   ·   ü0   ó+   ·   ü:   ó,   †H   ó,   Õ  ﬂô8   ó,   æ  J
+   +Õ  ﬂô   ó.   æ  J
+   Õ  ﬂô   ó/   æ  º J   J   &.Õ  ﬂæ  º J   J   &.Õ  ﬂº J   J      öó   ó9   æ   ·J   ‰9      <   æ  <   w ﬂº J   J    ú   óA   ﬂª!    æ   s óD   ö1   óE   æ   ·J   ‰9"      <   æ  <   w ﬂóJ   ôç   óJ   æ   ·J   ‰9#      <   æ  <   w ﬂº J   J    ú   óR   ﬂª!    æ   s óU   ö1   óV   æ   ·J   ‰9$      <   æ  <   w ﬂó[   º J   J%      öó   ó_   æ   ·J   ‰9&      <   æ  <   w ﬂº J   J'   ú   óg   ﬂª(    æ   s ój   ö1   ók   æ   ·J   ‰9)      <   æ  <   w ﬂóp   ôç   óp   æ   ·J   ‰9*      <   æ  <   w ﬂº J   J'   ú   óx   ﬂª(    æ   s ó{   ö1   ó|   æ   ·J   ‰9+      <   æ  <   w ﬂóÅ   º J   J,   öï   óÑ   æ  ·J-   ‰s  ·J.   ‰/   s ·J   ‰90      <   <      <      <   <   æ  ·J   ‰s  <   æ  ·J   ‰s  <   s ·J1   ‰æ   w ﬂóò   • `(`(`%P-P-P(PM	`@`P(`
+ˇˇˇ±P$`ˇˇˇ˚PD	`  `&`*`ë `*`.`@	`  `&`*`ë `*`.`@%`ò `ò@)`ù `
+	ˇˇˇÌP$`ò  ˇˇˇÙPì `
+	ˇˇˇÍPì0/ `
+	ˇˇˇÍP$`ò  ˇˇˇÙPì `
+	ˇˇˇÌP94@7`ù `
+	ˇˇˇÏP$`ò  ˇˇˇÚPì `
+	ˇˇˇÎPì0= `
+	ˇˇˇÎP$`ò  ˇˇˇÚPì `
+	ˇˇˇÏP9B@E`ó `	PP
+%*&**&P(PHF*PJNˇˇˇÙPP4   õò`[4   	                         º º  '¢• 	`QÄÄ<  À˜<  ∑                         ﬁÕ   ﬂª    æ   s ·J   ‰s  ª    ª    æ   s ·J   ‰   s s &ª    ª    æ   s ·J   ‰   s s &ª    ª    æ   s ·J   ‰   s s &ª    ª    æ   s ·J   ‰   s s &¢•&`	ˇˇˇ˛P
+P
+	ˇˇˇ˛PPˇˇˇÔP(	ˇˇˇ˛PPˇˇˇÔP'	ˇˇˇ˛PPˇˇˇÔP,	ˇˇˇ˛PPˇˇˇÔPQ<  Fv0E<  ∑                         ﬁÕ   ﬂª    æ   s ·J   ‰s  ª    ª    æ   s ·J   ‰   s s &ª    ª    æ   s ·J   ‰   s s &ª    ª    æ   s ·J   ‰   s s &ª    ª    æ   s ·J   ‰   s s &¢•&`	ˇˇˇ˛P
+P	ˇˇˇ˛PPˇˇˇÔP&	ˇˇˇ˛PPˇˇˇÔP)	ˇˇˇ˛PPˇˇˇÔP*	ˇˇˇ˛PPˇˇˇÔPQl   )Ü©ml   E                  
+        ª   J   ù4   ó   ﬂª   J   J   ù   ó   ﬂª   J   J   ó
+   ¢• `√Ql   )Ü©ml   E                  
+        ª   J   ù4   ó   ﬂª   J   J   ù   ó   ﬂª   J   J   ó
+   ¢• `√Qå   u"¿Qå   b                         ª   J   Õ   ﬂª   J   ùB   ó   ﬂæ   ú   ó   ﬂæ   J   ó   ù   ó   ﬂª   J   J   ó   ¢• `/`—Qå   u"¿Qå   b                         ª   J   Õ   ﬂª   J   ùB   ó   ﬂæ   ú   ó   ﬂæ   J   ó   ù   ó   ﬂª   J   J   ó   ¢• `/`—Q‰   ^y≠‰   ç                        ª    º s ù&   ó   ﬂª    º  s ·J   ‰s  J   ó   Õ   ﬂæ   ª    º  s ·J   ‰s  &ª    s  ª    s  &ú   ó   ﬂæ   ª    s  ' ó   ¢• `	ˇˇˇˇPî ˇˇˇ˛P
+Pí `ˇˇˇ˛P
+PVVî VQÄÄ‰   ¸jt‰   ç                        ª    º s ù&   ó   ﬂª    º  s ·J   ‰s  J   ó   Õ   ﬂæ   ª    º  s ·J   ‰s  &ª    s  ª    s  &ú   ó   ﬂæ   ª    s  ' ó   ¢• `	ˇˇˇˇPî ˇˇˇ˛P
+Pí `ˇˇˇ˛P
+PVVî VQÄÄ<  »¿'o<  ©        
+       2       ﬁÕ  ﬂª   ·J   ‰9      <   <   º  s Ã  ﬂæ     ö   ó   ô   ó   ª    æ  s ó
+   Õ   ﬂm	   Œ   ﬂº  J      úb   ó   ﬂª
+   J   J   úH   ó   ﬂª    ª
+       s ·J   ‰   s s ¡    s  +·J   ‰s ó   ö&   ó   m   Õ  ﬂæ   s  Õ  ﬂô8   ó    ª    ª    º  J   s ·J   ‰   s s Õ  ﬂó'   º  J   ö*   ó*   æ   æ  *·J   ‰s    &ô%   ó.   æ   æ  +·J   ‰s    &ó2   Õ  ﬂæ  ¢•F`%*&CPG`• ˇˇˇıP `K`π :[
+PˇˇˇÎP)VPî `J`Pí@	`ˇˇˇ˘PPˇˇˇﬁPM`ò %
+Pó 
+Pì `QÄê   `N Éê   b                         ª   J   Õ   ﬂª   J   ùB   ó   ﬂæ   ú   ó   ﬂæ   J   ó   ù   ó   ﬂª   J   J   ó   ¢• `/`— QÄÄÄ|   ∆F±|   A                          ª    ª       s ·J   ‰   s s ¡    s  +·J   ‰s *¢• `[
+PˇˇˇÎP'VP&QÄÄ3ıÿ  `     
+    `$  å        p  `;  %  <  #  ∞   R )  a  '  2  =  ú >  ?  @  A  B  C    $  D  E    F    `G  %    `
+  	  `$    Ç  ∞   _  U  W  
+  `$    Ç  ∞   _  U  W    `M  ê   N  O  $    Q  R  ú @  S  T  U  V  .  2  ¯  W  X  ∞   a    Y  Z  [  \  ]  '  B  _  Ç  `    p+    p  `  H  G  <  #  B  I    
+  pC  J  "  ∞   K    ;  %  $  D  F    p  `w    `$  .  '  ;  {  B  |  ç G  }  k  n    `$  ;  '  {  B  |  ç   `$    R ;  )  2  ∞   a  G    `$  ;  )    `b    @  c  d  ∞   e  f  g  G  h  i  j  ï k  l    ö m  n  o  ç R p  q  r  -  s  ®   a  t  u  ¯  1  S  v      p'  y  z    p  p)  ~    p  pÄ      `
+  $  Ç  É  Ñ  k  Ö    `$                   @      @                         !    "  $  #  &  %  (  '  *  )  +  -  ,  .  0  /  1  3  2  5  4  7  6  9  8    p  p
+    p  	  p	    pH    pw    `  `ı  ˆ  D  ˜  ¯  d    `ı  ˙  D  ˜  ˚  d    `D  ˜  ı  ˝  ˛  d    `D  ˜  ı     d    `±  $  •      ˇ  ˘    `±  $  •  ñ  ∂  ¸  Ù    `      `  	  
+    `       $      p    p  `∞   á  ;  à  C     `G  à  I  "  k  s  -    `ì  $  Ç  ï  •  ñ  b    @ó    ò      @  ô  `    p"  `;  à  C  "  k  s  ®   !  `ì  $  Ç  `    p#  `ì  $  Q  ï [  ú õ  G  2  %  `C  "  ∞   2  ;  $  ``    p  `  $  ∞   ï b    @  C  _  G  é  è  ê  É  ë  4  í  z    p  pö    p  p&  `w    `  pA  G  â  ∞   q  å     pa      p(  `∂    G  ∑  b    @)  `;  ∑  π  ∂  ó  ,  `$  C  +  `$  ∞   ï å   %  pG  π  *  `$  \  ;  π  ∫    @  +  $  pª  ∞   º  Ω  æ  ¥  X  C  .  `$  è  ê  É  ë  4  í  0  `$  \  Q  ¬  C  k  s  ®   G  π  -  À  Ã  Ω  2  `1  `$  ∞  b      ∫    @+  +  p3  `?  5  `4  `$  B  ú Z  w  \  Q  ï ¯  ∫    @  +  .  pG  œ  ∞   º  Ω  ’  /  `$  Ç  Q  ¬  ú ƒ  ∞  b    Ñ  ∆    X  ∫  
+  @+  I  G  π  k  s  -  )  p.  ∞   a  ¯  Õ  c    *  pR æ  ¥  ,  pZ  ;  œ  —  É  ”  Ø  -  p[  ÷  8  í  6  `w  -  `$  Ç  ú ï G  é  å   '  p  (  p/  p'  `∞   ù  $  ü  °  ,  ¢  .  /  6  •  ¶  ®  ê   ™  ¨  ≠  Æ  Ø  G  ∞  ±  c  C  ≤  ≥  ¥  !  p"  p#  p?  ø  b    @  ï 	  @  à  a  å   &  p7  `  @•    ⁄  ñ  €  ›  ‹  ﬂ  ﬁ  $  „  b    @Â  ‰    ∂  Ê      Á              ô   @ó     ï    @  @  @    @  ò    @  @  @!  Ë  G  È    @Í  8  `$    ±  b  Ï  Ì  Ó  Ô  9  `$  ∂  ±  b    Ò  Ú  Û  ;  `D  ˜  ı     d  <  `∞  $  d  b    :  `      @d   	 ê   ∞  ;  p$    b    <  pa ñ    `  p1  p4  p5  p6  p7  p8  p9  p   $  ◊   p    √    pS     pv  0  pÄ    2  p›  3  pﬂ  Ö  Ü  :  p ˇXÑ‰                B  	          ;            >            –   >                 :                      	             "             [             %             7   $          '             /             ñ   2          q             s             Ä             à   
+          í             »             ¶            K            å            Y             Q     !       s             k     "       y  
+           â             É     "       §            T  +   #       ≤     µ        π     ∏              &       ¬     '       ø     (       H     )       ‹     *         0   *       ‰     »        Ù  
+   ,       Û     -       ˛     ,            ,             -       F     *         2   .            Î        ±  	   /       ∫  	   0            Ù             ˘             ¸        $     ˇ        +     ò        3     ï        —     1       √     ˇ                     ùH©¿      ≥\      ≥\                Ç©  Ÿ  °  Ÿ                 9  h  1  h                  {  ‘  s  ‘                ÇÈ  Ú"  ‹  Ú"  !                 â    â  I                A  Ñ  9  Ñ  J               ¢  I  ö  I  O                i  ò  a  ò  _               ¥  Â  ¨  Â  c                j  ä  b  ä  i   +           Ät  ‡  l  ‡  p               +  |  #  |  ù                T  £  L  £  ∏                  ,"  ¯  ,"  ¡               K  Ä  C  Ä  —   &            ˘  ÷  Ò  ÷  ⁄               ‰  ;   ‹  ;   ﬂ               ¢   å!  ö   å!  Á               ö!  –!  í!  –!  Ï                K"  Ô"  C"  Ô"  Ù             Ç#  >*  #  >*  ¸   !            `#  ≈#  X#  ≈#  ˇ   !           Ç$  „)  $  „)    G           ÇÇ%  H'  z%  H'                 œ&  ;'  «&  ;'    $           ÇU'  7(  M'  7(                 ª'  *(  ≥'  *(    $            g(  )  _(  )                $)  ⁄)  )  ⁄)  %               K)  Õ)  C)  Õ)  &  $            *  :*  *  :*  .  $           Çe*  u@  ]*  u@  5  $            †.  /  ò.  /  F               >/  ï/  6/  ï/  K             º/  z1  ¥/  z1  M  $           30  »0  +0  »0  O  <            Z0  ó0  R0  ó0  P  $           ª2  q@  ≥2  q@  e  !            E3  µ3  =3  µ3  j             Ç 3  Õ?  ¬3  Õ?  k               e6  ˛7  ]6  ˛7  x  #          Ç9  Z:  9  Z:  â               :  4:  ˛9  4:  å  Q             .;  s;  &;  s;  ó  +           Œ<  >?  ∆<  >?  °  !             Ê=  >  ﬁ=  >  ß  L            2@  g@  *@  g@  ∏               ™C  ÷K  ¢C  ÷K  Œ  &            'L  ?L  L  ?L  #             dL  (M  \L  (M  %  #            NM  N  FM  N  )  $             +N  ãN  N  ãN  -               §N  O  éN  O  1               !O  ùO  	O  ùO  5               ∑O  0P  †O  0P  :               RQ  R  <Q  R  D              #R  ◊R  R  ◊R  I            ÇﬂW  ≤\  ◊W  ≤\  h  =            ©X  %Y  °X  %Y  q               Z[  ∏[  R[  ∏[  |             5°›ç¨ê‰T˜Ç      g¯ﬁ˚g¯ﬁ˚Hıg¯Âw   O    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/fg.menu.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:08:01 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|4c999c9c-8b8a-42f0-001f-25c69ef25be6|
+Accept-Ranges: bytes
+ETag: W/"23731-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 23731
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:08:01 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|4c999c9c-8b8a-42f0-001f-25c69ef25be6|
+Accept-Ranges: bytes
+ETag: W/"23731-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 23731
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=98
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 172 net-response-time-onstop 200 alt-data 1;23731,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  NJ

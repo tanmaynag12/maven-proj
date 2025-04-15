@@ -1,0 +1,312 @@
+/*
+ *
+ * Copyright (c) 2006-2011 Sam Collett (http://www.texotela.co.uk)
+ * Dual licensed under the MIT (http://www.opensource.org/licenses/mit-license.php)
+ * and GPL (http://www.opensource.org/licenses/gpl-license.php) licenses.
+ * 
+ * Version 1.3
+ * Demo: http://www.texotela.co.uk/code/jquery/numeric/
+ *
+ */
+(function($) {
+/*
+ * Allows only valid characters to be entered into input boxes.
+ * Note: fixes value when pasting via Ctrl+V, but not when using the mouse to paste
+  *      side-effect: Ctrl+A does not work, though you can still use the mouse to select (or double-click to select all)
+ *
+ * @name     numeric
+ * @param    config      { decimal : "." , negative : true }
+ * @param    callback     A function that runs if the number is not valid (fires onblur)
+ * @author   Sam Collett (http://www.texotela.co.uk)
+ * @example  $(".numeric").numeric();
+ * @example  $(".numeric").numeric(","); // use , as separater
+ * @example  $(".numeric").numeric({ decimal : "," }); // use , as separator
+ * @example  $(".numeric").numeric({ negative : false }); // do not allow negative values
+ * @example  $(".numeric").numeric(null, callback); // use default values, pass on the 'callback' function
+ *
+ */
+$.fn.numeric = function(config, callback)
+{
+	if(typeof config === 'boolean')
+	{
+		config = { decimal: config };
+	}
+	config = config || {};
+	// if config.negative undefined, set to true (default is to allow negative numbers)
+	if(typeof config.negative == "undefined") config.negative = true;
+	// set decimal point
+	var decimal = (config.decimal === false) ? "" : config.decimal || ".";
+	// allow negatives
+	var negative = (config.negative === true) ? true : false;
+	// callback function
+	var callback = typeof callback == "function" ? callback : function(){};
+	// set data and methods
+	return this.data("numeric.decimal", decimal).data("numeric.negative", negative).data("numeric.callback", callback).keypress($.fn.numeric.keypress).keyup($.fn.numeric.keyup).blur($.fn.numeric.blur);
+}
+
+$.fn.numeric.keypress = function(e)
+{
+	// get decimal character and determine if negatives are allowed
+	var decimal = $.data(this, "numeric.decimal");
+	var negative = $.data(this, "numeric.negative");
+	// get the key that was pressed
+	var key = e.charCode ? e.charCode : e.keyCode ? e.keyCode : 0;
+	// allow enter/return key (only when in an input box)
+	if(key == 13 && this.nodeName.toLowerCase() == "input")
+	{
+		return true;
+	}
+	else if(key == 13)
+	{
+		return false;
+	}
+	var allow = false;
+	// allow Ctrl+A
+	if((e.ctrlKey && key == 97 /* firefox */) || (e.ctrlKey && key == 65) /* opera */) return true;
+	// allow Ctrl+X (cut)
+	if((e.ctrlKey && key == 120 /* firefox */) || (e.ctrlKey && key == 88) /* opera */) return true;
+	// allow Ctrl+C (copy)
+	if((e.ctrlKey && key == 99 /* firefox */) || (e.ctrlKey && key == 67) /* opera */) return true;
+	// allow Ctrl+Z (undo)
+	if((e.ctrlKey && key == 122 /* firefox */) || (e.ctrlKey && key == 90) /* opera */) return true;
+	// allow or deny Ctrl+V (paste), Shift+Ins
+	if((e.ctrlKey && key == 118 /* firefox */) || (e.ctrlKey && key == 86) /* opera */
+	|| (e.shiftKey && key == 45)) return true;
+	// if a number was not pressed
+	if(key < 48 || key > 57)
+	{
+		/* '-' only allowed at start and if negative numbers allowed */
+		if(this.value.indexOf("-") != 0 && negative && key == 45 && (this.value.length == 0 || ($.fn.getSelectionStart(this)) == 0)) return true;
+		/* only one decimal separator allowed */
+		if(decimal && key == decimal.charCodeAt(0) && this.value.indexOf(decimal) != -1)
+		{
+			allow = false;
+		}
+		// check for other keys that have special purposes
+		if(
+			key != 8 /* backspace */ &&
+			key != 9 /* tab */ &&
+			key != 13 /* enter */ &&
+			key != 35 /* end */ &&
+			key != 36 /* home */ &&
+			key != 37 /* left */ &&
+			key != 39 /* right */ &&
+			key != 46 /* del */
+		)
+		{
+			allow = false;
+		}
+		else
+		{
+			// for detecting special keys (listed above)
+			// IE does not support 'charCode' and ignores them in keypress anyway
+			if(typeof e.charCode != "undefined")
+			{
+				// special keys have 'keyCode' and 'which' the same (e.g. backspace)
+				if(e.keyCode == e.which && e.which != 0)
+				{
+					allow = true;
+					// . and delete share the same code, don't allow . (will be set to true later if it is the decimal point)
+					if(e.which == 46) allow = false;
+				}
+				// or keyCode != 0 and 'charCode'/'which' = 0
+				else if(e.keyCode != 0 && e.charCode == 0 && e.which == 0)
+				{
+					allow = true;
+				}
+			}
+		}
+		// if key pressed is the decimal and it is not already in the field
+		if(decimal && key == decimal.charCodeAt(0))
+		{
+			if(this.value.indexOf(decimal) == -1)
+			{
+				allow = true;
+			}
+			else
+			{
+				allow = false;
+			}
+		}
+	}
+	else
+	{
+		allow = true;
+	}
+	return allow;
+}
+
+$.fn.numeric.keyup = function(e)
+{
+	var val = this.value;
+	if(val.length > 0)
+	{
+		// get carat (cursor) position
+		var carat = $.fn.getSelectionStart(this);
+		// get decimal character and determine if negatives are allowed
+		var decimal = $.data(this, "numeric.decimal");
+		var negative = $.data(this, "numeric.negative");
+		
+		// prepend a 0 if necessary
+		if(decimal != "")
+		{
+			// find decimal point
+			var dot = val.indexOf(decimal);
+			// if dot at start, add 0 before
+			if(dot == 0)
+			{
+				this.value = "0" + val;
+			}
+			// if dot at position 1, check if there is a - symbol before it
+			if(dot == 1 && val.charAt(0) == "-")
+			{
+				this.value = "-0" + val.substring(1);
+			}
+			val = this.value;
+		}
+		
+		// if pasted in, only allow the following characters
+		var validChars = [0,1,2,3,4,5,6,7,8,9,'-',decimal];
+		// get length of the value (to loop through)
+		var length = val.length;
+		// loop backwards (to prevent going out of bounds)
+		for(var i = length - 1; i >= 0; i--)
+		{
+			var ch = val.charAt(i);
+			// remove '-' if it is in the wrong place
+			if(i != 0 && ch == "-")
+			{
+				val = val.substring(0, i) + val.substring(i + 1);
+			}
+			// remove character if it is at the start, a '-' and negatives aren't allowed
+			else if(i == 0 && !negative && ch == "-")
+			{
+				val = val.substring(1);
+			}
+			var validChar = false;
+			// loop through validChars
+			for(var j = 0; j < validChars.length; j++)
+			{
+				// if it is valid, break out the loop
+				if(ch == validChars[j])
+				{
+					validChar = true;
+					break;
+				}
+			}
+			// if not a valid character, or a space, remove
+			if(!validChar || ch == " ")
+			{
+				val = val.substring(0, i) + val.substring(i + 1);
+			}
+		}
+		// remove extra decimal characters
+		var firstDecimal = val.indexOf(decimal);
+		if(firstDecimal > 0)
+		{
+			for(var i = length - 1; i > firstDecimal; i--)
+			{
+				var ch = val.charAt(i);
+				// remove decimal character
+				if(ch == decimal)
+				{
+					val = val.substring(0, i) + val.substring(i + 1);
+				}
+			}
+		}
+		// set the value and prevent the cursor moving to the end
+		this.value = val;
+		$.fn.setSelection(this, carat);
+	}
+}
+
+$.fn.numeric.blur = function()
+{
+	var decimal = $.data(this, "numeric.decimal");
+	var callback = $.data(this, "numeric.callback");
+	var val = this.value;
+	if(val != "")
+	{
+		var re = new RegExp("^\\d+$|\\d*" + decimal + "\\d+");
+		if(!re.exec(val))
+		{
+			callback.apply(this);
+		}
+	}
+}
+
+$.fn.removeNumeric = function()
+{
+	return this.data("numeric.decimal", null).data("numeric.negative", null).data("numeric.callback", null).unbind("keypress", $.fn.numeric.keypress).unbind("blur", $.fn.numeric.blur);
+}
+
+// Based on code from http://javascript.nwbox.com/cursor_position/ (Diego Perini <dperini@nwbox.com>)
+$.fn.getSelectionStart = function(o)
+{
+	if (o.createTextRange)
+	{
+		var r = document.selection.createRange().duplicate();
+		r.moveEnd('character', o.value.length);
+		if (r.text == '') return o.value.length;
+		return o.value.lastIndexOf(r.text);
+	} else return o.selectionStart;
+}
+
+// set the selection, o is the object (input), p is the position ([start, end] or just start)
+$.fn.setSelection = function(o, p)
+{
+	// if p is number, start and end are the same
+	if(typeof p == "number") p = [p, p];
+	// only set if p is an array of length 2
+	if(p && p.constructor == Array && p.length == 2)
+	{
+		if (o.createTextRange)
+		{
+			var r = o.createTextRange();
+			r.collapse(true);
+			r.moveStart('character', p[0]);
+			r.moveEnd('character', p[1]);
+			r.select();
+		}
+		else if(o.setSelectionRange)
+		{
+			o.focus();
+			o.setSelectionRange(p[0], p[1]);
+		}
+	}
+}
+
+})(jQuery);m¸Žø›w      gøÍegøÍeH\Šgøäî   T    O^partitionKey=%28https%2Ccmr.edu.in%29,:https://erp.cmr.edu.in/js/jquery.numeric.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:05:56 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|b7a5b773-f3c4-7d57-001f-25a9767417e2|
+Accept-Ranges: bytes
+ETag: W/"8387-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 8387
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:05:56 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|b7a5b773-f3c4-7d57-001f-25a9767417e2|
+Accept-Ranges: bytes
+ETag: W/"8387-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 8387
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=98
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 195 net-response-time-onstop 195    Ã

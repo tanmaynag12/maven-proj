@@ -1,0 +1,2082 @@
+/**
+ * By --  Nikhil Vanjara
+ * Date-- 32-01-2013
+ */
+
+function displayTestKeyModal()
+{
+	$('#onlineTestModal').modal('show').modal('show').css({
+		width:'600px',
+		'margin-left':function(){ return -($(this).width()/2); }
+	});
+}
+
+/**
+ * By--- Nikhil Vanjara
+ * used for redirecting applicant to registration page if provided key is valid
+ */
+function onlineTestKeyVerification()
+{
+	var key = $('#keyId').val();
+	$.ajax({
+		url:'onlineTestKeyVerification.json?key='+key,
+		dataType:'text',
+		async:false,
+		beforeSend : function() {
+			startCommonAjaxSpinner();
+		},
+		complete : function() {
+			stopCommonAjaxSpinner();
+		},
+		success : function(flag) 
+		{
+			if(flag!=0)
+			{
+				$('#onlineTestModal').modal('hide');
+				 var f = $('<form></form>')
+		            .attr({method:'post', action: 'RegisterApplicant.htm'})
+		            .appendTo(document.body);
+
+				    var i = $('<input>')
+				            .attr({type:'hidden',name:'flag',value:flag})
+				            .appendTo(f);
+				  
+		
+				    f[0].submit();
+				    f.remove();
+				//window.location.replace("RegisterApplicant.htm?flag="+flag);
+			}
+			else
+				jAlert("Your key is not valid..","Warning");
+		},
+		error : function(){
+			jAlert("In onlineTestKeyVerification error","Error");
+		}
+	});
+}
+
+function refreshImg()
+{
+	var captchaImage=document.getElementById("captchaImage");
+	var d = new Date();
+	$("#captchaImage").attr("src", "imageCaptcha.jpg?"+d.getTime());//jcaptcha.jpg
+}
+
+function fetchInstituteCourseStrength1()
+{
+	var customerId = $('#customerId').val();
+	var courseType = '';
+	if($('#courseType').val() != undefined && $('#courseType').val() != 'undefined')
+	{
+		courseType = $('#courseType').val();
+	}
+	$.ajax({
+		url:'fetchInstituteCourseStrengthForApplicantAdmissionRegistration1.json?customerId='+customerId+'&courseType='+courseType,
+		dataType:'json',
+		async:false,
+		success:function(jArray){
+			var boiler = '<option value="0">Select</option>';
+			for(var i=0;i<jArray.length;i++)
+			{
+				boiler += '<option value="'+jArray[i]["instituteStrengthId"]+'" >'+jArray[i]["courseName"]+'</option>';
+			}
+			$('#selInstituteCourseStrength1').html(boiler);
+		},
+		error:function(){
+			//jAlert("in Error Admission Type CMB","Error");
+		}
+	});
+}
+
+/**
+ * By--- Nikhil Vanjara
+ * used for add applicant details(Registration)
+ **/
+function addApplicantDetails()
+{
+	numberFormatValidation('contactApp');
+	var protectorKeyId = $('#hiddenKey').val();
+	var fName = $('#fnameApp').val();
+	var mName = $('#mnameApp').val();
+	var lName = $('#lnameApp').val();
+	var email = $('#emailApp').val();
+	var gender = $('#genderApp').val();
+	var dob = $('#dobApp').val();
+	var maritalStatus = $('#maritalStatusApp').val();
+	var presentAdd = $('#presentAddApp').val();
+	var permanentAdd = $('#permanentAddApp').val();
+	var contact = $('#contactApp').val();
+	
+	var value = contact.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
+    var intRegex = /^\d+$/;
+    
+	//var query = 'FName='+FName+'&LName='+LName+'&BDate='+BDate+'&Email='+Email+'&Gender='+Gender+'&MobileNo='+MobileNo+'&isMentor='+isMentor+'&isDeveloper='+isDeveloper;
+	if(fName=='' || lName=='' || dob=='' || contact=='' || email==''|| gender=='' || presentAdd=='' || permanentAdd==''){
+		if(fName==''  || ! isAlphaOrParen(fnameApp)){
+			$("#fnameApp").attr("placeholder","Please enter valid first name").css({"border":"1px solid #EB3313","color":"#EB3313"});
+			$("#fnameApp").val("");
+		}
+		if(lName==''  || ! isAlphaOrParen(lName)){
+			$("#lnameApp").attr("placeholder","Please enter valid last name").css({"border":"1px solid #EB3313","color":"#EB3313"});
+			$("#lnameApp").val("");
+		}
+		if(dob==''){
+			$("#dobApp").attr("placeholder","Please enter valid date of birth").css({"border":"1px solid #EB3313","color":"#EB3313"});
+			$("#dobApp").val("");
+		}
+		if(contact==''  || (!intRegex.test(value) || value.length<10)){
+			$("#contactApp").attr("placeholder","Please enter valid mobile number").css({"border":"1px solid #EB3313","color":"#EB3313"});
+			$("#contactApp").val();
+		}
+		if(email=='' || !isEmailvalid(email)){
+			$("#emailApp").attr("placeholder","Please enter valid email").css({"border":"1px solid #EB3313","color":"#EB3313"});
+			$("#emailApp").val("");
+		}
+		if(gender==''){
+			$("#genderApp").css("border", "1px solid #EB3313");
+		}
+		if(presentAdd==''  || ! isAlphaOrParen(presentAdd)){
+			$("#presentAddApp").attr("placeholder","Please enter valid present address").css({"border":"1px solid #EB3313","color":"#EB3313"});
+			$("#presentAddApp").val("");
+		}
+		if(permanentAdd==''  || ! isAlphaOrParen(permanentAdd)){
+			$("#permanentAddApp").attr("placeholder","Please enter valid permanent address").css({"border":"1px solid #EB3313","color":"#EB3313"});
+			$("#permanentAddApp").val("");
+		}
+	}
+	else
+	{
+		var data = 'fName='+fName+'&mName='+mName+'&lName='+lName+'&email='+email+'&gender='+gender+'&dob='+dob+'&maritalStatus='+maritalStatus+'&presentAdd='+presentAdd+
+		'&permanentAdd='+permanentAdd+'&contact='+contact+'&protectorKeyId='+protectorKeyId;
+		$.ajax({
+			url:'addApplicantDetails.htm',
+			dataType:'json',
+			data:data,
+			async:false,
+			beforeSend : function() {
+				startCommonAjaxSpinner();
+			},
+			complete : function() {
+				stopCommonAjaxSpinner();
+			},
+			success : function(json) 
+			{
+				jAlert("Details saved successfully..","Message");
+				
+				$('#hiddenApplicantId').val(json["APPLICANT_ID"]);
+				$('#fnameApp').val(json["fName"]);
+				$('#mnameApp').val(json["mName"]);
+				$('#lnameApp').val(json["lName"]);
+				$('#emailApp').val(json["email"]);
+				$('#genderApp').val(json["gender"]);
+				$('#dobApp').val(json["dob"]);
+				$('#maritalStatusApp').val(json["marStatus"]);
+				$('#presentAddApp').val(json["curAdd"]);
+				$('#permanentAddApp').val(json["perAdd"]);
+				$('#contactApp').val(json["contactNo"]);
+				
+				$('#appDetailSubmit').attr('disabled',true);
+				$('#appTestBtn').attr('disabled',false);
+			},
+			error : function(){
+				jAlert("In onlineTestKeyVerification error","Error");
+			}
+		});
+	}
+}
+function isAlphaOrParen(str) {
+	  return /^[a-zA-Z()]+$/.test(str);
+	}
+function isEmailvalid(str){
+return  /^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+$/.test(str);
+}
+/**
+ * By--- Nikhil Vanjara
+ * used for getting applicant details by proctor key
+ * @param protectorId
+ */
+function getApplicantDetailsByProtectorKeyId(protectorId)
+{
+	$.ajax({
+		url:'getApplicantDetailsByProtectorKeyId.json?protectorId='+protectorId,
+		dataType:'json',
+		async:false,
+		beforeSend : function() {
+			startCommonAjaxSpinner();
+		},
+		complete : function() {
+			stopCommonAjaxSpinner();
+		},
+		success : function(json) 
+		{
+			if(json["applicantId"]!=undefined)
+			{
+				$('#hiddenApplicantId').val(json["applicantId"]);
+				$('#fnameApp').val(json["firstName"]);
+				$('#mnameApp').val(json["middleName"]);
+				$('#lnameApp').val(json["lastName"]);
+				$('#emailApp').val(json["email"]);
+				$('#genderApp').val(json["gender"]);
+				$('#dobApp').val(json["dob"]);
+				$('#maritalStatusApp').val(json["maritalStatus"]);
+				$('#presentAddApp').val(json["curAdd"]);
+				$('#permanentAddApp').val(json["perAdd"]);
+				$('#contactApp').val(json["contactNo"]);
+				
+				$('#hiddenApplicantId').attr('disabled',true);
+				$('#fnameApp').attr('disabled',true);
+				$('#mnameApp').attr('disabled',true);
+				$('#lnameApp').attr('disabled',true);
+				$('#emailApp').attr('disabled',true);
+				$('#genderApp').attr('disabled',true);
+				$('#dobApp').attr('disabled',true);
+				$('#maritalStatusApp').attr('disabled',true);
+				$('#presentAddApp').attr('disabled',true);
+				$('#permanentAddApp').attr('disabled',true);
+				$('#contactApp').attr('disabled',true);
+				
+				$('#appDetailSubmit').attr('disabled',true);
+				$('#appTestBtn').attr('disabled',false);
+			}
+		},
+		error : function(){
+			jAlert("In getApplicantDetailsByProtectorKeyId error","Error");
+		}
+	});
+}
+
+/**
+ * By--- Nikhil Vanjara
+ * used for getting test details
+ */
+function getOnlineTestDetails()
+{
+	$.ajax({
+		url:'getAvailablePapers.json',
+		dataType:'json',
+		async:false,
+		beforeSend : function() {
+			startCommonAjaxSpinner();
+		},
+		complete : function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(json) 
+		{
+			var testBoiler = '<div class="label label-info" style="width: 100%; text-align:  center;" id="headerConfig">Test Details</div>'+
+			'<table class="table table-bordered"><thead>'+
+			'<tr><th>Test Name</th><th>Test Level</th><th>Duration(Minutes)</th><th>Negative Marking (%)</th><th>Skipped Negative Marking (%)</th></tr></thead><tbody>';
+			if(json.length>0)
+			{
+				for(var i=0;i<json.length;i++)
+				{
+				testBoiler +=   '<tr>'+
+									'<td><a href="#" onclick="getApplicantDetails('+json[i]["paperId"]+')">'+json[i]["paperName"]+'</a></td>'+
+									'<td>'+json[i]["level"]+'</td>'+
+									'<td>'+json[i]["duration"]+'</td>';
+									if(json[i]["testNegativeMarks"]!=undefined)
+										testBoiler += '<td>'+json[i]["testNegativeMarks"]+'</td>';
+									else
+										testBoiler += '<td>0</td>';
+									testBoiler += '<td>'+json[i]["testSkippedNegativeMarks"]+'</td>'+
+								'</tr>';
+				}
+			}
+			else
+				testBoiler += '<tr style="center"><td colspan="5" style="color:red;">No Records..</td></tr>';
+			testBoiler += '</tbody></table>';
+			$('#testDetailsDIV').html(testBoiler);
+		},
+		error:function(){
+			alert("In getOnlineTestDetails error");
+		}
+	});
+}
+
+/**
+ * By--- Nikhil Vanjara
+ * used for getting applicant details for evaluation
+ * @param testSettingId
+ */
+function getApplicantDetails(testSettingId)
+{
+	$('#testDetailsDIV').show();
+	$('#applicantDetailsDIV').show();
+	$('#applicantTestEvaluationDIV').hide();
+	$('#applicantTestEvaluationResultDIV').hide();
+	$.ajax({
+		url:'getApplicantDetails.json?testSettingId='+testSettingId,
+		dataType:'json',
+		async:false,
+		beforeSend : function() {
+			startCommonAjaxSpinner();
+		},
+		complete : function() {
+			stopCommonAjaxSpinner();
+		},
+		success : function(json) 
+		{
+			var applicantBoiler = '<div class="label label-info" style="width: 100%; text-align:  center;" id="headerConfig">Applicant Details</div>'+
+			'<table class="table table-bordered"><thead>'+
+			'<tr><th>Applicant Name</th><th>Email</th><th>Mobile</th><th>Evaluation</th><th>Evaluation Status</th><th>Obtain Marks</th><th>Passing Marks</th><th>Total Marks</th></tr></thead><tbody>';
+			if(json.length>0)
+			{
+				for(var i=0;i<json.length;i++)
+				{
+					applicantBoiler +=   '<tr>'+
+									'<td>'+json[i]["applicantName"]+'</td>'+
+									'<td>'+json[i]["applicantEmail"]+'</td>'+
+									'<td>'+json[i]["applicantMobile"]+'</td>';
+									
+									if(json[i]["evaluationStatus"]=="pending")
+									{
+										applicantBoiler +='<td><a href="#" onclick="evaluateApplicant('+json[i]["applicantId"]+','+testSettingId+',\''+json[i]["evaluationStatus"]+'\')">Evaluate</a></td><td><i class="icon-remove-sign"></i></td>'+
+										'<td>0</td>';
+									}
+									else
+									{
+										applicantBoiler +='<td><a href="#" style="color:green;" onclick="evaluateApplicant('+json[i]["applicantId"]+','+testSettingId+',\''+json[i]["evaluationStatus"]+'\')">Evaluate</a></td><td><i class="icon-ok-sign"></td>'+
+										'<td>'+json[i]["obtainMarks"]+'</td>';
+									}
+									if(json[i]["passingMarks"]!=undefined)
+										applicantBoiler +='<td>'+json[i]["passingMarks"]+'</td>';
+									else
+										applicantBoiler +='<td>Sectional</td>';
+									applicantBoiler +='<td>'+json[i]["totalMarks"]+'</td>'+
+								'</tr>';
+				}
+			}
+			else
+				applicantBoiler += '<tr align="center"><td colspan="8" style="color:red;">No Records..</td></tr>';
+			applicantBoiler += '</tbody></table>';
+			$('#applicantDetailsDIV').html(applicantBoiler);
+		},
+		error : function(){
+			jAlert("In getApplicantDetails error","Error");
+		}
+	});
+}
+
+
+/**
+ * By--- Nikhil Vanjara
+ * used for evaluate applicant test result
+ */
+var globalResultId = new Array();
+var globalNegativeMarks = new Array();
+var globalnegativeMarksForSkipped = new Array();
+var globalskippedFlag = new Array();
+var globalCategoryId = new Array();
+var isNegativeMarks = false;
+var isSkippedNegativeMarks = false;
+var globalAvailableCategoryId = new Array();
+var globalAvailableCategoryName = new Array();
+var globalSectionalTotal = new Array();
+var globalSectionalPassing = new Array();
+function evaluateApplicant(applicantId,testSettingId,evaluationStatus)
+{
+	$('#testDetailsDIV').hide();
+	$('#applicantDetailsDIV').hide();
+	$('#applicantTestEvaluationDIV').show();
+	$.ajax({
+		url:'evaluateApplicant.json?applicantId='+applicantId+'&testSettingId='+testSettingId,
+		dataType:'json',
+		async:false,
+		beforeSend : function() {
+			startCommonAjaxSpinner();
+		},
+		complete : function() {
+			stopCommonAjaxSpinner();
+		},
+		success : function(json) 
+		{
+			var applicantBoiler = '<div><b><a href="#" onclick="getApplicantDetails('+testSettingId+')" style="text-decoration:blink;" >Back</a></b></div>';
+			
+			if(json[0][0]["applicantName"]!=undefined)
+				applicantBoiler += '<div class="label label-info" style="width: 100%; text-align:  center;" id="headerConfig">Answer Sheet of '+json[0][0]["applicantName"]+'</div>';
+			else
+				applicantBoiler += '<div class="label label-info" style="width: 100%; text-align:  center;" id="headerConfig">Answer Sheet</div>';
+			
+			applicantBoiler +='<table class="table table-bordered"><thead>'+
+			'<tr><th>Question</th><th>Expected Answer</th><th>Given Answer</th><th>Run Code</th><th>Marks</th><th>Marks out of</th></tr></thead><tbody>';
+			if(json[0].length>0)
+			{
+				globalResultId = [];
+				globalskippedFlag = [];
+				globalCategoryId=[];
+				globalskippedCount = 0;
+				for(var i=0;i<json[0].length;i++)
+				{
+					globalNegativeMarks = json[0][0]["negativeMarks"];
+					globalnegativeMarksForSkipped = json[0][0]["negativeMarksForSkipped"];
+					
+					globalskippedFlag.push(json[0][i]["skippedFlad"]);
+					globalResultId.push(json[0][i]["applicantTestResultId"]);
+					globalCategoryId.push(json[0][i]["catId"]);
+					isNegativeMarks = json[0][0]["isNegativeMarks"];
+					isSkippedNegativeMarks = json[0][0]["isSkippedNegativeMarks"]; 
+					/*if(json[0][i]["categoryId"]!=null)
+						globalAvailableCategoryId.push(json[0][i]["categoryId"]);*/
+					
+					var testType = json[0][i]["testType"];
+					applicantBoiler +=   '<tr>'+
+									'<td>'+json[0][i]["question"]+'</td>';
+					
+									if(testType=="subjective")
+									{
+										var keywordArray = new Array();
+										var finalResult = "";
+										var splitlength = json[0][i]["expectedAns"].split(",").length; 
+										for(var x=0;x<splitlength;x++)
+											keywordArray.push(json[0][i]["expectedAns"].split(",")[x]);
+										
+										finalResult = json[0][i]["givenAns"];
+										for(var temp=0;temp<keywordArray.length;temp++)
+										{
+											var searchResult = finalResult.indexOf(keywordArray[temp].replace(/^\s+|\s+$/g,''));
+											
+											if(searchResult>0)
+											{
+												finalResult = finalResult.replace(keywordArray[temp],'<label style="font-size: 12px;color:red;display:inline;">'+keywordArray[temp]+'</label>'); 
+											}
+										}
+										
+										applicantBoiler +='<td>'+json[0][i]["expectedAns"]+'</td>'+
+										'<td>'+finalResult+'</td>';
+									}
+									else
+									{
+										applicantBoiler +='<td>'+json[0][i]["expectedAns"]+'</td>';
+										if(json[0][i]["givenAns"]!=undefined)
+											applicantBoiler +='<td>'+json[0][i]["givenAns"]+'</td>';
+										else
+											applicantBoiler +='<td>0</td>';
+									}
+									if(testType=="program")
+									{
+										if(json[0][i]["skippedFlad"]==false)
+											applicantBoiler += '<td><a href="#" onclick="runCode(\''+json[0][i]["pluginCode"]+'\')">Run Code</a></td>';
+										else
+											applicantBoiler += '<td>Skipped</td>';
+									}
+									else
+									{
+										if(json[0][i]["skippedFlad"]==false)
+											applicantBoiler += '<td></td>';
+										else
+											applicantBoiler += '<td>Skipped</td>';
+									}
+									
+									if(json[0][i]["skippedFlad"]==false)
+									{
+										if(evaluationStatus=="pending")
+										{
+											if(json[0][i]["expectedAns"]==json[0][i]["givenAns"])
+												applicantBoiler +='<td><input type="text" style="width:40px;" id="mark'+json[0][i]["applicantTestResultId"]+'-'+json[0][i]["catId"]+'" value="'+json[0][i]["marksOutOf"]+'" disabled="disabled" /></td>';
+											else
+												applicantBoiler +='<td><input type="text" style="width:40px;" id="mark'+json[0][i]["applicantTestResultId"]+'-'+json[0][i]["catId"]+'" onblur="marksValidation(\''+json[0][i]["applicantTestResultId"]+'\',\''+json[0][i]["marksOutOf"]+'\')" value="0" /></td>';
+										}
+										else
+										{
+											if(json[0][i]["obtainMarks"]!=undefined)
+												applicantBoiler +='<td><input type="text" style="width:40px;" id="mark'+json[0][i]["applicantTestResultId"]+'-'+json[0][i]["catId"]+'" value="'+json[0][i]["obtainMarks"]+'" onblur="marksValidation(\''+json[0][i]["applicantTestResultId"]+'\',\''+json[0][i]["marksOutOf"]+'\')" /></td>';
+											else
+												applicantBoiler +='<td><input type="text" style="width:40px;" id="mark'+json[0][i]["applicantTestResultId"]+'-'+json[0][i]["catId"]+'" value="0" onblur="marksValidation(\''+json[0][i]["applicantTestResultId"]+'\',\''+json[0][i]["marksOutOf"]+'\')" /></td>';
+										}
+									}
+									else
+									{
+										applicantBoiler +='<td><input type="text" style="width:40px;" id="mark'+json[0][i]["applicantTestResultId"]+'-'+json[0][i]["catId"]+'" value="0" disabled="disabled" /></td>';
+									}
+									
+									applicantBoiler +='<td id="outof-'+json[0][i]["applicantTestResultId"]+'-'+json[0][i]["catId"]+'">'+json[0][i]["marksOutOf"]+'</td></tr>';
+				}
+				//alert("globalCategoryId "+globalCategoryId);
+			}
+			else
+				applicantBoiler += '<tr><td colspan="6" style="color:red;">No Records..</td></tr>';
+
+			applicantBoiler += '<tr><td colspan="6"><input type="button" id="marksSubmit" value="Save Results" class="btn btn-inverse btn-mini  " onclick="saveResults(\''+json[0][0]["totalMarks"]+'\',\''+json[0][0]["passingMarks"]+'\','+json[0][0]["overallSectionalFlag"]+')" /></td></tr></tbody></table>';
+			$('#applicantTestEvaluationDIV').html(applicantBoiler);
+			
+			
+			if(json[1].length>0)
+			{
+				globalAvailableCategoryId = [];
+				globalAvailableCategoryName = [];
+				globalSectionalTotal = [];
+				globalSectionalPassing = [];
+				
+				for(var i=0;i<json[1].length;i++)
+				{
+					globalAvailableCategoryId.push(json[1][i]["categoryId"]);
+					globalAvailableCategoryName.push(json[1][i]["sectionName"]);
+					globalSectionalTotal.push(json[1][i]["totalMarks"]);
+					globalSectionalPassing.push(json[1][i]["passingMarks"]);
+				}
+			}
+		},
+		error : function(){
+			alert("In evaluateApplicant error");
+		}
+	});
+}
+
+/**
+ * By--- Nikhil Vanjara
+ * used for run applicant program with ideone api
+ * @param pluginCode
+ */
+function runCode(pluginCode)
+{
+	$.ajax({
+		url:'runCode.json?pluginCode='+pluginCode,
+		dataType:'json',
+		async:false,
+		beforeSend : function() {
+			startCommonAjaxSpinner();
+		},
+		complete : function() {
+			stopCommonAjaxSpinner();
+		},
+		success : function(json) 
+		{
+			var resultBoiler = '<table class="table table-bordered">'+
+			'<tr><th>Code</th><td>'+json["code"]+'</td></tr>'+
+			'<tr><th>Output</th><td>'+json["output"]+'</td></tr>'+
+			'<tr><th>Error</th><td></td></tr></table>';
+			$('#resultDialogBoxBody').html(resultBoiler);
+			$('#resultDialogBox').modal('show').modal('show').css({
+				width:'500px',
+				'margin-left':function(){ return -($(this).width()/2); }
+			});
+		},
+		error : function(){
+			alert("In runCode error","Error");
+		}
+	});
+}
+
+/**
+ * By --- Nikhil Vanjara
+ * used for saving final result of applicant
+ */
+var result = new Array();
+var finalResult = new Array();
+function saveResults(totalTestMarks, passingMarks, overallSectionalFlag)
+{
+	//alert(globalCategoryId);  every question category
+	//alert(globalAvailableCategoryId);  total available category in the same test 
+	$('#applicantTestEvaluationResultDIV').html('');
+	result = [];
+	var cnt = 0;   // Used for negative question count..
+	var cntSkipped = 0;   // Used for skipped negative question count..
+	var totalMarks = 0;
+	var negativeMarks = 0;
+	var skippedNegativeMarks = 0;
+	var wrongAnswer = 0; 
+	var trueAnswers = 0;
+	var finalTotal = 0;
+	
+	var sectionalBoiler = '';
+	if(!overallSectionalFlag)
+	{
+		finalResult=[];
+		sectionalBoiler += '<table class="table table-bordered"><thead><th class="head">Section</th><th class="head">Total Marks</th>'+
+		'<th class="head">Passing Marks</th><th class="head">Obtain Marks</th><th class="head">Percentage</th><th class="head">Result</th></thead><tbody>';
+		
+		finalTotal = 0;
+		for(var tmp=0;tmp<globalAvailableCategoryId.length;tmp++)
+		{
+			var catId = globalAvailableCategoryId[tmp];
+			var categoryNAME = globalAvailableCategoryName[tmp];
+			result = [];
+			totalMarks = 0;
+			negativeMarks = 0;
+			skippedNegativeMarks = 0;
+			for(var j=0;j<globalskippedFlag.length;j++)
+			{
+				//alert("flag= "+globalskippedFlag[j]);
+				if($('#mark'+globalResultId[j]+'-'+catId).val()=="0")
+					if(!globalskippedFlag[j])
+						if(parseInt(globalNegativeMarks)>0)
+							negativeMarks = parseFloat(negativeMarks) + ((globalNegativeMarks*($('#outof-'+globalResultId[j]+'-'+catId).html()))/100);   // negative marks calculation..
+				
+				if(globalskippedFlag[j]==true)
+				{
+					cntSkipped++;
+					if(parseInt(globalnegativeMarksForSkipped)>0)
+						skippedNegativeMarks = parseFloat(skippedNegativeMarks) + ((globalnegativeMarksForSkipped * ($('#outof-'+globalResultId[j]+'-'+catId).html()))/100);   // skipped negative marks calculation..
+				}
+				//alert("result "+$('#mark'+globalResultId[j]+'-'+catId).val());
+				if($('#mark'+globalResultId[j]+'-'+catId).val()!=undefined)
+				{
+					result.push($('#mark'+globalResultId[j]+'-'+catId).val());
+					finalResult.push($('#mark'+globalResultId[j]+'-'+catId).val());
+					//alert("mark"+globalResultId[j]+"-"+catId+"    value = "+$('#mark'+globalResultId[j]+'-'+catId).val());
+				}
+				/*else
+				{
+					result.push(0);
+					finalResult.push(0);
+				}*/
+			}
+			
+			for(var k=0;k<result.length;k++)  // Because here we calculate section wise result
+			{
+				if(result[k]=="0")
+				{
+					cnt++;   // Used for negative question count..
+				}
+				else
+				{
+					if(result[k]!=undefined)
+						totalMarks = parseFloat(totalMarks) + parseFloat(result[k]);
+				}
+			}
+			
+			if(isNegativeMarks && isSkippedNegativeMarks)
+				totalMarks = (totalMarks - (parseFloat(negativeMarks)+parseFloat(skippedNegativeMarks)));
+			else if(isNegativeMarks && !isSkippedNegativeMarks)
+				totalMarks = (totalMarks - ((parseFloat(negativeMarks))-(parseFloat(skippedNegativeMarks))));
+			else if(isSkippedNegativeMarks && !isNegativeMarks)
+				totalMarks = (totalMarks - parseFloat(skippedNegativeMarks));
+			//totalMarks = (totalMarks - (parseFloat(negativeMarks)+parseFloat(skippedNegativeMarks)));
+			finalTotal = finalTotal+totalMarks;
+			var categoryTotal = globalSectionalTotal[tmp];
+			var categoryPassing = globalSectionalPassing[tmp];
+			var percentage = (parseFloat(totalMarks)*100)/categoryTotal;
+			var sectionalResult = "fail";
+			if(totalMarks>=categoryPassing)
+				sectionalResult = "pass";
+			
+			sectionalBoiler += '<tr><th class="head">'+categoryNAME+'</th><td>'+categoryTotal+'</th><td>'+categoryPassing+'</th><td>'+totalMarks+'</th>'+
+			'<th class="head">'+parseFloat(percentage)+' %</th><th class="head">'+sectionalResult+'</th></tr>'; 
+			//alert("categoryNAME "+categoryNAME+"    totalMarks "+totalMarks+"     negativeMarks "+negativeMarks+"     skippedNegativeMarks "+skippedNegativeMarks);
+		}
+		//alert(finalResult);
+		sectionalBoiler += '</tbody></table><br> ';
+	}
+	else
+	{
+		finalResult = [];
+		totalMarks = 0;
+		finalTotal = 0;
+		//alert(globalCategoryId+"        result "+globalResultId);
+		sectionalBoiler += '<div class="label label-info" style="width: 100%; text-align:  center;" id="headerConfig">Final Results</div>'+
+		'<table class="table table-bordered">';
+		//alert("globalCategoryId "+globalCategoryId);
+		for(var j=0;j<globalskippedFlag.length;j++)
+		{
+			var catId = globalCategoryId[j];
+			//alert("catId "+catId+"    mark "+$('#mark'+globalResultId[j]+'-'+catId).val());
+			if($('#mark'+globalResultId[j]+'-'+catId).val()=="0")
+				if(!globalskippedFlag[j])
+					if(parseInt(globalNegativeMarks)>0)
+						negativeMarks = parseFloat(negativeMarks) + ((globalNegativeMarks*($('#outof-'+globalResultId[j]+'-'+catId).html()))/100);   // negative marks calculation..
+			
+			if(globalskippedFlag[j]==true)
+			{
+				cntSkipped++;
+				if(parseInt(globalnegativeMarksForSkipped)>0)
+					skippedNegativeMarks = parseFloat(skippedNegativeMarks) + ((globalnegativeMarksForSkipped * ($('#outof-'+globalResultId[j]+'-'+catId).html()))/100);   // skipped negative marks calculation..
+			}
+			//alert("mark"+globalResultId[j]+"-"+catId+"  ==  "+$('#mark'+globalResultId[j]+'-'+catId).val());
+			if($('#mark'+globalResultId[j]+'-'+catId).val()!=undefined)
+				finalResult.push($('#mark'+globalResultId[j]+'-'+catId).val());
+			else
+				finalResult.push(0);
+		}
+		
+		for(var k=0;k<finalResult.length;k++)
+		{
+			if(finalResult[k]=="0")
+			{
+				cnt++;   // Used for negative question count..
+			}
+			else
+				totalMarks = parseFloat(totalMarks) + parseFloat(finalResult[k]);
+		}
+		//alert("totalMarks "+totalMarks);
+		if(isNegativeMarks && isSkippedNegativeMarks)
+			totalMarks = (totalMarks - (parseFloat(negativeMarks)+parseFloat(skippedNegativeMarks)));
+		else if(isNegativeMarks && !isSkippedNegativeMarks)
+			totalMarks = (totalMarks - ((parseFloat(negativeMarks))-(parseFloat(skippedNegativeMarks))));
+		else if(isSkippedNegativeMarks && !isNegativeMarks)
+			totalMarks = (totalMarks - parseFloat(skippedNegativeMarks));
+
+		finalTotal = totalMarks; 
+		
+		wrongAnswer = parseInt(cnt)-parseInt(cntSkipped);  // Because all result which has value 0 are considered as negative question and skipped que. value are also 0. 
+		trueAnswers = parseInt(globalskippedFlag.length) - parseInt(wrongAnswer) - parseInt(cntSkipped);
+		
+		sectionalBoiler +=	'<tr><th class="head">Skipped Question</th><th class="head">Wrong Answers</th><th class="head">True Answers</th><th class="head">Obtained Marks</th><th class="head">Passing Marks</th><th class="head">Total Marks</th></tr>'+
+							'<tr><td>'+cntSkipped+'</td><td>'+wrongAnswer+'</td><td>'+trueAnswers+'</td><td>'+totalMarks+'</td><td>'+passingMarks+'</td><td>'+totalTestMarks+'</td></tr>'+ 
+							'</table><br>';
+	}
+	
+	
+	$.ajax({
+		url:'saveResults.json?globalResultId='+globalResultId+'&result='+finalResult+'&totalMarks='+finalTotal,
+		dataType:'text',
+		async:false,
+		beforeSend : function() {
+			startCommonAjaxSpinner();
+		},
+		complete : function() {
+			stopCommonAjaxSpinner();
+		},
+		success : function(text) 
+		{
+			alert("Results saved successfully..");
+			$('#applicantTestEvaluationResultDIV').show();
+			$('#applicantTestEvaluationResultDIV').html(sectionalBoiler);
+			totalMarks = 0;
+		},
+		error : function(){
+			jAlert("In saveResults error","Error");
+		}
+	});
+}
+
+/**
+ * By--- Nikhil Vanjara
+ * used for marks validation
+ * @param testResultId
+ * @param marksOutOf
+ */
+function marksValidation(testResultId, marksOutOf)
+{
+	var enteredMark = $('#mark'+testResultId).val();
+	if(parseInt(enteredMark) > parseInt(marksOutOf))
+	{
+		$('#mark'+testResultId).focus();
+		$('#mark'+testResultId).css('background-color','#FCB9B9');
+	}
+	if(parseInt(enteredMark) <= parseInt(marksOutOf))
+	{
+		$('#mark'+testResultId).css('background-color','white');
+	}
+}
+
+
+//Only for MGM
+var g_mgm_jObj = null;
+function app_getDropdownForMgm(){
+	var customerId=$('#customerId').val();
+	$('#cmbInstitute').attr('disabled',true);
+	$('#cmbCampus').attr('disabled',true);
+	$('#selInstituteCourseStrength').attr('disabled',true);
+	$.ajax({
+		url:'anon_fetchAdmisiionComboDataForMGM.json?customerId='+customerId,
+		dataType:'json',
+		success:function(jObj){
+			//selStreamStrength
+			//selInstituteCourseStrength
+			//cmbCampus
+			//cmbInstitute
+			var boiler = '<option value="0">Select Faculty</option>';
+			for(var obj of jObj.stream){
+				boiler += `<option value="${obj.id}">${obj.name}</option>`;
+			}
+			$('#selStreamStrength').html(boiler);
+			
+			boiler = '<option value="0">Select Institute</option>';
+			for(var obj of jObj.insti){
+				boiler += `<option value="${obj.id}" data-streamId="${obj.streamId}">${obj.name}</option>`;
+			}
+			
+			$('#cmbInstitute').html(boiler);
+			
+			
+			setTimeout(function(){
+			
+			boiler = '<option value="0">Select Programme Type</option>';
+			for(var obj of jObj.courseType){
+				
+				boiler += `<option value="${obj.name}" data-instituteCourseId = "${obj.instituteCourseId}" data-streamId="${obj.streamId}" data-instiId="${obj.instiId}">${obj.name}</option>`;
+			}
+			$('#cmbCampus').html(boiler);
+			},1000);
+			
+			boiler = '<option value="0">Select Programme</option>';
+			for(var obj of jObj.course){
+				boiler += `<option value="${obj.id}" data-streamId="${obj.streamId}" data-instiId="${obj.instiId}" data-courseType="${obj.courseType}" roundStructureId="${obj.roundStructureId}">${obj.name}</option>`;
+			}
+			$('#selInstituteCourseStrength').html(boiler);
+			
+			$('#selStreamStrength').change(function(){
+				$('#cmbInstitute option').hide();
+				var streamId = $(this).val();
+				$('#cmbInstitute option[data-streamId="'+streamId+'"]').show();
+				$('#cmbInstitute option').eq(0).show().attr('selected', true);
+				$('#cmbCampus option').eq(0).show().attr('selected', true);
+				$('#selInstituteCourseStrength option').eq(0).show().attr('selected', true);
+				$('#cmbInstitute').attr('disabled',false);
+			});
+			
+			$('#cmbInstitute').change(function(){
+				$('#cmbCampus option').hide();
+				var instiId = $(this).val();
+				var streamId = $('#cmbInstitute option:selected').attr('data-streamId');
+				
+				$('#cmbCampus option[data-streamId="'+streamId+'"][data-instiId="'+instiId+'"]').show();
+				$('#cmbCampus option').eq(0).show().attr('selected', true);
+				$('#selInstituteCourseStrength option').eq(0).show().attr('selected', true);
+				$('#cmbCampus').attr('disabled',false);
+			});
+			
+			$('#cmbCampus').change(function(){
+				$('#selInstituteCourseStrength option').hide();
+				var courseType = $(this).val();
+				var instiId = $('#cmbCampus option:selected').attr('data-instiId');
+				var streamId = $('#cmbCampus option:selected').attr('data-streamId');
+				$('#selInstituteCourseStrength option[data-streamId="'+streamId+'"][data-instiId="'+instiId+'"][data-courseType="'+courseType+'"]').show();
+				$('#selInstituteCourseStrength option').eq(0).show().attr('selected', true);
+				$('#selInstituteCourseStrength').attr('disabled',false);
+			});
+			
+			setTimeout(function(){
+				var instituteStrengthId = $('#instituteStrengthId').val();
+				$('#selInstituteCourseStrength').val(instituteStrengthId);
+				
+				var courseType = $('#selInstituteCourseStrength option:selected').attr('data-courseType');
+				var instituteId = $('#instituteId').val();
+				
+				$('#cmbCampus').val(courseType);
+				$('#cmbInstitute').val(instituteId);
+				var streamId = $('#selInstituteCourseStrength option:selected').attr('data-streamId');
+				$('#selStreamStrength').val(streamId);
+				
+				
+			}, 1500)
+			
+			
+		}
+	});
+}
+
+function verifyMobileNoByOTP(){
+	var mobileNo = $.trim($('#mobileNo').val());
+	if(mobileNo.length==0){
+		jAlert("Please Enter Valid Mobile Number!");
+		return false;
+	}
+	
+	$.ajax({
+		url:'anon_sendOTPonMobileNumber.json',
+		data:{
+			mobileNo:mobileNo
+		},
+		success:function(txt){
+			if(txt=='success'){
+				$('#gemsCommonAuthenticationModal').modal('show');
+				
+				var boiler='';
+				var exprTime = 15;
+				boiler += '<p style="color: green">'+'<i class="icon icon-info-sign"></i> &nbsp; One time password (OTP) has been sent to your Mobile. '+ 
+					' (This OTP is only valid for '+exprTime+' minutes)'+'</p>'+
+					'<span class="pull-right countDownGems" style="font-size:10px;font-family:comic sans ms;"></span>';
+				
+				boiler +='<table class="table table-condenced table-bordered">';
+				
+					boiler +='<tr><th>Mobile No.</th><td>'+mobileNo+'</td><td> <input type="text" class ="gemsAuthTxtFields" id="SmsAuthTxtField_" placeholder="Enter OTP" style="width:100px;height:20px;"> </td></tr>';
+				
+				
+				boiler +='</table>';
+				$('.gemsCommonAuthenticationSentOtpInfo').html(boiler);
+				
+				var countDownDateGEMS__ = new Date();
+				countDownDateGEMS__.setMinutes(countDownDateGEMS__.getMinutes() + exprTime);
+				
+			}
+		}
+	});
+}
+
+function verifySentOTP(){
+	var inputOtp = $('#SmsAuthTxtField_').val();
+	$.ajax({
+		url:'anon_verifyMobileNumberByOTP.json',
+		data:{otp:inputOtp},
+		success:function(txt){
+			
+			if(txt=='success'){
+				$('#btnRegister').css('cursor', '');
+		    	$('#btnRegister').attr('disabled', false);
+		    	$('#gemsCommonAuthenticationModal').modal('hide');
+		    	swal("Successfully Verified !");
+		    	$('#verifyOTP').hide();
+		    	$('#mobileNo').attr('readonly',true);
+		    	$('#mobileNo').data('isOTPVerified', true);
+		    }else{
+		    	swal("Please Enter Valid OTP !");
+				$('#mobileNo').data('isOTPVerified', false);
+			}
+		}
+	});
+}
+
+function verifyEmailSentOTP(){
+	var inputOtpMail = $('#EmailAuthTxtFieldNew').val();
+	$.ajax({
+		url:'anon_verifyEmailByOTP.json',
+		data:{otpEmail:inputOtpMail},
+		success:function(txt){
+			
+			if(txt=='success'){
+				$('#btnRegister').css('cursor', '');
+		    	$('#btnRegister').attr('disabled', false);
+		    	$('#gemsCommonAuthenticationModal').modal('hide');
+		    	swal("Successfully Verified !");
+		    	$('#verifyEMAIL').hide();
+				$('#resendVerifyEMAIL').hide();
+		    	$('#emailIdName').attr('readonly',true);
+		    	$('#emailIdName').data('isOTPVerified', true);
+		    	$('#gemsCommonAuthenticationModaEmail').modal('hide');
+				$('#confirmEmailIdName').attr('readonly',true);
+		    }else{
+		    	swal("Please Enter Valid OTP !");
+				$('#emailIdName').data('isOTPVerified', false);
+			}
+		}
+	});
+}
+var faSpinnerBoiler = '<i class="fa fa-spinner fa-pulse fa-lg fa-fw"></i>';
+function verifyEmailByOTP(){
+	var emailId = $.trim($('#emailIdName').val());
+	if(emailId.length==0){
+		jAlert("Please Enter Valid Email Id!");
+		return false;
+	}
+	
+	$.ajax({
+		url:'anon_sendOTPonEmail.json',
+		data:{
+			emailId:emailId
+		},
+		beforeSend : function() {
+			$('span.previewMailSend').html(faSpinnerBoiler);
+		},
+		complete : function() {
+			$('span.previewMailSend').html("");
+		},
+		success:function(txt){
+			if(txt=='success'){
+				$('#gemsCommonAuthenticationModaEmail').modal('show');
+				
+				var boiler='';
+				var exprTime = 15;
+				boiler += '<p style="color: green">'+'<i class="icon icon-info-sign"></i> &nbsp; One time password (OTP) has been sent to your Email. '+ 
+					' (This OTP is only valid for '+exprTime+' minutes)'+'</p>'+
+					'<span class="pull-right countDownGems" style="font-size:10px;font-family:comic sans ms;"></span>'+
+					'<span><b style="color: red; ">Your OPT email has not been received in your inbox. Please check your spam folder.</b></span>';
+				
+				boiler +='<table class="table table-condenced table-bordered">';
+				
+					boiler +='<tr><th>Email Id</th><td>'+emailId+'</td><td> <input type="text" class ="" id="EmailAuthTxtFieldNew" placeholder="Enter OTP" style="width:100px;height:20px;"> </td></tr>';
+				
+				
+				boiler +='</table>';
+				$('.gemsCommonAuthenticationSentOtpInfoMail').html(boiler);
+				$('#verifyEMAIL').hide();
+				$('#resendVerifyEMAIL').show();
+				var countDownDateGEMS__ = new Date();
+				countDownDateGEMS__.setMinutes(countDownDateGEMS__.getMinutes() + exprTime);
+				
+			}
+		}
+	});
+}
+
+function nameIsInArabic(){
+	applyGoogleTranslateApi('apl_arbicFullName');
+	
+	const translateEnglish = function(){
+		$('#apl_arbicFullName').val($('#firstName').val());
+		$('#apl_arbicFullName')[0].dispatchEvent(new KeyboardEvent('keypress',{'key':' '}));
+		setTimeout(function(){
+			$('#apl_arbicFullName').val($('#apl_arbicFullName').val()+' '+$('#middleName').val());
+			$('#apl_arbicFullName')[0].dispatchEvent(new KeyboardEvent('keypress',{'key':' '}));
+			
+			setTimeout(function(){
+				$('#apl_arbicFullName').val($('#apl_arbicFullName').val()+' '+$('#lastName').val());
+				$('#apl_arbicFullName')[0].dispatchEvent(new KeyboardEvent('keypress',{'key':' '}));
+			}, 500);
+		}, 500);
+	};
+	$('#firstName').blur(function(){
+		translateEnglish();
+	});
+	
+	$('#middleName').blur(function(){
+		translateEnglish();
+	});
+	
+	$('#lastName').blur(function(){
+		translateEnglish();
+	});
+	
+}
+
+function showHideCandidateCategory(){
+	
+	var candidateCategory = $('input[name = "candidateCategory"]:checked').val();
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+		
+		if(courseName !='VLFM'){
+			$('.categoryDropCls').show();
+			$('#physicallyHandicappedTR').show();	
+		}
+		
+	
+/*	if(courseName == 'PGDSM'){
+		if(candidateCategory == 'Direct'){
+				$('.categoryDropCls').show();
+				$('.catNumberTextCls').show();
+				$('#physicallyHandicappedTR').show();
+				//$('#CATRegistrationNumber').attr("placeholder", "CAT Registration Number");
+		
+			}else if(candidateCategory == 'International' ){
+				$('.categoryDropCls').show();
+				$('.catNumberTextCls').show();
+				$('#physicallyHandicappedTR').show();
+				//$('#CATRegistrationNumber').attr("placeholder", "GMAT Registration Number");
+			}else if(candidateCategory == 'Sponsored'){
+				$('.categoryDropCls').show();
+				$('.catNumberTextCls').show();
+				$('#physicallyHandicappedTR').show();
+				//$('#CATRegistrationNumber').attr("placeholder", "GMAT Registration Number");
+			}
+	}else{
+		if(candidateCategory == 'Direct'){
+		$('.categoryDropCls').show();
+		$('.catNumberTextCls').show();
+		$('#physicallyHandicappedTR').show();
+		
+		
+	}else if(candidateCategory == 'International' || candidateCategory == 'Sponsored'){
+		$('.categoryDropCls').show();
+		$('.catNumberTextCls').hide();
+		$('#physicallyHandicappedTR').show();
+	}
+	}*/
+	
+	var placeholderLbl = $('input[name = "candidateCategory"]:checked').attr('placeholderLbl'); 
+	if(placeholderLbl !=''){
+		$('.catNumberTextCls').show();
+		$('#CATRegistrationNumber').attr("placeholder", placeholderLbl);	
+	}else{
+		$('.catNumberTextCls').hide();
+		$('#CATRegistrationNumber').attr("placeholder", "CAT Registration Number");
+	}
+	
+	
+}
+
+function fetchCategoryReservations(){
+var admissionType = $('input[name = "candidateCategory"]:checked').val();
+var instituteCourseStrengthId = $('#selInstituteCourseStrength').val(); 
+
+$.ajax({
+		url:'restApi/fetchCategoryReservationByAdmissionType.json?admissionType='+admissionType+'&instituteCourseStrengthId='+instituteCourseStrengthId,
+		dataType:'json',
+		async:false,
+		headers:{'security-helper-prop':true},
+		beforeSend : function() {
+			//$('#categoryLoadingIcon').show();
+		},
+		complete : function() {
+			//$('#categoryLoadingIcon').fadeOut(1000);
+		},
+		success : function(jArr) 
+		{
+			var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+			if(courseName == 'VLFM'){
+				var boiler = '';
+				for(var obj of jArr.categoryReservationList){
+					boiler += `<option admissionTypeId = "${obj.admissionTypeId}" value="${obj.categoryReservationId}">${obj.categoryName}</option>`;
+				}
+				$('#cmbCategory').html(boiler);
+				$('#cmbCategoryReRegister').html(boiler);
+			}else{
+				
+				var boiler = '<option value="0">Select Category</option>';
+				for(var obj of jArr.categoryReservationList){
+					boiler += `<option admissionTypeId = "${obj.admissionTypeId}" value="${obj.categoryReservationId}">${obj.categoryName}</option>`;
+				}
+				$('#cmbCategory').html(boiler);
+				$('#cmbCategoryReRegister').html(boiler);
+			}
+			
+		},
+		error : function(){
+			jAlert("In saveResults error","Error");
+		}
+	});
+	
+}
+
+function checkCATRegistrationNo(){
+		//onblur="checkAluminiEmailId()"
+	var InstituteCourseStrength = $('#selInstituteCourseStrength option:selected').val();
+	var trustAbbr = $('#cmbCampus option:selected').attr("trustAbbr");
+	 var CATRegistrationNumber = $('#CATRegistrationNumber').val().trim();
+	var pattern = /^23\d{6}$/;
+	 if(CATRegistrationNumber != ''){
+            if(pattern.test(CATRegistrationNumber)) {
+		 	$.ajax({
+				url:'restApi/checkCATRegistrationNo.json',
+				data:{
+					CATRegistrationNumber : CATRegistrationNumber,
+					InstituteCourseStrength : InstituteCourseStrength
+				},
+				dataType:'json',
+				headers:{'security-helper-prop':true},
+				type:'POST',
+				async:true,
+				beforeSend: function() {
+					$('#CATLoadingIcon').show();
+				},
+				complete: function() {
+					$('#CATLoadingIcon').fadeOut(2000);
+				},
+				success:function(jObject){
+					if(!jObject.accountExpired){
+						if(jObject.alreadyAllocatedStatus){
+							swal("Your CAT Registration No. have already applied for this course!\n You may use your credentials to login for the same.");
+							$('#j_username').val($('#CATRegistrationNumber').val());
+							$('#CATRegistrationNumber').val("");
+						}else if(!jObject.status){
+							var courseBatch = (jObject.CourseName!=undefined&&jObject.CourseName!=""?" for ( "+jObject.CourseName+" ) - ":"")+" "+ (jObject.batch!=undefined?jObject.batch:"");
+							$('#errorDetailsTemp').html("You are already registered on <u>"+trustAbbr+" "+courseBatch+"</u>. <br/> To apply for other course, continue with same CAT Registration No.");
+						
+							$('#submitCheckDetailsAgainstEmailDialog').off('click').click(function(){
+								initUserMergerCAT(jObject.adhaarNo,jObject.emailId,CATRegistrationNumber);
+							});
+							$('#noCheckDetailsAgainstEmailDialog').off('click').click(function(){
+								$('#j_username').val($('#CATRegistrationNumber').val());
+								$('#password-1').focus();
+								$('#CATRegistrationNumber').val("").css('border','');
+							});
+							$('#cancelCheckDetailsAgainstEmailDialog').off('click').click(function(){$('#CATRegistrationNumber').val("").css('border','');;});
+						
+							$('#checkDetailsAgainstEmailDialog').modal('show');
+							$('#checkDetailsAgainstEmailDialog').modal({
+						   		backdrop: 'static',
+						    	keyboard: false
+							})
+								$('#CATRegistrationNumber').css("border","1px solid red");
+						}else{
+							$('#CATRegistrationNumber').css("border","1px solid GREEN");
+						}
+					}else{
+						swal('Username has been expired (on '+trustAbbr+' portal ) please try other Email id.');
+						$('#CATRegistrationNumber').val("");
+					}
+				},
+				error:function(){
+					//jAlert("in Error Admission Type CMB","Error");
+				}
+			});
+			// $('#CATRegistrationNumber').css("border","1px solid GREEN");
+			} else {
+                swal("Invalid input. It should start with '23' and be followed by 8 digits.");
+				$('#CATRegistrationNumber').css("border", "1px solid red");
+            }	 	
+	 }
+}
+
+function guideLinePopup(){
+	var firstName = $('#firstName').val().trim()+" "+$('#middleName').val().trim()+" "+$('#lastName').val().trim();
+	var emailIdName = $('#emailIdName').val().trim();
+	var mobileNo = $('#mobileNo').val().trim();
+	var CategoryName = $('#cmbCategory option:selected').text();
+	var CATRegistrationNumber = $('#CATRegistrationNumber').val().trim();
+	var	 physicallyHandicapped = $('input[name = "physicallyHandicapped"]:checked').val();
+	var	 dateofbirth= $('#ApplicantBirthdate').val();
+	var InstituteCourseStrength = $('#selInstituteCourseStrength option:selected').val();
+	
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	var guidelines = '';
+	$.ajax({
+			url:'restApi/getInstituteContactDetailsRegistration.json?InstituteCourseStrength='+InstituteCourseStrength,
+			dataType:'json',
+			async:false,
+			beforeSend: function() {
+				$('#guideLineIcon').show();
+			},
+			complete: function() {
+				$('#guideLineIcon').fadeOut(2000);
+			},
+			success:function(reply){
+			var instructions="";
+            try{instructions=decodeURIComponent(reply.profileInstructions)}catch(e){instructions=reply.profileInstructions}
+            guidelines = instructions;
+			},
+ 			error:function(){
+ 				//jAlert("in Error Admission Type CMB","Error");
+ 			}
+ 		});
+	
+	$('#commonModalNITIE').modal('show');
+	
+	var boiler = '';
+	if(guidelines =="" || guidelines =="-" ||  guidelines =="undefined"){
+		boiler += 
+			'<td>'+getGuidelinesBoiler()+'</td>';	
+	}else{
+		/*<tr>
+			<td colspan="6" ><p class="termsCls">${guidelines}</p></td>
+		</tr>*/
+		
+		boiler+= `<table class="table table-bordered">`;
+		boiler+= `<tr><td><b>Selected Program List :</b>`;
+		if($('#multipleProgramSelection').val()=="true"){
+		$('.ckallProgram:checked').each(function() {
+			var ProgramName = $(this).attr('data-name');
+			
+			boiler+= `<span class="badge badge-info">${ProgramName}</span>`;
+		});
+		}else{
+			boiler+= `<span class="badge badge-info">${courseName}</span>`;
+		}
+		boiler+= `</td></tr>`;
+		var fee=$('#categoryWisePayment').val();
+		if(fee!="0"){
+		boiler+= `<tr><td><b>Application Form Fee  : <i class="fa fa-inr" aria-hidden="true"> ${fee} /-</i>  </b></td></tr> 
+		<tr><td><b style="color:blue;font-size:12px;">Note :- Candidates who apply for multiple programmes must pay their respective programme fees separately.</b></td></tr>
+		 `;
+	}
+	boiler+= `	<tr>
+			<table class="table table-bordered">
+			<thead>
+            <tr>
+			<th>Verification For</th>
+			<th>Entered / Selection Value</th>
+			<th><input type="checkbox" class="ckallcls" id="selectall" onclick="juno.isSelectAllCheckBox(this,\'.chkMultipledetails\');"></th> 
+			</tr> </thead><tbody>
+			<tr>
+			<td>Candidate's Name</td>
+			<td>${firstName}</td>
+			<td><input type="checkbox"class="chkMultipledetails" value="${firstName}"/></td>
+			</tr>
+			<tr>
+			<td>Date of Birth </td>
+			<td>${dateofbirth}</td>
+			<td><input type="checkbox"class="chkMultipledetails" value="${dateofbirth}"/></td>
+			</tr>
+			<tr>
+			<td>Candidate's Email</td>
+			<td>${emailIdName}</td>
+			<td><input type="checkbox"class="chkMultipledetails" value="${emailIdName}"/></td>
+			</tr>
+			<tr>
+			<td>Candidate's Mobile No</td>
+			<td>${mobileNo}</td>
+			<td><input type="checkbox"class="chkMultipledetails" value="${mobileNo}"/></td>
+			</tr>`;
+			if($("#cmbCategory").is(":visible")){
+			boiler+= `<tr>
+			<td>Category Name</td>
+			<td>${CategoryName}</td>
+			<td><input type="checkbox"class="chkMultipledetails" value="${CategoryName}"/></td>
+			</tr>`;}
+			if($("#CATRegistrationNumber").is(":visible")){
+				boiler+= `<tr>
+			<td>CAT Registration No </td>
+			<td>${CATRegistrationNumber}</td>
+			<td><input type="checkbox"class="chkMultipledetails" value="${CATRegistrationNumber}"/></td>
+			</tr>`;
+			}
+			if($("#physicallyHandicappedTR").is(":visible")){
+		boiler+= `	<tr>
+			<td>PwD </td>
+			<td>${physicallyHandicapped}</td>
+			<td><input type="checkbox"class="chkMultipledetails" value="${physicallyHandicapped}"/></td>
+			</tr>`;}
+		boiler+= `	</tbody></table>
+		</tr>
+		</table></tr>`;
+		
+		boiler+= `<tr><p><input type="checkbox"class="chkMultipledetails" value="Disclaimer"/>     Disclaimer: I hereby declare that I have carefully read the instructions. 
+		All particulars stated in this Registration Form are true and correct to the best of my knowledge and belief. 
+		If any information provided is false or incorrect. I shall abide by the actions and decisions taken by IIM Mumbai authorities.</p>`;
+		boiler+= `</tr></table>`;	
+	}
+	var headindSpan = `<b>Verify your Details </b>`;
+	
+	$('#commonModalHeadingNITIE').html(headindSpan);
+	$('#commonModalBodyNITIE').html(boiler);
+	
+}
+
+function checkverificationAlldeatils(){
+	 var totalCheckboxes = $(".chkMultipledetails").length;
+	 var checkedCheckboxes = $(".chkMultipledetails:checked").length;
+	if(totalCheckboxes === checkedCheckboxes){
+		if($('#multipleProgramSelection').val()=="true"){
+				addAdmissionApplicantForNITIEMultipleChoise();
+				// addAdmissionApplicant();
+		}else{
+			addAdmissionApplicant();
+		}
+	}else{
+		if(checkedCheckboxes==0){
+		swal('select the check-box if the entered value is displayed correctly.')
+		}else{
+		$('#commonModalNITIE').modal('hide');
+		swal('Please provide accurate information.')
+		}	
+	}
+}
+function changeAmountOfCategory(){
+	var candidateCategoryId = $('#cmbCategory option:selected').val();
+	if(candidateCategoryId > 1){
+		fetchAmountofApplicationFee();
+	}
+	
+}
+function showHideCandidateCategoryNew(){
+	$('.categoryDropCls').show();
+	$('.catNumberTextCls').hide();
+	$('#cmbCategory').attr("placeholder", "Admission Category");
+}
+function getAdmissionTypeByBatchCapacityId(){
+	var batchSemesterCapacityIdMDP = $('#bscId').val() != null ? $('#bscId').val() : "0";
+	if (batchSemesterCapacityIdMDP != "0" && batchSemesterCapacityIdMDP != undefined) {
+		$.ajax({
+			url: 'restApi/getAdmissionQuotaTypeWithBatchSemesterCapacityId.json?batchSemesterCapacityId=' + batchSemesterCapacityIdMDP,
+			dataType: 'json',
+			async: false,
+			success: function(admissionTypeList) {
+				var boiler = '';
+				for (var i = 0; i < admissionTypeList.length; i++) {
+					boiler += '<input type="radio" class="disabledBox" name="candidateCategory" id="candidateCategory" placeholderLbl="' + admissionTypeList[i]["admissionTypePlaceholder"] + '" value="' + admissionTypeList[i]["admissionType"] + '" size="10" onclick="fetchCategoryReservations();showHideCandidateCategoryNew();"><label style="display:inline;">&nbsp;&nbsp;' + admissionTypeList[i]["admissionType"] + '</label>&nbsp;&nbsp;&nbsp;&nbsp;';
+				}
+				$('#candDirectSpanDiv').html(boiler);
+				if (admissionTypeList.length == 1) {
+					$('input[name="candidateCategory"]').prop("checked", true);
+					$('input[name="candidateCategory"]').trigger('onclick');
+					$('#candidateCategoryTRCls').css('display', 'none')
+				}
+			}
+
+		});
+	}
+}
+function getAdmissionTypeByStrength(){
+	var jArray = $('#cmbInstitute option:selected').data('courses');
+	var instituteCourseStrengthId = $('#selInstituteCourseStrength').val();
+	var ProgramArr =jArray.filter(jObj=>jObj.icsId==instituteCourseStrengthId);
+	if($('#multipleProgramSelection').val()=="true"){
+		$('#selInstituteCourseStrength').css('display', 'none');
+		$('#cmbInstitute').css('display', 'none');
+		$('#cmbCampus').css('display', 'none');
+		$('#NoteforNitieTR').show();
+		var boiler='';
+	boiler+=`<input type="checkbox" class="ckallProgram" data-icsId="${instituteCourseStrengthId}"  data-name="${ProgramArr[0].cNm}" data-agree="false" onclick="changeAmountOfCategory();popUpEligibilityDetails(this);" />    ${ProgramArr[0].cNm}  &nbsp &nbsp &nbsp`;
+	var dataArray = ProgramArr[0].OtherProgramName.split(',');
+		for(i=0;i<dataArray.length;i++){
+			var array=dataArray[i];
+			var program=array.split('_');
+			boiler+=`<input type="checkbox" class="ckallProgram" data-icsId="${program[0]}"  roundStructureId="${program[2]}" data-agree="false" onclick="changeAmountOfCategory();popUpEligibilityDetails(this);" data-name="${program[1]}"/>      ${program[1]} &nbsp &nbsp &nbsp`;
+		}
+	$('#ProgramSelectionDiv').html(boiler);
+	}
+	
+	var admissionType = '0';
+	$.ajax({
+		url : 'restApi/fetchCategoryReservationByAdmissionType.json?admissionType='+admissionType+'&instituteCourseStrengthId='+instituteCourseStrengthId,
+		dataType : 'json',
+		async : false,
+		headers:{'security-helper-prop':true},
+		success : function(jArray) {
+			
+			var admissionTypeList = jArray.admissionTypeList;
+			if(admissionTypeList.length > 1){
+			
+			if(admissionTypeList.length <=4){
+				var boiler = '';
+				for ( var i = 0; i < admissionTypeList.length; i++) {
+					boiler += '<input type="radio" class="disabledBox" name="candidateCategory" id="candidateCategory" placeholderLbl="'+admissionTypeList[i]["admissionTypePlaceholder"]+'" value="'+admissionTypeList[i]["admissionType"]+'" size="10" onclick="fetchCategoryReservations();showHideCandidateCategory();"><label style="display:inline;">&nbsp;&nbsp;'+admissionTypeList[i]["admissionType"]+'</label>&nbsp;&nbsp;&nbsp;&nbsp;';
+				}
+			
+				$('#candDirectSpanDiv').html(boiler);
+			}else{
+			
+				var boiler = '';
+				boiler +='<option value="0">Select</option>';
+				
+				for ( var i = 0; i < admissionTypeList.length; i++) {
+					boiler += '<option value="' + admissionTypeList[i]["admissionTypeId"]+'" placeholderLbl="'+admissionTypeList[i]["admissionTypePlaceholder"]+'" onchange="fetchCategoryReservations("'+admissionTypeList[i]["admissionType"]+'");">' + admissionTypeList[i]["admissionType"] + '</option>';
+				}
+			
+				$('#candDirectSpanDiv').html(boiler);
+				}
+			}else if($('#customerHelper').val()=="NITIE_SERVER"||$('#customerHelper').val()=="LOCAL_SERVER"){
+				var boiler = '';
+				for ( var i = 0; i < admissionTypeList.length; i++) {
+					boiler += '<input type="radio" class="disabledBox" name="candidateCategory" id="candidateCategory" placeholderLbl="'+admissionTypeList[i]["admissionTypePlaceholder"]+'" value="'+admissionTypeList[i]["admissionType"]+'" size="10" onclick="fetchCategoryReservations();showHideCandidateCategory();"><label style="display:inline;">&nbsp;&nbsp;'+admissionTypeList[i]["admissionType"]+'</label>&nbsp;&nbsp;&nbsp;&nbsp;';
+				}
+			
+				$('#candDirectSpanDiv').html(boiler);
+			}
+			if(admissionTypeList.length ==1 && ($('#customerHelper').val()=="NITIE_SERVER"||$('#customerHelper').val()=="LOCAL_SERVER")){
+				 $('input[name="candidateCategory"]').prop("checked", true);
+				$('input[name="candidateCategory"]').trigger('onclick'); 
+				
+				$('#candidateCategoryTRCls').css('display','none')
+			}
+		},
+		error : function() { 
+			getCustomAlertMessage("alert_error");
+		}
+	});
+}
+
+function initUserMergerCAT(adhaarNo,emailId,CATRegNo)
+{
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	var admissionType = $('input[name = "candidateCategory"]:checked').val();
+	
+	$("#commonModalHeading").html("<h1>Login merger - Identity Verification</h1>");
+	var boiler = '<table class="table table-bordered">'+
+	'<tr><td colspan="2">Email id&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3"><input type="text" id="emailIdModal" length="10" ></td></tr>'+
+	'<tr class="hideForNITIE"><td colspan="2">Date of birth&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3"><input type="text" id="dobIdModal" length="10" readonly></td></tr>'+
+	'<tr class="hideForNITIE"><td colspan="2">Mothers name&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3"><input type="text" id="motherNameIdModal" length="10"></td></tr>';
+	
+	if($('#customerHelper').val()=="NITIE_SERVER"){
+		if(admissionType =='Direct'){
+			boiler +='<tr class="showForNITIE"><td colspan="2">CAT/GATE Registration Number&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3"><input type="text" id="CATRegNo" disabled ></td></tr>';
+		}
+		boiler +='<tr><td colspan="2">Candidate Category&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td><td colspan="3">'+
+		'<select id="cmbCategoryReRegister" ></select>'+
+		'</td></tr>';
+	}
+	
+	if(adhaarNo!='' && adhaarNo!= undefined && adhaarNo!= 'undefined'){
+		boiler +='<tr class="hideForNITIE" id="adhaarMsg"><td colspan="5">Enter any one following detail,<strong> Same </strong> as that of which you have entered earlier.&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td></tr>';
+	    boiler +='<tr class="hideForNITIE" id="adhaarTxt"><td colspan="2">Aadhaar-card No.</td><td><input type="text" id="adharIdModal" maxlength="12"></td><td><strong>Or</strong> Passport No.</td><td><input type="text" id="passportIdModal" length="10"></td></tr>';
+	    
+	    boiler +='<tr class="hideForNITIE" style="display:none;" id="otpMsg"><td colspan="5">Enter following detail,<strong> Same </strong> as sent on your registered mobile number.&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td></tr>';
+		boiler +='<tr class="hideForNITIE" style="display:none;" id="otpTxt"><td colspan="2">OTP</td><td><input type="text" id="otpIdModal" length="8"><span></span>'+
+			'<i class="fa fa-spinner fa-pulse fa-lg fa-fw" style="position: absolute;right: 35%;top: 9%;display:none;" id="sendOTPmailSpinner"></i>'+
+		'</td><td> <a class="btn btn-success" id="btnSendOTP" onclick="sendOTP()"><b>Send OTP</b></a> &nbsp;&nbsp;</td></tr>';
+	}else{
+		
+		boiler +='<tr class="hideForNITIE" style="display:none;" id="adhaarMsg"><td colspan="5">Enter any one following detail,<strong> Same </strong> as that of which you have entered earlier.&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font></td></tr>';
+	    boiler +='<tr class="hideForNITIE" style="display:none;" id="adhaarTxt"><td colspan="2">Aadhaar-card No.</td><td><input type="text" id="adharIdModal" maxlength="12"></td><td><strong>Or</strong> Passport No.</td><td><input type="text" id="passportIdModal" length="10"></td></tr>';
+	    if(emailId!='' && emailId!= undefined){
+		boiler +='<tr class="hideForNITIE" id="otpMsg"><td colspan="5">Enter following detail,<strong> Same </strong> as sent on your registered emailId.&nbsp;&nbsp;<font style="color:red;font-weight:bold;">*</font><strong> '+emailId+' </strong></td></tr>';
+	    }
+		boiler +='<tr class="hideForNITIE" id="otpTxt"><td colspan="2">OTP</td><td><input type="text" id="otpIdModal" length="8"></td><td><a class="btn btn-success" id="btnSendOTP" onclick="sendOTP()"><b>Send OTP</b></a> &nbsp;&nbsp;</td></tr>';
+	}
+	
+	boiler +='<tr><td colspan="3"> All fields marked with <font style="color:red;font-weight:bold;">*</font> are mandatory. <br> Your login id is your e-mail id. </td><td><div class="preview"></div></td></tr>'+
+	'</table>';
+	$("#commonModalBody").html(boiler);
+	if($('#customerHelper').val()=="NITIE_SERVER"){
+		$('.hideForNITIE').hide();	
+	}
+	$('#CATRegNo').val(CATRegNo);
+	
+	fetchCategoryReservations();
+	$("#modalFooter").html();
+	$("#commonModal").modal('show');
+	$('#emailIdModal').val($('#emailIdName').val());
+	
+	$('#dobIdModal').datepicker({
+		dateFormat : 'M dd,yy',
+		changeMonth : true,
+		changeYear : true,
+		yearRange : "-80:+0",
+		firstDay : 1
+	});
+}
+function checkConfirmEmailId(){
+	 var emailIdName = $('#emailIdName').val().trim();
+	 var confirmEmailIdName = $('#confirmEmailIdName').val().trim();
+	 if (validateEmail()) {
+		 $('#emailIdName').css("border","");
+	 }else{
+		 $('#emailIdName').css("border","1px solid red");
+		 return false;
+	 }
+	var emailIdObk = $("#emailIdName");
+ 		var isOtpVer = emailIdObk.data('isOTPVerified');
+	 if(confirmEmailIdName!=emailIdName){
+		 $('#emailIdName').css("border","1px solid red");
+		 $('#confirmEmailIdName').css("border","1px solid red");
+	 }else{
+		 $('#emailIdName').css("border","1px solid GREEN");
+		 $('#confirmEmailIdName').css("border","1px solid GREEN");
+		if(!isOtpVer||isOtpVer!=true)
+		$('#verifyEMAIL').show();
+	 }
+}
+function checkConfirmMobileNo(){
+	 var mobileNo = $('#mobileNo').val().trim();
+	 var ConfirmMobileNo = $('#ConfirmMobileNo').val().trim();
+	 if (mobileNo != "") {
+		 $('#mobileNo').css("border","");
+	 }else{
+		 $('#mobileNo').css("border","1px solid red");
+		 return false;
+	 }
+	 if(ConfirmMobileNo!=mobileNo){
+		 $('#mobileNo').css("border","1px solid red");
+		 $('#ConfirmMobileNo').css("border","1px solid red");
+	 }else{
+		 $('#mobileNo').css("border","1px solid GREEN");
+		 $('#ConfirmMobileNo').css("border","1px solid GREEN");
+		if(window.flow.isMobileNoVerify=='true'||window.flow.isMobileNoVerify){
+			$('#verifyOTP').show();
+		}
+		
+	 }
+}
+function fetchAmountOfApplicationfeePwD(){
+	fetchAmountofApplicationFee();
+}
+function fetchAmountofApplicationFee(){
+	if($('#multipleProgramSelection').val()=="true"){
+		$('#categoryWisePayment').val("");
+		var otherprogram='';
+		var admissionType = $('input[name = "candidateCategory"]:checked').val();
+		var candidateCategoryId = $('#cmbCategory option:selected').val();
+		var candidateCategory = $('#cmbCategory option:selected').text();
+		var	 physicallyHandicapped = $('input[name = "physicallyHandicapped"]:checked').val()!=undefined?$('input[name = "physicallyHandicapped"]:checked').val():"No";
+		 $('.ckallProgram:checked').each(function() {
+			  var icsId =  $(this).attr('data-icsid');
+				otherprogram=otherprogram!=''?otherprogram+","+icsId:icsId;
+		 });
+		$.ajax({
+        url: 'restApi/fetchAmountofApplicationFee.json',
+		data: {
+            admissionType: admissionType,
+            otherprogram: otherprogram,
+			candidateCategory:candidateCategory,
+			candidateCategoryId:candidateCategoryId,
+			physicallyHandicapped:physicallyHandicapped
+        },
+        dataType: 'text',
+		async : false,
+        success: function(jObj) {
+		$('#categoryWisePayment').val(jObj);
+     
+        },
+        error: function() {
+            jAlert("Something went wrong, Please try after some time", "Error");
+        }
+    });
+	}
+}
+function popUpEligibilityDetails(src){
+	var icsId;
+	var chkSrc = $(src);
+	var ProgramName;
+	/*$('.ckallProgram:checked').each(function() {*/
+ 		 icsId =  chkSrc.attr('data-icsid');
+		ProgramName=chkSrc.attr('data-name');
+	if(chkSrc.is(':checked')){		
+		var boiler=`<div>`;
+        if(icsId=="fada5c74a21acb1ea08e764da596bd00"){
+		boiler+= `<b>Eligibility: </b>
+			<p> &emsp;&emsp; The candidate must hold a Bachelors Degree, with at least 50% marks or equivalent CGPA [45% in case of candidates belonging to the 
+			Scheduled Caste (SC), Scheduled Tribe (ST) and Persons with Disability (PwD) categories], awarded by any University or educational 
+			institution as incorporated by an Act of Parliament or State legislature in India or declared to be deemed as a University under Section 
+			3 of the UGC Act, 1956, or possess an equivalent qualification recognised by the Ministry of Education, Government of India.</p>  
+			<p>&emsp;&emsp;Students in the final year of above degree can also apply subject to the following conditions:- 
+			<li style="margin-left: 70px;">Provided they qualify the above criteria for examinations appeared till date.</li>
+			<li style="margin-left: 70px;">Complete their examination, viva voce etc, by the time of joining the Institute.</li></p>
+			<p>Applicants should take the Common Admission Test (CAT) conducted by the Indian Institutes of Management (IIMs) in order to apply for the programs.</p>  
+			<p>Application fee for General Candidates -  <i class="fa fa-inr" aria-hidden="true"> 2000/-</i> SC/ST/PwD <i class="fa fa-inr" aria-hidden="true"> 1000/-</i> </P>`;
+		}else if(icsId=="445f0c48852782289a09be23757a845d"){
+			boiler+= `<b>Eligibility: </b>
+			<p> &emsp;&emsp; Full-time Engineering/Technology degree in any branch from a recognized university/institution with 
+					aggregate 50% marks (relaxed by 5% for SC/ST/PwD candidates). OR Full-time degree from a 
+					recognized university with aggregate 50% marks (relaxed by 5% for SC/ST/PwD candidates) in following disciplines  </p>
+			<li style="margin-left: 70px;">M.Sc. (Mathematics) </li>
+			<li style="margin-left: 70px;">M.Sc. (Statistics) </li>
+			<li style="margin-left: 70px;">Dual Degree (Maths and Computing) Minimum 5 yrs. </li>
+			<li style="margin-left: 70px;">BS./B. Tech (Economics) Minimum 4 yrs. </li>		 
+			<p>Students in the final year of above degree can also apply subject to the following conditions:- 
+			<li style="margin-left: 70px;">Provided they qualify the above criteria for examinations appeared till date.</li>
+			<li style="margin-left: 70px;">Complete their examination, viva voce etc, by the time of joining the Institute.</li></p>
+			<p>Applicants should take the Common Admission Test (CAT) conducted by the Indian Institutes of Management (IIMs) in order to apply for the programs.</p>  
+			<p>Application fee for General Candidates -  <i class="fa fa-inr" aria-hidden="true"> 2000/-</i> SC/ST/PwD <i class="fa fa-inr" aria-hidden="true"> 1000/-</i> </P>`;
+		}else if(icsId=="a273787f61dc96edd7e57deef4374cda"){
+			boiler+= `<b>Eligibility: </b>
+			<p> &emsp;&emsp;The candidate must hold a Bachelors Degree, with at least 50% marks or equivalent CGPA 
+			[45% in case of candidates belonging to the Scheduled Caste (SC), Scheduled Tribe (ST) and Persons with Disability (PwD) categories], 
+			awarded by any University or educational institution as incorporated by an Act of Parliament or State legislature in India or 
+			declared to be deemed as a University under Section 3 of the UGC Act, 1956, or possess an equivalent qualification recognised 
+			by the Ministry of Education, Government of India.  </p>
+			<p>&emsp;&emsp; Applicants should take the Common Admission Test (CAT) conducted by the Indian Institutes of Management (IIMs) in order to apply for the programs.</p>  
+			<p>Application fee for General Candidates -  <i class="fa fa-inr" aria-hidden="true"> 2000/-</i> SC/ST/PwD <i class="fa fa-inr" aria-hidden="true"> 1000/-</i> </P>`;
+			
+		}
+		boiler+=`</div>`;
+		var footer=`<a class="btn btn-success"onclick="AcceptedAgreeEligility()"><b>Agree</b></a>`;
+	juno.modal({
+		id: 'eligibilityMode',
+		backdrop: 'static',
+		header: `<h3>Eligibility Details For :- ${ProgramName}</h3>`,
+		body: boiler,
+		footer: footer,
+		width: '800px'
+	});
+	}
+	/*});*/
+	
+}
+function AcceptedAgreeEligility(){
+	$('#eligibilityMode').modal('hide');
+}
+function addAdmissionApplicantForNITIEMultipleChoise()
+{
+	
+	if($('#customerHelper').val()=="NITIE_SERVER"||$('#customerHelper').val()=="LOCAL_SERVER"){
+		$('#commonModalNITIE').modal('hide');
+	}
+	
+	//var customerId = $('#customerId').val();
+	var urlDomainName = window.location.host;
+	var customerId = 0;
+	var validationLogStr = new Array();	
+	if(urlDomainName=="kjedu.in")
+		customerId="<%= new JunoEncryption().encrypt(4) %>";
+	else	
+		customerId=$('#customerId').val();
+
+	var firstName = $('#firstName').val().trim();
+	var middleName = $('#middleName').val().trim();
+	var lastName = $('#lastName').val().trim();
+	var emailIdName = $('#emailIdName').val().trim();
+	var mobileNo = $('#mobileNo').val().trim();
+	var InstituteCourseStrength = '';
+	var txtCapecha = $("#txtCapecha").val().trim();
+	var FixedGender = $("#fixedGender").val().trim();
+	var StudentElective = $("#StudentElective").val().trim();
+	var isEntrance = $("#isEntrance").val().trim();
+	var Aadharno = $('#AdharcardNo').val();
+	var DteNo = $('#Dteno').val();
+	var countryCode = ini_CountryCode.getSelectedCountryData().dialCode;
+	
+	var candidateCategory = '';
+	var CATRegistrationNumber = '';
+	var categoryReservationId = 0;
+	var admissionTypeId = 0;
+	var physicallyHandicapped = '';
+	var abcId = '';
+	var dateofbirth='';
+	var otherprogram='';
+	
+	
+	
+	var txtCapecha1 = $("#captchaInfo");
+	var isValid = true;
+	$('#applicantRegistrationTLB input[type=text]').each(function(){
+		if(!($(this).val()!=undefined && $(this).val().trim()!='')){
+			if($(this).attr('id') != 'middleName' && $(this).attr('id') != 'lastName' && $(this).attr('id') != 'CATRegistrationNumber'){
+				$(this).css("border","1px solid red");
+				isValid = false;
+				if($(this).prop('placeholder')!=undefined){
+					validationLogStr.push($(this).prop('placeholder'));
+				}
+			}
+		}else{
+			$(this).css("border","1px solid #CCCCCC");
+		}
+		
+	});
+	
+	 if (emailIdName != ""  && emailIdName.includes(',')){
+		 $('#emailIdName').css("border","1px solid red");
+		 isValid = false;
+	 }else{
+		 $('#emailIdName').css("border","");		
+	 }
+	
+	 if (validateEmail() && firstName != "" && emailIdName != "" && mobileNo != "") {
+		 
+		var regExp = /^[A-Za-z]+$/;
+		var firstNameInfo = $("#firstNameInfo");
+		var mobileInfo = $("#mobileInfo");
+		var mobileNoObk = $("#mobileNo");
+		var emailIdObk = $("#emailIdName");
+		var txtCapecha1 = $("#captchaInfo");
+		
+ 		if (mobileNo.length < 10 && countryCode=="91") 
+ 		{
+ 			//lastNameInfo.hide();
+			//mobileInfo.text("Enter valid mobile number");
+			
+			errorAlertBootstrap("Enter valid mobile number");
+			mobileNoObk.css("border","1px solid red");
+			//mobileInfo.show();
+			mobileInfo.hide();
+			isValid = false;
+			return ;
+		}else{
+			mobileNoObk.css("border","");
+			mobileInfo.hide();
+			isValid = true;
+		}
+ 		
+ 		/* if(($('#customerHelper').val()=="MGMU_SERVER")){
+			var isOtpVer = mobileNoObk.data('isOTPVerified');
+			if(isOtpVer!=true){
+				errorAlertBootstrap("Please verify OTP of mobile number!");
+				mobileNoObk.css("border","1px solid red");
+				//mobileInfo.show();
+				mobileInfo.hide();
+				isValid = false;
+			}else{
+				mobileNoObk.css("border","");
+				mobileInfo.hide();
+				isValid = true;
+			}
+		}	 */
+ 			
+		if($('#customerHelper').val()=="NITIE_SERVER" && courseName !="VLFM"){
+			
+			if($("#candidateCategoryTRCls").is(":visible") && $('[name="candidateCategory"]:checked').val()==undefined){
+				$('#candidateCategoryTRCls').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#candidateCategoryTRCls').css('border', 'none');
+			}
+			
+			if($("#CATRegistrationNumber").is(":visible") && $('#CATRegistrationNumber').val().trim() == ""){
+				$('#CATRegistrationNumber').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#CATRegistrationNumber').css('border', 'none');
+			}
+			
+			if($("#cmbCategory").is(":visible") && $('#cmbCategory').val() == "0"){
+				$('#cmbCategory').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#cmbCategory').css('border', 'none');
+			}
+			if($("#physicallyHandicappedTR").is(":visible") && $('[name="physicallyHandicapped"]:checked').val()==undefined){
+				$('#physicallyHandicappedTR').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#physicallyHandicappedTR').css('border', 'none');
+			}
+			if($("#ApplicantBirthDayTR").is(":visible") &&  $('#ApplicantBirthdate').val().trim() == ""){
+				$('#ApplicantBirthdate').css("border", "1px solid red");
+				isValid = false;
+			}else{
+				$('#ApplicantBirthdate').css('border', 'none');
+			}
+			
+		}
+		 //isValid = true;
+	 } else {
+		 isValid = false;
+	 }
+	 InstituteCourseStrength =  $('#selInstituteCourseStrength').val();
+	if(InstituteCourseStrength==null || InstituteCourseStrength=='null' || InstituteCourseStrength=="0")
+	{
+		swal("Please Select Course Name");
+		isValid = false;
+	}
+	var appliedForCampus = false;
+	var appliedForCampusName = '';
+	var roundStructureId = $('#selInstituteCourseStrength option:selected').attr("roundStructureId");
+	var roundStructureIdNew = $('#selInstituteCourseStrength option:selected').attr("roundStructureIdDecr");
+	var instituteCourseId = $('#selInstituteCourseStrength option:selected').attr("instituteCourseId");
+	if(instituteCourseId == undefined || instituteCourseId == 'undefined'){
+		//instituteCourseId =  data-instituteCourseId
+		instituteCourseId = $('#cmbCampus option:selected').attr("data-instituteCourseId");
+	}
+	var instName = $('#cmbInstitute option:selected').text();
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	var courseType = $('#selInstituteCourseStrength option:selected').attr('courseType');
+	var instAbb = $('#cmbInstitute option:selected').attr('instAbbr');
+	var icsCheck =true;
+	var checkedCount = 0;
+	$('.ckallProgram:checked').each(function() {
+		checkedCount++;
+		 var ICS =  $(this).attr('data-icsid');
+		 if(InstituteCourseStrength == ICS){
+			 icsCheck=false; 
+		 }
+	});
+	var jArray = $('#cmbInstitute option:selected').data('courses');
+	if(icsCheck && checkedCount==1){
+		 $('.ckallProgram:checked').each(function() {
+			 var courseName = $(this).attr('data-name');
+			  var ICS =  $(this).attr('data-icsid');
+			 var RoundStructureId = $(this).attr('roundStructureId');
+			 var ProgramArr =jArray.filter(jObj=>jObj.icsId==ICS);
+			 
+			 InstituteCourseStrength=ProgramArr[0].icsId;
+			 roundStructureId=ProgramArr[0].rsId;
+			 roundStructureIdNew=ProgramArr[0].roundStructureIdDecr;
+			 instituteCourseId=ProgramArr[0].instCoId;
+			 courseName=ProgramArr[0].cNm;
+			 courseType=ProgramArr[0].courseType;
+			
+		 });
+	}else if(icsCheck && checkedCount >1){
+		$('.ckallProgram:checked').each(function() {
+			 var courseName = $(this).attr('data-name');
+			  var ICS =  $(this).attr('data-icsid');
+			 var RoundStructureId = $(this).attr('roundStructureId');
+			 var ProgramArr =jArray.filter(jObj=>jObj.icsId==ICS);
+			 
+			 InstituteCourseStrength=ProgramArr[0].icsId;
+			 roundStructureId=ProgramArr[0].rsId;
+			 roundStructureIdNew=ProgramArr[0].roundStructureIdDecr;
+			 instituteCourseId=ProgramArr[0].instCoId;
+			 courseName=ProgramArr[0].cNm;
+			 courseType=ProgramArr[0].courseType;
+			
+		 });
+		 $('.ckallProgram:checked').each(function() {
+			 var courseName = $(this).attr('data-name');
+			  var ICS =  $(this).attr('data-icsid');
+			 var RoundStructureId = $(this).attr('roundStructureId');
+			if(InstituteCourseStrength!=ICS){
+				otherprogram=otherprogram!=''?otherprogram+","+ICS+"_"+RoundStructureId+"_"+courseName:ICS+"_"+RoundStructureId+"_"+courseName;
+			}
+			
+		 });
+	}else if(!icsCheck){
+		$('.ckallProgram:checked').each(function() {
+			 var courseName = $(this).attr('data-name');
+			  var ICS =  $(this).attr('data-icsid');
+			 var RoundStructureId = $(this).attr('roundStructureId');
+			if(InstituteCourseStrength!=ICS){
+				otherprogram=otherprogram!=''?otherprogram+","+ICS+"_"+RoundStructureId+"_"+courseName:ICS+"_"+RoundStructureId+"_"+courseName;
+			}
+			
+		 });
+	}
+	if($('#customerHelper').val()=="NITIE_SERVER"||$('#customerHelper').val()=="LOCAL_SERVER"){
+		 candidateCategory = $('input[name = "candidateCategory"]:checked').val();
+		 CATRegistrationNumber = $('#CATRegistrationNumber').val().trim();
+		 categoryReservationId =  $('#cmbCategory option:selected').val();	
+		 admissionTypeId = $('#cmbCategory option:selected').attr("admissionTypeId");	
+		 physicallyHandicapped = $('input[name = "physicallyHandicapped"]:checked').val();
+		 dateofbirth=$('#ApplicantBirthdate').val().trim();
+	}
+	if(isValid)
+	{
+		
+		var URL1=window.location.href;
+		var admFormCampSource = "undefined";
+		var campaignName=$('#campaignNameId').val()!=null?$('#campaignNameId').val():"undefined";
+		var campaignMedium=$('#campaignMediumId').val()!=null?$('#campaignMediumId').val():"undefined";
+		var campaignSource=$('#campaignSourceId').val()!=null?$('#campaignSourceId').val():"undefined";
+	 $.ajax({
+			url:'restApi/applicantStudentRegistration.json',//addAdmissionApplicant.json  addAdmissionApplicantSP.json   
+			//url:'restApi/addAdmissionApplicantSP.json',//addAdmissionApplicant.json  addAdmissionApplicantSP.json
+			data:{
+				InstituteCourseStrength : InstituteCourseStrength,
+				customerId : customerId,
+				firstName :firstName,
+				middleName : middleName,
+				lastName : lastName,
+				emailIdName : emailIdName,
+				mobileNo:mobileNo,
+				txtCapecha : txtCapecha,
+				URL1 : URL1 , 
+				roundStructureId : roundStructureId,
+				FixedGender : FixedGender,
+				StudentElective :StudentElective,
+				isEntrance:isEntrance,
+				Aadharno:Aadharno,
+				DteNo:DteNo,
+				admFormCampSource:admFormCampSource,
+				appliedForCampusName:appliedForCampusName,
+				countryCode:countryCode,
+				instituteCourseId:instituteCourseId,
+				instName:instName,
+				courseName:courseName,
+				courseType:courseType,
+				instAbb:instAbb,
+				candidateCategory:candidateCategory,
+				CATRegistrationNumber:CATRegistrationNumber,
+				categoryReservationId:categoryReservationId,
+				admissionTypeId:admissionTypeId,
+				physicallyHandicapped:physicallyHandicapped,
+				abcId:abcId,
+				dateofbirth:dateofbirth,
+				otherprogram:otherprogram,
+				campaignName:campaignName,
+				campaignMedium:campaignMedium,
+				campaignSource:campaignSource
+			},
+			dataType:'json',
+			type:'POST',
+			headers:{'security-helper-prop':true},
+			async:false,
+			beforeSend: function() {
+				$('.preview').addClass('loading');
+				$('.lblTimeWarn').show();
+				$('#btnRegister').hide();
+			},
+			complete: function() {
+				$('.preview').removeClass('loading');
+				$('.lblTimeWarn').hide();
+				$('#btnRegister').show();
+			},
+			success:function(jArray){
+				
+				if(jArray[0].status=="capachaError"){
+				    //jAlert("Invalid captcha. Please try again.");
+				    errorAlertBootstrap("Invalid captcha. Please try again.");
+				    refreshImg();
+				    return;
+				}if(jArray[0].status=="alreadyAdded"){
+				    //jAlert("Invalid captcha. Please try again.");
+				    swal("You have already applied for this course!\n You may use your credentials to login for the same.");
+				    //window.location.reload();
+				    return;
+				}
+				if(jArray[0].status=="ApplicationLimit")
+     	   		{
+     	   			//jAlert('Applicant registration fulfilled. Please try next time');
+	     	   		errorAlertBootstrap('Applicant registration fulfilled. Please try next time');
+	  				 return;
+     	   		}
+				if(jArray.isError!=undefined && jArray.isError==true){
+					swal("Sorry for inconvenience! Please contact to Admission department!");
+					return ;
+				}
+				if(jArray[0].status){
+					if(jArray[0].status!="capachaError"){
+						var msg='';
+						if($('#customerHelper').val()=="MGMU_SERVER"){
+							msg="Thank you for your interest in MGM University. <br> Your login credentials sent on your Mobile - \''"+mobileNo+"'\' & E-Mail - \''"+emailIdName+"'\'.";
+						}else if($('#customerHelper').val()=="RCOEM_SERVER"){
+							msg="Successfully Registered! <br> Please go to registered email address for getting password. <br>You will be required to use this credentials for login/ process.";
+						}else{
+							msg="Successfully Registered! <br> Please go to registered email address or phone number for getting password. <br>You will be required to use this credentials for login process.";
+						}
+						if($('#customerHelper').val()!="MATS_SERVER"){
+						
+						jAlert(msg,"Success",function(r) {
+						  	if (r) {
+						  		window.location.href = "login.htm";
+							  }
+							 });
+						}else{
+							window.location.href = "login.htm";
+						}
+						/* alert('Successfully Registered Please go to registered Email Id/Mobile No for getting password');
+						$("#applicantRegistrationDiv").hide();
+						$("#applicantGuidelinesDiv").html(getGuidelinesBoiler()).show();	 */					
+					}
+				} else{
+					errorAlertBootstrap('Oops something went wrong, please try again.');
+				}
+			},
+			error:function(){
+				//jAlert("in Error Admission Type CMB","Error");
+			}
+		}); 
+	}else{
+		if(validationLogStr.length>0)
+			errorAlertBootstrap(validationLogStr.join(', ')+' are not valid!');
+		setTimeout(function(){
+			$('#applicantRegistrationTLB input[type=text]').css("border","");
+		},5000);
+	}
+}
+function checkAgeLimit(){
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	dateofbirth=$('#ApplicantBirthdate').val().trim();
+	var dob = new Date(dateofbirth);
+	var today = new Date();
+	var age = Math.floor((today-dob) / (365 * 24 * 60 * 60 * 1000));
+	// $('#applicantAge').val(isNaN(age)==false?age:"");
+	if(courseName=='BBP'){
+	if(age>=35){
+		$('#ApplicantBirthdate').css("border", "1px solid red");
+		$('#BirthValidation').html("You are not eligible for this program. The age limit for this program is 18-35 years on the program start date.");
+		$('#btnRegister').hide();
+	}else if(age<=18){
+		$('#ApplicantBirthdate').css("border", "1px solid red");
+		$('#BirthValidation').html("You are not eligible for this program. The age limit for this program is 18-35 years on the program start date.");
+		$('#btnRegister').hide();
+	}else{
+		$('#ApplicantBirthdate').css('border', 'none');
+		$('#BirthValidation').html('');
+		$('#btnRegister').show();
+	}
+	}
+}
+function popforbml(){
+	var courseName = $('#selInstituteCourseStrength option:selected').attr('courseName');
+	if(courseName=='BBP'){
+	var boiler=`<div>`;
+		boiler+= `
+			<p>1. The allocation of branches / offices of the Bank will be as per the business requirements of the Bank and vacancies available at the time of posting across India.</p>  
+			<p>2. Please go through the details of the program provided on this website carefully before applying.</p>
+			<p>3. The role offered by Axis Bank via this program will constitute of selling banking & financial products to the bank's existing and new customers.</p>  
+			<p>4. The gross CTC structure comprises both cash components and non-cash benefits.</P></div>`;
+		boiler+= `<p><input type="checkbox"class="chkpopforBMl" value="Disclaimer"/> I have read, understood and accepted the above information and agree to proceed with the application further</p>`;
+			var footer=`<a class="btn btn-success"onclick="AcceptedAgreeEligilityforBML()"><b>Proceed</b></a>`;
+	juno.modal({
+		id: 'eligibilityMode1',
+		backdrop: 'static',
+		 dismissModalBtn:false,
+		// header: `<h3>Eligibility Details For :-</h3>`,
+		body: boiler,
+		 footer: footer,
+		width: '800px'
+	});
+	$('.btn-danger').hide();
+	}
+}
+function AcceptedAgreeEligilityforBML(){
+	 var checkedCheckboxes = $(".chkpopforBMl:checked").length;
+		if(1 === checkedCheckboxes){
+			$('#eligibilityMode1').modal('hide');
+		}else{
+			swal('Select the checkbox if you have accepted the information.')
+		}
+	
+}
+Æjµø~      gøÍegøÍeH\Šgøäî   k    O^partitionKey=%28https%2Ccmr.edu.in%29,:https://erp.cmr.edu.in/scripts/applicantEmployee/applicantLogin.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:05:56 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|548b6e0e-9cd6-d648-001f-25a97b16aa2c|
+Accept-Ranges: bytes
+ETag: W/"80666-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 80666
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:05:56 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|548b6e0e-9cd6-d648-001f-25a97b16aa2c|
+Accept-Ranges: bytes
+ETag: W/"80666-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 80666
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=96
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 272 net-response-time-onstop 329  ;

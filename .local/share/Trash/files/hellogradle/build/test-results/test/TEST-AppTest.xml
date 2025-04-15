@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="AppTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2025-02-24T03:29:56" hostname="aimll502pc006-HP-Pro-Tower-280-G9-PCI-Desktop-PC" time="0.0">
-  <properties/>
-  <testcase name="testAppHasAGreeting" classname="AppTest" time="0.0"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

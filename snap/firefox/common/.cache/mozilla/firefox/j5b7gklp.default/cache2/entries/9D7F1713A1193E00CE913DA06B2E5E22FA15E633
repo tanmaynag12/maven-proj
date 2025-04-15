@@ -1,0 +1,2979 @@
+/*
+ * jQuery UI Timepicker 0.2.9
+ *
+ * Copyright 2010-2011, Francois Gelinas
+ * Dual licensed under the MIT or GPL Version 2 licenses.
+ * http://jquery.org/license
+ *
+ * http://fgelinas.com/code/timepicker
+ *
+ * Depends:
+ *	jquery.ui.core.js
+ *  jquery.ui.position.js (only if position settngs are used)
+ *
+ * Change version 0.1.0 - moved the t-rex up here
+*/
+
+(function ($, undefined) {
+
+    $.extend($.ui, { timepicker: { version: "0.2.9"} });
+
+    var PROP_NAME = 'timepicker';
+    var tpuuid = new Date().getTime();
+
+    /* Time picker manager.
+    Use the singleton instance of this class, $.timepicker, to interact with the time picker.
+    Settings for (groups of) time pickers are maintained in an instance object,
+    allowing multiple different settings on the same page. */
+
+    function Timepicker() {
+        this.debug = true; // Change this to true to start debugging
+        this._curInst = null; // The current instance in use
+        this._isInline = false; // true if the instance is displayed inline
+        this._disabledInputs = []; // List of time picker inputs that have been disabled
+        this._timepickerShowing = false; // True if the popup picker is showing , false if not
+        this._inDialog = false; // True if showing within a "dialog", false if not
+        this._dialogClass = 'ui-timepicker-dialog'; // The name of the dialog marker class
+        this._mainDivId = 'ui-timepicker-div'; // The ID of the main timepicker division
+        this._inlineClass = 'ui-timepicker-inline'; // The name of the inline marker class
+        this._currentClass = 'ui-timepicker-current'; // The name of the current hour / minutes marker class
+        this._dayOverClass = 'ui-timepicker-days-cell-over'; // The name of the day hover marker class
+
+        this.regional = []; // Available regional settings, indexed by language code
+        this.regional[''] = { // Default regional settings
+            hourText: 'Hour',           // Display text for hours section
+            minuteText: 'Minute',       // Display text for minutes link
+            amPmText: ['AM', 'PM'],     // Display text for AM PM
+            closeButtonText: 'Done',        // Text for the confirmation button (ok button)
+            nowButtonText: 'Now',           // Text for the now button
+            deselectButtonText: 'Deselect'  // Text for the deselect button
+        };
+        this._defaults = { // Global defaults for all the time picker instances
+            showOn: 'focus',    // 'focus' for popup on focus,
+                                // 'button' for trigger button, or 'both' for either (not yet implemented)
+            button: null,                   // 'button' element that will trigger the timepicker
+            showAnim: 'fadeIn',             // Name of jQuery animation for popup
+            showOptions: {},                // Options for enhanced animations
+            appendText: '',                 // Display text following the input box, e.g. showing the format
+
+            beforeShow: null,               // Define a callback function executed before the timepicker is shown
+            onSelect: null,                 // Define a callback function when a hour / minutes is selected
+            onClose: null,                  // Define a callback function when the timepicker is closed
+
+            timeSeparator: ':',             // The character to use to separate hours and minutes.
+            periodSeparator: ' ',           // The character to use to separate the time from the time period.
+            showPeriod: false,              // Define whether or not to show AM/PM with selected time
+            showPeriodLabels: true,         // Show the AM/PM labels on the left of the time picker
+            showLeadingZero: true,          // Define whether or not to show a leading zero for hours < 10. [true/false]
+            showMinutesLeadingZero: true,   // Define whether or not to show a leading zero for minutes < 10.
+            altField: '',                   // Selector for an alternate field to store selected time into
+            defaultTime: 'now',             // Used as default time when input field is empty or for inline timePicker
+                                            // (set to 'now' for the current time, '' for no highlighted time)
+            myPosition: 'left top',         // Position of the dialog relative to the input.
+                                            // see the position utility for more info : http://jqueryui.com/demos/position/
+            atPosition: 'left bottom',      // Position of the input element to match
+                                            // Note : if the position utility is not loaded, the timepicker will attach left top to left bottom
+            //NEW: 2011-02-03
+            onHourShow: null,			    // callback for enabling / disabling on selectable hours  ex : function(hour) { return true; }
+            onMinuteShow: null,             // callback for enabling / disabling on time selection  ex : function(hour,minute) { return true; }
+
+            hours: {
+                starts: 0,                  // first displayed hour
+                ends: 23                    // last displayed hour
+            },
+            minutes: {
+                starts: 0,                  // first displayed minute
+                ends: 55,                   // last displayed minute
+                interval: 5                 // interval of displayed minutes
+            },
+            rows: 4,                        // number of rows for the input tables, minimum 2, makes more sense if you use multiple of 2
+            // 2011-08-05 0.2.4
+            showHours: true,                // display the hours section of the dialog
+            showMinutes: true,              // display the minute section of the dialog
+            optionalMinutes: false,         // optionally parse inputs of whole hours with minutes omitted
+						
+            // buttons
+            showCloseButton: false,         // shows an OK button to confirm the edit
+            showNowButton: false,           // Shows the 'now' button
+            showDeselectButton: false       // Shows the deselect time button
+
+        };
+        $.extend(this._defaults, this.regional['']);
+
+        this.tpDiv = $('<div id="' + this._mainDivId + '" class="ui-timepicker ui-widget ui-helper-clearfix ui-corner-all " style="display: none"></div>');
+    }
+
+    $.extend(Timepicker.prototype, {
+        /* Class name added to elements to indicate already configured with a time picker. */
+        markerClassName: 'hasTimepicker',
+
+        /* Debug logging (if enabled). */
+        log: function () {
+            if (this.debug)
+                console.log.apply('', arguments);
+        },
+
+        _widgetTimepicker: function () {
+            return this.tpDiv;
+        },
+
+        /* Override the default settings for all instances of the time picker.
+        @param  settings  object - the new settings to use as defaults (anonymous object)
+        @return the manager object */
+        setDefaults: function (settings) {
+            extendRemove(this._defaults, settings || {});
+            return this;
+        },
+
+        /* Attach the time picker to a jQuery selection.
+        @param  target    element - the target input field or division or span
+        @param  settings  object - the new settings to use for this time picker instance (anonymous) */
+        _attachTimepicker: function (target, settings) {
+            // check for settings on the control itself - in namespace 'time:'
+            var inlineSettings = null;
+            for (var attrName in this._defaults) {
+                var attrValue = target.getAttribute('time:' + attrName);
+                if (attrValue) {
+                    inlineSettings = inlineSettings || {};
+                    try {
+                        inlineSettings[attrName] = eval(attrValue);
+                    } catch (err) {
+                        inlineSettings[attrName] = attrValue;
+                    }
+                }
+            }
+            var nodeName = target.nodeName.toLowerCase();
+            var inline = (nodeName == 'div' || nodeName == 'span');
+
+            if (!target.id) {
+                this.uuid += 1;
+                target.id = 'tp' + this.uuid;
+            }
+            var inst = this._newInst($(target), inline);
+            inst.settings = $.extend({}, settings || {}, inlineSettings || {});
+            if (nodeName == 'input') {
+                this._connectTimepicker(target, inst);
+                // init inst.hours and inst.minutes from the input value
+                this._setTimeFromField(inst);
+            } else if (inline) {
+                this._inlineTimepicker(target, inst);
+            }
+
+
+        },
+
+        /* Create a new instance object. */
+        _newInst: function (target, inline) {
+            var id = target[0].id.replace(/([^A-Za-z0-9_-])/g, '\\\\$1'); // escape jQuery meta chars
+            return {
+                id: id, input: target, // associated target
+                inline: inline, // is timepicker inline or not :
+                tpDiv: (!inline ? this.tpDiv : // presentation div
+                    $('<div class="' + this._inlineClass + ' ui-timepicker ui-widget  ui-helper-clearfix"></div>'))
+            };
+        },
+
+        /* Attach the time picker to an input field. */
+        _connectTimepicker: function (target, inst) {
+            var input = $(target);
+            inst.append = $([]);
+            inst.trigger = $([]);
+            if (input.hasClass(this.markerClassName)) { return; }
+            this._attachments(input, inst);
+            input.addClass(this.markerClassName).
+                keydown(this._doKeyDown).
+                keyup(this._doKeyUp).
+                bind("setData.timepicker", function (event, key, value) {
+                    inst.settings[key] = value;
+                }).
+                bind("getData.timepicker", function (event, key) {
+                    return this._get(inst, key);
+                });
+            $.data(target, PROP_NAME, inst);
+        },
+
+        /* Handle keystrokes. */
+        _doKeyDown: function (event) {
+            var inst = $.timepicker._getInst(event.target);
+            var handled = true;
+            inst._keyEvent = true;
+            if ($.timepicker._timepickerShowing) {
+                switch (event.keyCode) {
+                    case 9: $.timepicker._hideTimepicker();
+                        handled = false;
+                        break; // hide on tab out
+                    case 13:
+                        $.timepicker._updateSelectedValue(inst);
+                        $.timepicker._hideTimepicker();
+                            
+						return false; // don't submit the form
+						break; // select the value on enter
+                    case 27: $.timepicker._hideTimepicker();
+                        break; // hide on escape
+                    default: handled = false;
+                }
+            }
+            else if (event.keyCode == 36 && event.ctrlKey) { // display the time picker on ctrl+home
+                $.timepicker._showTimepicker(this);
+            }
+            else {
+                handled = false;
+            }
+            if (handled) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        },
+
+        /* Update selected time on keyUp */
+        /* Added verion 0.0.5 */
+        _doKeyUp: function (event) {
+            var inst = $.timepicker._getInst(event.target);
+            $.timepicker._setTimeFromField(inst);
+            $.timepicker._updateTimepicker(inst);
+        },
+
+        /* Make attachments based on settings. */
+        _attachments: function (input, inst) {
+            var appendText = this._get(inst, 'appendText');
+            var isRTL = this._get(inst, 'isRTL');
+            if (inst.append) { inst.append.remove(); }
+            if (appendText) {
+                inst.append = $('<span class="' + this._appendClass + '">' + appendText + '</span>');
+                input[isRTL ? 'before' : 'after'](inst.append);
+            }
+            input.unbind('focus.timepicker', this._showTimepicker);
+            if (inst.trigger) { inst.trigger.remove(); }
+
+            var showOn = this._get(inst, 'showOn');
+            if (showOn == 'focus' || showOn == 'both') { // pop-up time picker when in the marked field
+                input.bind("focus.timepicker", this._showTimepicker);
+            }
+            if (showOn == 'button' || showOn == 'both') { // pop-up time picker when 'button' element is clicked
+                var button = this._get(inst, 'button');
+                $(button).bind("click.timepicker", function () {
+                    if ($.timepicker._timepickerShowing && $.timepicker._lastInput == input[0]) { $.timepicker._hideTimepicker(); }
+                    else { $.timepicker._showTimepicker(input[0]); }
+                    return false;
+                });
+
+            }
+        },
+
+
+        /* Attach an inline time picker to a div. */
+        _inlineTimepicker: function(target, inst) {
+            var divSpan = $(target);
+            if (divSpan.hasClass(this.markerClassName))
+                return;
+            divSpan.addClass(this.markerClassName).append(inst.tpDiv).
+                bind("setData.timepicker", function(event, key, value){
+                    inst.settings[key] = value;
+                }).bind("getData.timepicker", function(event, key){
+                    return this._get(inst, key);
+                });
+            $.data(target, PROP_NAME, inst);
+
+            this._setTimeFromField(inst);
+            this._updateTimepicker(inst);
+            inst.tpDiv.show();
+        },
+
+        /* Pop-up the time picker for a given input field.
+        @param  input  element - the input field attached to the time picker or
+        event - if triggered by focus */
+        _showTimepicker: function (input) {
+            input = input.target || input;
+            if (input.nodeName.toLowerCase() != 'input') { input = $('input', input.parentNode)[0]; } // find from button/image trigger
+            if ($.timepicker._isDisabledTimepicker(input) || $.timepicker._lastInput == input) { return; } // already here
+
+            // fix v 0.0.8 - close current timepicker before showing another one
+            $.timepicker._hideTimepicker();
+
+            var inst = $.timepicker._getInst(input);
+            if ($.timepicker._curInst && $.timepicker._curInst != inst) {
+                $.timepicker._curInst.tpDiv.stop(true, true);
+            }
+            var beforeShow = $.timepicker._get(inst, 'beforeShow');
+            extendRemove(inst.settings, (beforeShow ? beforeShow.apply(input, [input, inst]) : {}));
+            inst.lastVal = null;
+            $.timepicker._lastInput = input;
+
+            $.timepicker._setTimeFromField(inst);
+
+            // calculate default position
+            if ($.timepicker._inDialog) { input.value = ''; } // hide cursor
+            if (!$.timepicker._pos) { // position below input
+                $.timepicker._pos = $.timepicker._findPos(input);
+                $.timepicker._pos[1] += input.offsetHeight; // add the height
+            }
+            var isFixed = false;
+            $(input).parents().each(function () {
+                isFixed |= $(this).css('position') == 'fixed';
+                return !isFixed;
+            });
+            if (isFixed && $.browser.opera) { // correction for Opera when fixed and scrolled
+                $.timepicker._pos[0] -= document.documentElement.scrollLeft;
+                $.timepicker._pos[1] -= document.documentElement.scrollTop;
+            }
+
+            var offset = { left: $.timepicker._pos[0], top: $.timepicker._pos[1] };
+
+            $.timepicker._pos = null;
+            // determine sizing offscreen
+            inst.tpDiv.css({ position: 'absolute', display: 'block', top: '-1000px' });
+            $.timepicker._updateTimepicker(inst);
+
+
+            // position with the ui position utility, if loaded
+            if ( ( ! inst.inline )  && ( typeof $.ui.position == 'object' ) ) {
+                inst.tpDiv.position({
+                    of: inst.input,
+                    my: $.timepicker._get( inst, 'myPosition' ),
+                    at: $.timepicker._get( inst, 'atPosition' ),
+                    // offset: $( "#offset" ).val(),
+                    // using: using,
+                    collision: 'flip'
+                });
+                var offset = inst.tpDiv.offset();
+                $.timepicker._pos = [offset.top, offset.left];
+            }
+
+
+            // reset clicked state
+            inst._hoursClicked = false;
+            inst._minutesClicked = false;
+
+            // fix width for dynamic number of time pickers
+            // and adjust position before showing
+            offset = $.timepicker._checkOffset(inst, offset, isFixed);
+            inst.tpDiv.css({ position: ($.timepicker._inDialog && $.blockUI ?
+			    'static' : (isFixed ? 'fixed' : 'absolute')), display: 'none',
+                left: offset.left + 'px', top: offset.top + 'px'
+            });
+            if ( ! inst.inline ) {
+                var showAnim = $.timepicker._get(inst, 'showAnim');
+                var duration = $.timepicker._get(inst, 'duration');
+
+                var postProcess = function () {
+                    $.timepicker._timepickerShowing = true;
+                    var borders = $.timepicker._getBorders(inst.tpDiv);
+                    inst.tpDiv.find('iframe.ui-timepicker-cover'). // IE6- only
+					css({ left: -borders[0], top: -borders[1],
+					    width: inst.tpDiv.outerWidth(), height: inst.tpDiv.outerHeight()
+					});
+                };
+
+                // Fixed the zIndex problem for real (I hope) - FG - v 0.2.9
+                inst.tpDiv.css('zIndex', $.timepicker._getZIndex(input) +1);
+
+                if ($.effects && $.effects[showAnim]) {
+                    inst.tpDiv.show(showAnim, $.timepicker._get(inst, 'showOptions'), duration, postProcess);
+                }
+                else {
+                    inst.tpDiv[showAnim || 'show']((showAnim ? duration : null), postProcess);
+                }
+                if (!showAnim || !duration) { postProcess(); }
+                if (inst.input.is(':visible') && !inst.input.is(':disabled')) { inst.input.focus(); }
+                $.timepicker._curInst = inst;
+            }
+        },
+
+        // This is a copy of the zIndex function of UI core 1.8.??
+        // Copied in the timepicker to stay backward compatible.
+        _getZIndex: function (target) {
+            var elem = $( target ), position, value;
+            while ( elem.length && elem[ 0 ] !== document ) {
+                position = elem.css( "position" );
+                if ( position === "absolute" || position === "relative" || position === "fixed" ) {
+                    value = parseInt( elem.css( "zIndex" ), 10 );
+                    if ( !isNaN( value ) && value !== 0 ) {
+                        return value;
+                    }
+                }
+                elem = elem.parent();
+            }
+        },
+
+        /* Generate the time picker content. */
+        _updateTimepicker: function (inst) {
+            inst.tpDiv.empty().append(this._generateHTML(inst));
+            this._rebindDialogEvents(inst);
+
+        },
+
+        _rebindDialogEvents: function (inst) {
+            var borders = $.timepicker._getBorders(inst.tpDiv),
+                self = this;
+            inst.tpDiv
+			.find('iframe.ui-timepicker-cover') // IE6- only
+				.css({ left: -borders[0], top: -borders[1],
+				    width: inst.tpDiv.outerWidth(), height: inst.tpDiv.outerHeight()
+				})
+			.end()
+            // after the picker html is appended bind the click & double click events (faster in IE this way
+            // then letting the browser interpret the inline events)
+            // the binding for the minute cells also exists in _updateMinuteDisplay
+            .find('.ui-timepicker-minute-cell')
+                .unbind()
+                .bind("click", { fromDoubleClick:false }, $.proxy($.timepicker.selectMinutes, this))
+                .bind("dblclick", { fromDoubleClick:true }, $.proxy($.timepicker.selectMinutes, this))
+            .end()
+            .find('.ui-timepicker-hour-cell')
+                .unbind()
+                .bind("click", { fromDoubleClick:false }, $.proxy($.timepicker.selectHours, this))
+                .bind("dblclick", { fromDoubleClick:true }, $.proxy($.timepicker.selectHours, this))
+            .end()
+			.find('.ui-timepicker td a')
+                .unbind()
+				.bind('mouseout', function () {
+				    $(this).removeClass('ui-state-hover');
+				    if (this.className.indexOf('ui-timepicker-prev') != -1) $(this).removeClass('ui-timepicker-prev-hover');
+				    if (this.className.indexOf('ui-timepicker-next') != -1) $(this).removeClass('ui-timepicker-next-hover');
+				})
+				.bind('mouseover', function () {
+				    if ( ! self._isDisabledTimepicker(inst.inline ? inst.tpDiv.parent()[0] : inst.input[0])) {
+				        $(this).parents('.ui-timepicker-calendar').find('a').removeClass('ui-state-hover');
+				        $(this).addClass('ui-state-hover');
+				        if (this.className.indexOf('ui-timepicker-prev') != -1) $(this).addClass('ui-timepicker-prev-hover');
+				        if (this.className.indexOf('ui-timepicker-next') != -1) $(this).addClass('ui-timepicker-next-hover');
+				    }
+				})
+			.end()
+			.find('.' + this._dayOverClass + ' a')
+				.trigger('mouseover')
+			.end()
+            .find('.ui-timepicker-now').bind("click",function(e) {
+                    $.timepicker.selectNow(e);
+            }).end()
+            .find('.ui-timepicker-deselect').bind("click",function(e) {
+                    $.timepicker.deselectTime(e);
+            }).end()
+            .find('.ui-timepicker-close').bind("click",function(e) {
+                    $.timepicker._hideTimepicker();
+            }).end();
+        },
+
+        /* Generate the HTML for the current state of the time picker. */
+        _generateHTML: function (inst) {
+
+            var h, m, row, col, html, hoursHtml, minutesHtml = '',
+                showPeriod = (this._get(inst, 'showPeriod') == true),
+                showPeriodLabels = (this._get(inst, 'showPeriodLabels') == true),
+                showLeadingZero = (this._get(inst, 'showLeadingZero') == true),
+                showHours = (this._get(inst, 'showHours') == true),
+                showMinutes = (this._get(inst, 'showMinutes') == true),
+                amPmText = this._get(inst, 'amPmText'),
+                rows = this._get(inst, 'rows'),
+                amRows = 0,
+                pmRows = 0,
+                amItems = 0,
+                pmItems = 0,
+                amFirstRow = 0,
+                pmFirstRow = 0,
+                hours = Array(),
+                hours_options = this._get(inst, 'hours'),
+                hoursPerRow = null,
+                hourCounter = 0,
+                hourLabel = this._get(inst, 'hourText'),
+                showCloseButton = this._get(inst, 'showCloseButton'),
+                closeButtonText = this._get(inst, 'closeButtonText'),
+                showNowButton = this._get(inst, 'showNowButton'),
+                nowButtonText = this._get(inst, 'nowButtonText'),
+                showDeselectButton = this._get(inst, 'showDeselectButton'),
+                deselectButtonText = this._get(inst, 'deselectButtonText'),
+                showButtonPanel = showCloseButton || showNowButton || showDeselectButton;
+            
+
+
+            // prepare all hours and minutes, makes it easier to distribute by rows
+            for (h = hours_options.starts; h <= hours_options.ends; h++) {
+                hours.push (h);
+            }
+            hoursPerRow = Math.ceil(hours.length / rows); // always round up
+
+            if (showPeriodLabels) {
+                for (hourCounter = 0; hourCounter < hours.length; hourCounter++) {
+                    if (hours[hourCounter] < 12) {
+                        amItems++;
+                    }
+                    else {
+                        pmItems++;
+                    }
+                }
+                hourCounter = 0; 
+
+                amRows = Math.floor(amItems / hours.length * rows);
+                pmRows = Math.floor(pmItems / hours.length * rows);
+
+                // assign the extra row to the period that is more densly populated
+                if (rows != amRows + pmRows) {
+                    // Make sure: AM Has Items and either PM Does Not, AM has no rows yet, or AM is more dense
+                    if (amItems && (!pmItems || !amRows || (pmRows && amItems / amRows >= pmItems / pmRows))) {
+                        amRows++;
+                    } else {
+                        pmRows++;
+                    }
+                }
+                amFirstRow = Math.min(amRows, 1);
+                pmFirstRow = amRows + 1;
+                hoursPerRow = Math.ceil(Math.max(amItems / amRows, pmItems / pmRows));
+            }
+
+
+            html = '<table class="ui-timepicker-table ui-widget-content ui-corner-all"><tr>';
+
+            if (showHours) {
+
+                html += '<td class="ui-timepicker-hours">' +
+                        '<div class="ui-timepicker-title ui-widget-header ui-helper-clearfix ui-corner-all">' +
+                        hourLabel +
+                        '</div>' +
+                        '<table class="ui-timepicker">';
+
+                for (row = 1; row <= rows; row++) {
+                    html += '<tr>';
+                    // AM
+                    if (row == amFirstRow && showPeriodLabels) {
+                        html += '<th rowspan="' + amRows.toString() + '" class="periods" scope="row">' + amPmText[0] + '</th>';
+                    }
+                    // PM
+                    if (row == pmFirstRow && showPeriodLabels) {
+                        html += '<th rowspan="' + pmRows.toString() + '" class="periods" scope="row">' + amPmText[1] + '</th>';
+                    }
+                    for (col = 1; col <= hoursPerRow; col++) {
+                        if (showPeriodLabels && row < pmFirstRow && hours[hourCounter] >= 12) {
+                            html += this._generateHTMLHourCell(inst, undefined, showPeriod, showLeadingZero);
+                        } else {
+                            html += this._generateHTMLHourCell(inst, hours[hourCounter], showPeriod, showLeadingZero);
+                            hourCounter++;
+                        }
+                    }
+                    html += '</tr>';
+                }
+                html += '</tr></table>' + // Close the hours cells table
+                        '</td>';          // Close the Hour td
+            }
+
+            if (showMinutes) {
+                html += '<td class="ui-timepicker-minutes">';
+                html += this._generateHTMLMinutes(inst);
+                html += '</td>';
+            }
+            
+            html += '</tr>';
+
+
+            if (showButtonPanel) {
+                var buttonPanel = '<tr><td colspan="3"><div class="ui-timepicker-buttonpane ui-widget-content">';
+                if (showNowButton) {
+                    buttonPanel += '<button type="button" class="ui-timepicker-now ui-state-default ui-corner-all" '
+                                   + ' data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" >'
+                                   + nowButtonText + '</button>';
+                }
+                if (showDeselectButton) {
+                    buttonPanel += '<button type="button" class="ui-timepicker-deselect ui-state-default ui-corner-all" '
+                                   + ' data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" >'
+                                   + deselectButtonText + '</button>';
+                }
+                if (showCloseButton) {
+                    buttonPanel += '<button type="button" class="ui-timepicker-close ui-state-default ui-corner-all" '
+                                   + ' data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" >'
+                                   + closeButtonText + '</button>';
+                }
+
+                html += buttonPanel + '</div></td></tr>';
+            }
+            html += '</table>';
+
+             /* IE6 IFRAME FIX (taken from datepicker 1.5.3, fixed in 0.1.2 */
+            html += ($.browser.msie && parseInt($.browser.version,10) < 7 && !inst.inline ?
+                '<iframe src="javascript:false;" class="ui-timepicker-cover" frameborder="0"></iframe>' : '');
+
+            return html;
+        },
+
+        /* Special function that update the minutes selection in currently visible timepicker
+         * called on hour selection when onMinuteShow is defined  */
+        _updateMinuteDisplay: function (inst) {
+            var newHtml = this._generateHTMLMinutes(inst);
+            inst.tpDiv.find('td.ui-timepicker-minutes').html(newHtml);
+            this._rebindDialogEvents(inst);
+                // after the picker html is appended bind the click & double click events (faster in IE this way
+                // then letting the browser interpret the inline events)
+                // yes I know, duplicate code, sorry
+/*                .find('.ui-timepicker-minute-cell')
+                    .bind("click", { fromDoubleClick:false }, $.proxy($.timepicker.selectMinutes, this))
+                    .bind("dblclick", { fromDoubleClick:true }, $.proxy($.timepicker.selectMinutes, this));
+*/
+
+        },
+
+        /*
+         * Generate the minutes table
+         * This is separated from the _generateHTML function because is can be called separately (when hours changes)
+         */
+        _generateHTMLMinutes: function (inst) {
+
+            var m, row, html = '',
+                rows = this._get(inst, 'rows'),
+                minutes = Array(),
+                minutes_options = this._get(inst, 'minutes'),
+                minutesPerRow = null,
+                minuteCounter = 0,
+                showMinutesLeadingZero = (this._get(inst, 'showMinutesLeadingZero') == true),
+                onMinuteShow = this._get(inst, 'onMinuteShow'),
+                minuteLabel = this._get(inst, 'minuteText');
+
+            if ( ! minutes_options.starts) {
+                minutes_options.starts = 0;
+            }
+            if ( ! minutes_options.ends) {
+                minutes_options.ends = 59;
+            }
+            for (m = minutes_options.starts; m <= minutes_options.ends; m += minutes_options.interval) {
+                minutes.push(m);
+            }
+            minutesPerRow = Math.round(minutes.length / rows + 0.49); // always round up
+
+            /*
+             * The minutes table
+             */
+            // if currently selected minute is not enabled, we have a problem and need to select a new minute.
+            if (onMinuteShow &&
+                (onMinuteShow.apply((inst.input ? inst.input[0] : null), [inst.hours , inst.minutes]) == false) ) {
+                // loop minutes and select first available
+                for (minuteCounter = 0; minuteCounter < minutes.length; minuteCounter += 1) {
+                    m = minutes[minuteCounter];
+                    if (onMinuteShow.apply((inst.input ? inst.input[0] : null), [inst.hours, m])) {
+                        inst.minutes = m;
+                        break;
+                    }
+                }
+            }
+
+
+
+            html += '<div class="ui-timepicker-title ui-widget-header ui-helper-clearfix ui-corner-all">' +
+                    minuteLabel +
+                    '</div>' +
+                    '<table class="ui-timepicker">';
+            
+            minuteCounter = 0;
+            for (row = 1; row <= rows; row++) {
+                html += '<tr>';
+                while (minuteCounter < row * minutesPerRow) {
+                    var m = minutes[minuteCounter];
+                    var displayText = '';
+                    if (m !== undefined ) {
+                        displayText = (m < 10) && showMinutesLeadingZero ? "0" + m.toString() : m.toString();
+                    }
+                    html += this._generateHTMLMinuteCell(inst, m, displayText);
+                    minuteCounter++;
+                }
+                html += '</tr>';
+            }
+
+            html += '</table>';
+
+            return html;
+        },
+
+        /* Generate the content of a "Hour" cell */
+        _generateHTMLHourCell: function (inst, hour, showPeriod, showLeadingZero) {
+
+            var displayHour = hour;
+            if ((hour > 12) && showPeriod) {
+                displayHour = hour - 12;
+            }
+            if ((displayHour == 0) && showPeriod) {
+                displayHour = 12;
+            }
+            if ((displayHour < 10) && showLeadingZero) {
+                displayHour = '0' + displayHour;
+            }
+
+            var html = "";
+            var enabled = true;
+            var onHourShow = this._get(inst, 'onHourShow');		//custom callback
+
+            if (hour == undefined) {
+                html = '<td><span class="ui-state-default ui-state-disabled">&nbsp;</span></td>';
+                return html;
+            }
+
+            if (onHourShow) {
+            	enabled = onHourShow.apply((inst.input ? inst.input[0] : null), [hour]);
+            }
+
+            if (enabled) {
+                html = '<td class="ui-timepicker-hour-cell" data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" data-hour="' + hour.toString() + '">' +
+                   '<a class="ui-state-default ' +
+                   (hour == inst.hours ? 'ui-state-active' : '') +
+                   '">' +
+                   displayHour.toString() +
+                   '</a></td>';
+            }
+            else {
+            	html =
+            		'<td>' +
+		                '<span class="ui-state-default ui-state-disabled ' +
+		                (hour == inst.hours ? ' ui-state-active ' : ' ') +
+		                '">' +
+		                displayHour.toString() +
+		                '</span>' +
+		            '</td>';
+            }
+            return html;
+        },
+
+        /* Generate the content of a "Hour" cell */
+        _generateHTMLMinuteCell: function (inst, minute, displayText) {
+        	 var html = "";
+             var enabled = true;
+             var onMinuteShow = this._get(inst, 'onMinuteShow');		//custom callback
+             if (onMinuteShow) {
+            	 //NEW: 2011-02-03  we should give the hour as a parameter as well!
+             	enabled = onMinuteShow.apply((inst.input ? inst.input[0] : null), [inst.hours,minute]);		//trigger callback
+             }
+
+             if (minute == undefined) {
+                 html = '<td><span class="ui-state-default ui-state-disabled">&nbsp;</span></td>';
+                 return html;
+             }
+
+             if (enabled) {
+	             html = '<td class="ui-timepicker-minute-cell" data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" data-minute="' + minute.toString() + '" >' +
+	                   '<a class="ui-state-default ' +
+	                   (minute == inst.minutes ? 'ui-state-active' : '') +
+	                   '" >' +
+	                   displayText +
+	                   '</a></td>';
+             }
+             else {
+
+            	html = '<td>' +
+	                 '<span class="ui-state-default ui-state-disabled" >' +
+	                 	displayText +
+	                 '</span>' +
+                 '</td>';
+             }
+             return html;
+        },
+
+
+        /* Enable the date picker to a jQuery selection.
+           @param  target    element - the target input field or division or span */
+        _enableTimepicker: function(target) {
+            var $target = $(target),
+                target_id = $target.attr('id'),
+                inst = $.data(target, PROP_NAME);
+            
+            if (!$target.hasClass(this.markerClassName)) {
+                return;
+            }
+            var nodeName = target.nodeName.toLowerCase();
+            if (nodeName == 'input') {
+                target.disabled = false;
+                inst.trigger.filter('button').
+                    each(function() { this.disabled = false; }).end();
+            }
+            else if (nodeName == 'div' || nodeName == 'span') {
+                var inline = $target.children('.' + this._inlineClass);
+                inline.children().removeClass('ui-state-disabled');
+            }
+            this._disabledInputs = $.map(this._disabledInputs,
+                function(value) { return (value == target_id ? null : value); }); // delete entry
+        },
+
+        /* Disable the time picker to a jQuery selection.
+           @param  target    element - the target input field or division or span */
+        _disableTimepicker: function(target) {
+            var $target = $(target);
+            var inst = $.data(target, PROP_NAME);
+            if (!$target.hasClass(this.markerClassName)) {
+                return;
+            }
+            var nodeName = target.nodeName.toLowerCase();
+            if (nodeName == 'input') {
+                target.disabled = true;
+
+                inst.trigger.filter('button').
+                    each(function() { this.disabled = true; }).end();
+
+            }
+            else if (nodeName == 'div' || nodeName == 'span') {
+                var inline = $target.children('.' + this._inlineClass);
+                inline.children().addClass('ui-state-disabled');
+            }
+            this._disabledInputs = $.map(this._disabledInputs,
+                function(value) { return (value == target ? null : value); }); // delete entry
+            this._disabledInputs[this._disabledInputs.length] = $target.attr('id');
+        },
+
+        /* Is the first field in a jQuery collection disabled as a timepicker?
+        @param  target_id element - the target input field or division or span
+        @return boolean - true if disabled, false if enabled */
+        _isDisabledTimepicker: function (target_id) {
+            if ( ! target_id) { return false; }
+            for (var i = 0; i < this._disabledInputs.length; i++) {
+                if (this._disabledInputs[i] == target_id) { return true; }
+            }
+            return false;
+        },
+
+        /* Check positioning to remain on screen. */
+        _checkOffset: function (inst, offset, isFixed) {
+            var tpWidth = inst.tpDiv.outerWidth();
+            var tpHeight = inst.tpDiv.outerHeight();
+            var inputWidth = inst.input ? inst.input.outerWidth() : 0;
+            var inputHeight = inst.input ? inst.input.outerHeight() : 0;
+            var viewWidth = document.documentElement.clientWidth + $(document).scrollLeft();
+            var viewHeight = document.documentElement.clientHeight + $(document).scrollTop();
+
+            offset.left -= (this._get(inst, 'isRTL') ? (tpWidth - inputWidth) : 0);
+            offset.left -= (isFixed && offset.left == inst.input.offset().left) ? $(document).scrollLeft() : 0;
+            offset.top -= (isFixed && offset.top == (inst.input.offset().top + inputHeight)) ? $(document).scrollTop() : 0;
+
+            // now check if datepicker is showing outside window viewport - move to a better place if so.
+            offset.left -= Math.min(offset.left, (offset.left + tpWidth > viewWidth && viewWidth > tpWidth) ?
+			Math.abs(offset.left + tpWidth - viewWidth) : 0);
+            offset.top -= Math.min(offset.top, (offset.top + tpHeight > viewHeight && viewHeight > tpHeight) ?
+			Math.abs(tpHeight + inputHeight) : 0);
+
+            return offset;
+        },
+
+        /* Find an object's position on the screen. */
+        _findPos: function (obj) {
+            var inst = this._getInst(obj);
+            var isRTL = this._get(inst, 'isRTL');
+            while (obj && (obj.type == 'hidden' || obj.nodeType != 1)) {
+                obj = obj[isRTL ? 'previousSibling' : 'nextSibling'];
+            }
+            var position = $(obj).offset();
+            return [position.left, position.top];
+        },
+
+        /* Retrieve the size of left and top borders for an element.
+        @param  elem  (jQuery object) the element of interest
+        @return  (number[2]) the left and top borders */
+        _getBorders: function (elem) {
+            var convert = function (value) {
+                return { thin: 1, medium: 2, thick: 3}[value] || value;
+            };
+            return [parseFloat(convert(elem.css('border-left-width'))),
+			parseFloat(convert(elem.css('border-top-width')))];
+        },
+
+
+        /* Close time picker if clicked elsewhere. */
+        _checkExternalClick: function (event) {
+            if (!$.timepicker._curInst) { return; }
+            var $target = $(event.target);
+            if ($target[0].id != $.timepicker._mainDivId &&
+				$target.parents('#' + $.timepicker._mainDivId).length == 0 &&
+				!$target.hasClass($.timepicker.markerClassName) &&
+				!$target.hasClass($.timepicker._triggerClass) &&
+				$.timepicker._timepickerShowing && !($.timepicker._inDialog && $.blockUI))
+                $.timepicker._hideTimepicker();
+        },
+
+        /* Hide the time picker from view.
+        @param  input  element - the input field attached to the time picker */
+        _hideTimepicker: function (input) {
+            var inst = this._curInst;
+            if (!inst || (input && inst != $.data(input, PROP_NAME))) { return; }
+            if (this._timepickerShowing) {
+                var showAnim = this._get(inst, 'showAnim');
+                var duration = this._get(inst, 'duration');
+                var postProcess = function () {
+                    $.timepicker._tidyDialog(inst);
+                    this._curInst = null;
+                };
+                if ($.effects && $.effects[showAnim]) {
+                    inst.tpDiv.hide(showAnim, $.timepicker._get(inst, 'showOptions'), duration, postProcess);
+                }
+                else {
+                    inst.tpDiv[(showAnim == 'slideDown' ? 'slideUp' :
+					    (showAnim == 'fadeIn' ? 'fadeOut' : 'hide'))]((showAnim ? duration : null), postProcess);
+                }
+                if (!showAnim) { postProcess(); }
+                var onClose = this._get(inst, 'onClose');
+                if (onClose) {
+                    onClose.apply(
+                        (inst.input ? inst.input[0] : null),
+					    [(inst.input ? inst.input.val() : ''), inst]);  // trigger custom callback
+                }
+                this._timepickerShowing = false;
+                this._lastInput = null;
+                if (this._inDialog) {
+                    this._dialogInput.css({ position: 'absolute', left: '0', top: '-100px' });
+                    if ($.blockUI) {
+                        $.unblockUI();
+                        $('body').append(this.tpDiv);
+                    }
+                }
+                this._inDialog = false;
+            }
+        },
+
+
+
+        /* Tidy up after a dialog display. */
+        _tidyDialog: function (inst) {
+            inst.tpDiv.removeClass(this._dialogClass).unbind('.ui-timepicker');
+        },
+
+        /* Retrieve the instance data for the target control.
+        @param  target  element - the target input field or division or span
+        @return  object - the associated instance data
+        @throws  error if a jQuery problem getting data */
+        _getInst: function (target) {
+            try {
+                return $.data(target, PROP_NAME);
+            }
+            catch (err) {
+                throw 'Missing instance data for this timepicker';
+            }
+        },
+
+        /* Get a setting value, defaulting if necessary. */
+        _get: function (inst, name) {
+            return inst.settings[name] !== undefined ?
+			inst.settings[name] : this._defaults[name];
+        },
+
+        /* Parse existing time and initialise time picker. */
+        _setTimeFromField: function (inst) {
+            if (inst.input.val() == inst.lastVal) { return; }
+            var defaultTime = this._get(inst, 'defaultTime');
+
+            var timeToParse = defaultTime == 'now' ? this._getCurrentTimeRounded(inst) : defaultTime;
+            if ((inst.inline == false) && (inst.input.val() != '')) { timeToParse = inst.input.val(); }
+
+            if (timeToParse instanceof Date) {
+                inst.hours = timeToParse.getHours();
+                inst.minutes = timeToParse.getMinutes();
+            } else {
+                var timeVal = inst.lastVal = timeToParse;
+                if (timeToParse == '') {
+                    inst.hours = -1;
+                    inst.minutes = -1;
+                } else {
+                    var time = this.parseTime(inst, timeVal);
+                    inst.hours = time.hours;
+                    inst.minutes = time.minutes;
+                }
+            }
+
+
+            $.timepicker._updateTimepicker(inst);
+        },
+
+        /* Update or retrieve the settings for an existing time picker.
+           @param  target  element - the target input field or division or span
+           @param  name    object - the new settings to update or
+                           string - the name of the setting to change or retrieve,
+                           when retrieving also 'all' for all instance settings or
+                           'defaults' for all global defaults
+           @param  value   any - the new value for the setting
+                       (omit if above is an object or to retrieve a value) */
+        _optionTimepicker: function(target, name, value) {
+            var inst = this._getInst(target);
+            if (arguments.length == 2 && typeof name == 'string') {
+                return (name == 'defaults' ? $.extend({}, $.timepicker._defaults) :
+                    (inst ? (name == 'all' ? $.extend({}, inst.settings) :
+                    this._get(inst, name)) : null));
+            }
+            var settings = name || {};
+            if (typeof name == 'string') {
+                settings = {};
+                settings[name] = value;
+            }
+            if (inst) {
+                if (this._curInst == inst) {
+                    this._hideTimepicker();
+                }
+                extendRemove(inst.settings, settings);
+                this._updateTimepicker(inst);
+            }
+        },
+
+
+        /* Set the time for a jQuery selection.
+	    @param  target  element - the target input field or division or span
+	    @param  time    String - the new time */
+	    _setTimeTimepicker: function(target, time) {
+		    var inst = this._getInst(target);
+		    if (inst) {
+			    this._setTime(inst, time);
+    			this._updateTimepicker(inst);
+	    		this._updateAlternate(inst, time);
+		    }
+	    },
+
+        /* Set the time directly. */
+        _setTime: function(inst, time, noChange) {
+            var origHours = inst.hours;
+            var origMinutes = inst.minutes;
+            var time = this.parseTime(inst, time);
+            inst.hours = time.hours;
+            inst.minutes = time.minutes;
+
+            if ((origHours != inst.hours || origMinutes != inst.minuts) && !noChange) {
+                inst.input.trigger('change');
+            }
+            this._updateTimepicker(inst);
+            this._updateSelectedValue(inst);
+        },
+
+        /* Return the current time, ready to be parsed, rounded to the closest 5 minute */
+        _getCurrentTimeRounded: function (inst) {
+            var currentTime = new Date(),
+                currentMinutes = currentTime.getMinutes(),
+                // round to closest 5
+                adjustedMinutes = Math.round( currentMinutes / 5 ) * 5;
+            currentTime.setMinutes(adjustedMinutes);
+            return currentTime;
+        },
+
+        /*
+        * Parse a time string into hours and minutes
+        */
+        parseTime: function (inst, timeVal) {
+            var retVal = new Object();
+            retVal.hours = -1;
+            retVal.minutes = -1;
+
+            var timeSeparator = this._get(inst, 'timeSeparator'),
+                amPmText = this._get(inst, 'amPmText'),
+                showHours = this._get(inst, 'showHours'),
+                showMinutes = this._get(inst, 'showMinutes'),
+                optionalMinutes = this._get(inst, 'optionalMinutes'),
+                showPeriod = (this._get(inst, 'showPeriod') == true),
+                p = timeVal.indexOf(timeSeparator);
+
+            // check if time separator found
+            if (p != -1) {
+                retVal.hours = parseInt(timeVal.substr(0, p), 10);
+                retVal.minutes = parseInt(timeVal.substr(p + 1), 10);
+            }
+            // check for hours only
+            else if ( (showHours) && ( !showMinutes || optionalMinutes ) ) {
+                retVal.hours = parseInt(timeVal, 10);
+            }
+            // check for minutes only
+            else if ( ( ! showHours) && (showMinutes) ) {
+                retVal.minutes = parseInt(timeVal, 10);
+            }
+
+            if (showHours) {
+                var timeValUpper = timeVal.toUpperCase();
+                if ((retVal.hours < 12) && (showPeriod) && (timeValUpper.indexOf(amPmText[1].toUpperCase()) != -1)) {
+                    retVal.hours += 12;
+                }
+                // fix for 12 AM
+                if ((retVal.hours == 12) && (showPeriod) && (timeValUpper.indexOf(amPmText[0].toUpperCase()) != -1)) {
+                    retVal.hours = 0;
+                }
+            }
+            
+            return retVal;
+        },
+
+        selectNow: function(e) {
+
+            var id = $(e.target).attr("data-timepicker-instance-id"),
+                $target = $(id),
+                inst = this._getInst($target[0]);
+
+            //if (!inst || (input && inst != $.data(input, PROP_NAME))) { return; }
+            var currentTime = new Date();
+            inst.hours = currentTime.getHours();
+            inst.minutes = currentTime.getMinutes();
+            this._updateSelectedValue(inst);
+            this._updateTimepicker(inst);
+            this._hideTimepicker();
+        },
+
+        deselectTime: function(e) {
+            var id = $(e.target).attr("data-timepicker-instance-id"),
+                $target = $(id),
+                inst = this._getInst($target[0]);
+            inst.hours = -1;
+            inst.minutes = -1;
+            this._updateSelectedValue(inst);
+            this._hideTimepicker();
+        },
+
+
+        selectHours: function (event) {
+            var $td = $(event.currentTarget),
+                id = $td.attr("data-timepicker-instance-id"),
+                newHours = $td.attr("data-hour"),
+                fromDoubleClick = event.data.fromDoubleClick,
+                $target = $(id),
+                inst = this._getInst($target[0]),
+                showMinutes = (this._get(inst, 'showMinutes') == true);
+
+            // don't select if disabled
+            if ( $.timepicker._isDisabledTimepicker($target.attr('id')) ) { return false; }
+
+            $td.parents('.ui-timepicker-hours:first').find('a').removeClass('ui-state-active');
+            $td.children('a').addClass('ui-state-active');
+            inst.hours = newHours;
+
+            // added for onMinuteShow callback
+            var onMinuteShow = this._get(inst, 'onMinuteShow');
+            if (onMinuteShow) {
+                // this will trigger a callback on selected hour to make sure selected minute is allowed. 
+                this._updateMinuteDisplay(inst);
+            }
+
+            this._updateSelectedValue(inst);
+
+            inst._hoursClicked = true;
+            if ((inst._minutesClicked) || (fromDoubleClick) || (showMinutes == false)) {
+                $.timepicker._hideTimepicker();
+            }
+            // return false because if used inline, prevent the url to change to a hashtag
+            return false;
+        },
+
+        selectMinutes: function (event) {
+            var $td = $(event.currentTarget),
+                id = $td.attr("data-timepicker-instance-id"),
+                newMinutes = $td.attr("data-minute"),
+                fromDoubleClick = event.data.fromDoubleClick,
+                $target = $(id),
+                inst = this._getInst($target[0]),
+                showHours = (this._get(inst, 'showHours') == true);
+
+            // don't select if disabled
+            if ( $.timepicker._isDisabledTimepicker($target.attr('id')) ) { return false; }
+
+            $td.parents('.ui-timepicker-minutes:first').find('a').removeClass('ui-state-active');
+            $td.children('a').addClass('ui-state-active');
+
+            inst.minutes = newMinutes;
+            this._updateSelectedValue(inst);
+
+            inst._minutesClicked = true;
+            if ((inst._hoursClicked) || (fromDoubleClick) || (showHours == false)) {
+                $.timepicker._hideTimepicker();
+                // return false because if used inline, prevent the url to change to a hashtag
+                return false;
+            }
+
+            // return false because if used inline, prevent the url to change to a hashtag
+            return false;
+        },
+
+        _updateSelectedValue: function (inst) {
+            var newTime = this._getParsedTime(inst);
+            if (inst.input) {
+                inst.input.val(newTime);
+                inst.input.trigger('change');
+            }
+            var onSelect = this._get(inst, 'onSelect');
+            if (onSelect) { onSelect.apply((inst.input ? inst.input[0] : null), [newTime, inst]); } // trigger custom callback
+            this._updateAlternate(inst, newTime);
+            return newTime;
+        },
+        
+        /* this function process selected time and return it parsed according to instance options */
+        _getParsedTime: function(inst) {
+
+            if (inst.hours == -1 && inst.minutes == -1) {
+                return '';
+            }
+
+            if ((inst.hours < 0) || (inst.hours > 23)) { inst.hours = 12; }
+            if ((inst.minutes < 0) || (inst.minutes > 59)) { inst.minutes = 0; }
+
+            var period = "",
+                showPeriod = (this._get(inst, 'showPeriod') == true),
+                showLeadingZero = (this._get(inst, 'showLeadingZero') == true),
+                showHours = (this._get(inst, 'showHours') == true),
+                showMinutes = (this._get(inst, 'showMinutes') == true),
+                optionalMinutes = (this._get(inst, 'optionalMinutes') == true),
+                amPmText = this._get(inst, 'amPmText'),
+                selectedHours = inst.hours ? inst.hours : 0,
+                selectedMinutes = inst.minutes ? inst.minutes : 0,
+                displayHours = selectedHours ? selectedHours : 0,
+                parsedTime = '';
+
+            if (showPeriod) { 
+                if (inst.hours == 0) {
+                    displayHours = 12;
+                }
+                if (inst.hours < 12) {
+                    period = amPmText[0];
+                }
+                else {
+                    period = amPmText[1];
+                    if (displayHours > 12) {
+                        displayHours -= 12;
+                    }
+                }
+            }
+
+            var h = displayHours.toString();
+            if (showLeadingZero && (displayHours < 10)) { h = '0' + h; }
+
+            var m = selectedMinutes.toString();
+            if (selectedMinutes < 10) { m = '0' + m; }
+
+            if (showHours) {
+                parsedTime += h;
+            }
+            if (showHours && showMinutes && (!optionalMinutes || m != 0)) {
+                parsedTime += this._get(inst, 'timeSeparator');
+            }
+            if (showMinutes && (!optionalMinutes || m != 0)) {
+                parsedTime += m;
+            }
+            if (showHours) {
+                if (period.length > 0) { parsedTime += this._get(inst, 'periodSeparator') + period; }
+            }
+            
+            return parsedTime;
+        },
+        
+        /* Update any alternate field to synchronise with the main field. */
+        _updateAlternate: function(inst, newTime) {
+            var altField = this._get(inst, 'altField');
+            if (altField) { // update alternate field too
+                $(altField).each(function(i,e) {
+                    $(e).val(newTime);
+                });
+            }
+        },
+
+        /* This might look unused but it's called by the $.fn.timepicker function with param getTime */
+        /* added v 0.2.3 - gitHub issue #5 - Thanks edanuff */
+        _getTimeTimepicker : function(input) {
+            var inst = this._getInst(input);
+            return this._getParsedTime(inst);
+        },
+        _getHourTimepicker: function(input) {
+            var inst = this._getInst(input);
+            if ( inst == undefined) { return -1; }
+            return inst.hours;
+        },
+        _getMinuteTimepicker: function(input) {
+            var inst= this._getInst(input);
+            if ( inst == undefined) { return -1; }
+            return inst.minutes;
+        }
+
+    });
+
+
+
+    /* Invoke the timepicker functionality.
+    @param  options  string - a command, optionally followed by additional parameters or
+    Object - settings for attaching new timepicker functionality
+    @return  jQuery object */
+    $.fn.timepicker = function (options) {
+
+        /* Initialise the time picker. */
+        if (!$.timepicker.initialized) {
+            $(document).mousedown($.timepicker._checkExternalClick).
+			find('body').append($.timepicker.tpDiv);
+            $.timepicker.initialized = true;
+        }
+
+        var otherArgs = Array.prototype.slice.call(arguments, 1);
+        if (typeof options == 'string' && (options == 'getTime' || options == 'getHour' || options == 'getMinute' ))
+            return $.timepicker['_' + options + 'Timepicker'].
+			    apply($.timepicker, [this[0]].concat(otherArgs));
+        if (options == 'option' && arguments.length == 2 && typeof arguments[1] == 'string')
+            return $.timepicker['_' + options + 'Timepicker'].
+                apply($.timepicker, [this[0]].concat(otherArgs));
+        return this.each(function () {
+            typeof options == 'string' ?
+			$.timepicker['_' + options + 'Timepicker'].
+				apply($.timepicker, [this].concat(otherArgs)) :
+			$.timepicker._attachTimepicker(this, options);
+        });
+    };
+
+    /* jQuery extend now ignores nulls! */
+    function extendRemove(target, props) {
+        $.extend(target, props);
+        for (var name in props)
+            if (props[name] == null || props[name] == undefined)
+                target[name] = props[name];
+        return target;
+    };
+
+    $.timepicker = new Timepicker(); // singleton instance
+    $.timepicker.initialized = false;
+    $.timepicker.uuid = new Date().getTime();
+    $.timepicker.version = "0.2.9";
+
+    // Workaround for #4055
+    // Add another global to avoid noConflict issues with inline event handlers
+    window['TP_jQuery_' + tpuuid] = $;
+
+})(jQuery);
+        †Ã x ˇˇ     20250331133932-8lÉÃ †ˆ6©2   https://erp.cmrit.ac.in/js/jquery.ui.timepicker.js      ÷Í  /*
+ * jQuery UI Timepicker 0.2.9
+ *
+ * Copyright 2010-2011, Francois Gelinas
+ * Dual licensed under the MIT or GPL Version 2 licenses.
+ * http://jquery.org/license
+ *
+ * http://fgelinas.com/code/timepicker
+ *
+ * Depends:
+ *	jquery.ui.core.js
+ *  jquery.ui.position.js (only if position settngs are used)
+ *
+ * Change version 0.1.0 - moved the t-rex up here
+*/
+
+(function ($, undefined) {
+
+    $.extend($.ui, { timepicker: { version: "0.2.9"} });
+
+    var PROP_NAME = 'timepicker';
+    var tpuuid = new Date().getTime();
+
+    /* Time picker manager.
+    Use the singleton instance of this class, $.timepicker, to interact with the time picker.
+    Settings for (groups of) time pickers are maintained in an instance object,
+    allowing multiple different settings on the same page. */
+
+    function Timepicker() {
+        this.debug = true; // Change this to true to start debugging
+        this._curInst = null; // The current instance in use
+        this._isInline = false; // true if the instance is displayed inline
+        this._disabledInputs = []; // List of time picker inputs that have been disabled
+        this._timepickerShowing = false; // True if the popup picker is showing , false if not
+        this._inDialog = false; // True if showing within a "dialog", false if not
+        this._dialogClass = 'ui-timepicker-dialog'; // The name of the dialog marker class
+        this._mainDivId = 'ui-timepicker-div'; // The ID of the main timepicker division
+        this._inlineClass = 'ui-timepicker-inline'; // The name of the inline marker class
+        this._currentClass = 'ui-timepicker-current'; // The name of the current hour / minutes marker class
+        this._dayOverClass = 'ui-timepicker-days-cell-over'; // The name of the day hover marker class
+
+        this.regional = []; // Available regional settings, indexed by language code
+        this.regional[''] = { // Default regional settings
+            hourText: 'Hour',           // Display text for hours section
+            minuteText: 'Minute',       // Display text for minutes link
+            amPmText: ['AM', 'PM'],     // Display text for AM PM
+            closeButtonText: 'Done',        // Text for the confirmation button (ok button)
+            nowButtonText: 'Now',           // Text for the now button
+            deselectButtonText: 'Deselect'  // Text for the deselect button
+        };
+        this._defaults = { // Global defaults for all the time picker instances
+            showOn: 'focus',    // 'focus' for popup on focus,
+                                // 'button' for trigger button, or 'both' for either (not yet implemented)
+            button: null,                   // 'button' element that will trigger the timepicker
+            showAnim: 'fadeIn',             // Name of jQuery animation for popup
+            showOptions: {},                // Options for enhanced animations
+            appendText: '',                 // Display text following the input box, e.g. showing the format
+
+            beforeShow: null,               // Define a callback function executed before the timepicker is shown
+            onSelect: null,                 // Define a callback function when a hour / minutes is selected
+            onClose: null,                  // Define a callback function when the timepicker is closed
+
+            timeSeparator: ':',             // The character to use to separate hours and minutes.
+            periodSeparator: ' ',           // The character to use to separate the time from the time period.
+            showPeriod: false,              // Define whether or not to show AM/PM with selected time
+            showPeriodLabels: true,         // Show the AM/PM labels on the left of the time picker
+            showLeadingZero: true,          // Define whether or not to show a leading zero for hours < 10. [true/false]
+            showMinutesLeadingZero: true,   // Define whether or not to show a leading zero for minutes < 10.
+            altField: '',                   // Selector for an alternate field to store selected time into
+            defaultTime: 'now',             // Used as default time when input field is empty or for inline timePicker
+                                            // (set to 'now' for the current time, '' for no highlighted time)
+            myPosition: 'left top',         // Position of the dialog relative to the input.
+                                            // see the position utility for more info : http://jqueryui.com/demos/position/
+            atPosition: 'left bottom',      // Position of the input element to match
+                                            // Note : if the position utility is not loaded, the timepicker will attach left top to left bottom
+            //NEW: 2011-02-03
+            onHourShow: null,			    // callback for enabling / disabling on selectable hours  ex : function(hour) { return true; }
+            onMinuteShow: null,             // callback for enabling / disabling on time selection  ex : function(hour,minute) { return true; }
+
+            hours: {
+                starts: 0,                  // first displayed hour
+                ends: 23                    // last displayed hour
+            },
+            minutes: {
+                starts: 0,                  // first displayed minute
+                ends: 55,                   // last displayed minute
+                interval: 5                 // interval of displayed minutes
+            },
+            rows: 4,                        // number of rows for the input tables, minimum 2, makes more sense if you use multiple of 2
+            // 2011-08-05 0.2.4
+            showHours: true,                // display the hours section of the dialog
+            showMinutes: true,              // display the minute section of the dialog
+            optionalMinutes: false,         // optionally parse inputs of whole hours with minutes omitted
+						
+            // buttons
+            showCloseButton: false,         // shows an OK button to confirm the edit
+            showNowButton: false,           // Shows the 'now' button
+            showDeselectButton: false       // Shows the deselect time button
+
+        };
+        $.extend(this._defaults, this.regional['']);
+
+        this.tpDiv = $('<div id="' + this._mainDivId + '" class="ui-timepicker ui-widget ui-helper-clearfix ui-corner-all " style="display: none"></div>');
+    }
+
+    $.extend(Timepicker.prototype, {
+        /* Class name added to elements to indicate already configured with a time picker. */
+        markerClassName: 'hasTimepicker',
+
+        /* Debug logging (if enabled). */
+        log: function () {
+            if (this.debug)
+                console.log.apply('', arguments);
+        },
+
+        _widgetTimepicker: function () {
+            return this.tpDiv;
+        },
+
+        /* Override the default settings for all instances of the time picker.
+        @param  settings  object - the new settings to use as defaults (anonymous object)
+        @return the manager object */
+        setDefaults: function (settings) {
+            extendRemove(this._defaults, settings || {});
+            return this;
+        },
+
+        /* Attach the time picker to a jQuery selection.
+        @param  target    element - the target input field or division or span
+        @param  settings  object - the new settings to use for this time picker instance (anonymous) */
+        _attachTimepicker: function (target, settings) {
+            // check for settings on the control itself - in namespace 'time:'
+            var inlineSettings = null;
+            for (var attrName in this._defaults) {
+                var attrValue = target.getAttribute('time:' + attrName);
+                if (attrValue) {
+                    inlineSettings = inlineSettings || {};
+                    try {
+                        inlineSettings[attrName] = eval(attrValue);
+                    } catch (err) {
+                        inlineSettings[attrName] = attrValue;
+                    }
+                }
+            }
+            var nodeName = target.nodeName.toLowerCase();
+            var inline = (nodeName == 'div' || nodeName == 'span');
+
+            if (!target.id) {
+                this.uuid += 1;
+                target.id = 'tp' + this.uuid;
+            }
+            var inst = this._newInst($(target), inline);
+            inst.settings = $.extend({}, settings || {}, inlineSettings || {});
+            if (nodeName == 'input') {
+                this._connectTimepicker(target, inst);
+                // init inst.hours and inst.minutes from the input value
+                this._setTimeFromField(inst);
+            } else if (inline) {
+                this._inlineTimepicker(target, inst);
+            }
+
+
+        },
+
+        /* Create a new instance object. */
+        _newInst: function (target, inline) {
+            var id = target[0].id.replace(/([^A-Za-z0-9_-])/g, '\\\\$1'); // escape jQuery meta chars
+            return {
+                id: id, input: target, // associated target
+                inline: inline, // is timepicker inline or not :
+                tpDiv: (!inline ? this.tpDiv : // presentation div
+                    $('<div class="' + this._inlineClass + ' ui-timepicker ui-widget  ui-helper-clearfix"></div>'))
+            };
+        },
+
+        /* Attach the time picker to an input field. */
+        _connectTimepicker: function (target, inst) {
+            var input = $(target);
+            inst.append = $([]);
+            inst.trigger = $([]);
+            if (input.hasClass(this.markerClassName)) { return; }
+            this._attachments(input, inst);
+            input.addClass(this.markerClassName).
+                keydown(this._doKeyDown).
+                keyup(this._doKeyUp).
+                bind("setData.timepicker", function (event, key, value) {
+                    inst.settings[key] = value;
+                }).
+                bind("getData.timepicker", function (event, key) {
+                    return this._get(inst, key);
+                });
+            $.data(target, PROP_NAME, inst);
+        },
+
+        /* Handle keystrokes. */
+        _doKeyDown: function (event) {
+            var inst = $.timepicker._getInst(event.target);
+            var handled = true;
+            inst._keyEvent = true;
+            if ($.timepicker._timepickerShowing) {
+                switch (event.keyCode) {
+                    case 9: $.timepicker._hideTimepicker();
+                        handled = false;
+                        break; // hide on tab out
+                    case 13:
+                        $.timepicker._updateSelectedValue(inst);
+                        $.timepicker._hideTimepicker();
+                            
+						return false; // don't submit the form
+						break; // select the value on enter
+                    case 27: $.timepicker._hideTimepicker();
+                        break; // hide on escape
+                    default: handled = false;
+                }
+            }
+            else if (event.keyCode == 36 && event.ctrlKey) { // display the time picker on ctrl+home
+                $.timepicker._showTimepicker(this);
+            }
+            else {
+                handled = false;
+            }
+            if (handled) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        },
+
+        /* Update selected time on keyUp */
+        /* Added verion 0.0.5 */
+        _doKeyUp: function (event) {
+            var inst = $.timepicker._getInst(event.target);
+            $.timepicker._setTimeFromField(inst);
+            $.timepicker._updateTimepicker(inst);
+        },
+
+        /* Make attachments based on settings. */
+        _attachments: function (input, inst) {
+            var appendText = this._get(inst, 'appendText');
+            var isRTL = this._get(inst, 'isRTL');
+            if (inst.append) { inst.append.remove(); }
+            if (appendText) {
+                inst.append = $('<span class="' + this._appendClass + '">' + appendText + '</span>');
+                input[isRTL ? 'before' : 'after'](inst.append);
+            }
+            input.unbind('focus.timepicker', this._showTimepicker);
+            if (inst.trigger) { inst.trigger.remove(); }
+
+            var showOn = this._get(inst, 'showOn');
+            if (showOn == 'focus' || showOn == 'both') { // pop-up time picker when in the marked field
+                input.bind("focus.timepicker", this._showTimepicker);
+            }
+            if (showOn == 'button' || showOn == 'both') { // pop-up time picker when 'button' element is clicked
+                var button = this._get(inst, 'button');
+                $(button).bind("click.timepicker", function () {
+                    if ($.timepicker._timepickerShowing && $.timepicker._lastInput == input[0]) { $.timepicker._hideTimepicker(); }
+                    else { $.timepicker._showTimepicker(input[0]); }
+                    return false;
+                });
+
+            }
+        },
+
+
+        /* Attach an inline time picker to a div. */
+        _inlineTimepicker: function(target, inst) {
+            var divSpan = $(target);
+            if (divSpan.hasClass(this.markerClassName))
+                return;
+            divSpan.addClass(this.markerClassName).append(inst.tpDiv).
+                bind("setData.timepicker", function(event, key, value){
+                    inst.settings[key] = value;
+                }).bind("getData.timepicker", function(event, key){
+                    return this._get(inst, key);
+                });
+            $.data(target, PROP_NAME, inst);
+
+            this._setTimeFromField(inst);
+            this._updateTimepicker(inst);
+            inst.tpDiv.show();
+        },
+
+        /* Pop-up the time picker for a given input field.
+        @param  input  element - the input field attached to the time picker or
+        event - if triggered by focus */
+        _showTimepicker: function (input) {
+            input = input.target || input;
+            if (input.nodeName.toLowerCase() != 'input') { input = $('input', input.parentNode)[0]; } // find from button/image trigger
+            if ($.timepicker._isDisabledTimepicker(input) || $.timepicker._lastInput == input) { return; } // already here
+
+            // fix v 0.0.8 - close current timepicker before showing another one
+            $.timepicker._hideTimepicker();
+
+            var inst = $.timepicker._getInst(input);
+            if ($.timepicker._curInst && $.timepicker._curInst != inst) {
+                $.timepicker._curInst.tpDiv.stop(true, true);
+            }
+            var beforeShow = $.timepicker._get(inst, 'beforeShow');
+            extendRemove(inst.settings, (beforeShow ? beforeShow.apply(input, [input, inst]) : {}));
+            inst.lastVal = null;
+            $.timepicker._lastInput = input;
+
+            $.timepicker._setTimeFromField(inst);
+
+            // calculate default position
+            if ($.timepicker._inDialog) { input.value = ''; } // hide cursor
+            if (!$.timepicker._pos) { // position below input
+                $.timepicker._pos = $.timepicker._findPos(input);
+                $.timepicker._pos[1] += input.offsetHeight; // add the height
+            }
+            var isFixed = false;
+            $(input).parents().each(function () {
+                isFixed |= $(this).css('position') == 'fixed';
+                return !isFixed;
+            });
+            if (isFixed && $.browser.opera) { // correction for Opera when fixed and scrolled
+                $.timepicker._pos[0] -= document.documentElement.scrollLeft;
+                $.timepicker._pos[1] -= document.documentElement.scrollTop;
+            }
+
+            var offset = { left: $.timepicker._pos[0], top: $.timepicker._pos[1] };
+
+            $.timepicker._pos = null;
+            // determine sizing offscreen
+            inst.tpDiv.css({ position: 'absolute', display: 'block', top: '-1000px' });
+            $.timepicker._updateTimepicker(inst);
+
+
+            // position with the ui position utility, if loaded
+            if ( ( ! inst.inline )  && ( typeof $.ui.position == 'object' ) ) {
+                inst.tpDiv.position({
+                    of: inst.input,
+                    my: $.timepicker._get( inst, 'myPosition' ),
+                    at: $.timepicker._get( inst, 'atPosition' ),
+                    // offset: $( "#offset" ).val(),
+                    // using: using,
+                    collision: 'flip'
+                });
+                var offset = inst.tpDiv.offset();
+                $.timepicker._pos = [offset.top, offset.left];
+            }
+
+
+            // reset clicked state
+            inst._hoursClicked = false;
+            inst._minutesClicked = false;
+
+            // fix width for dynamic number of time pickers
+            // and adjust position before showing
+            offset = $.timepicker._checkOffset(inst, offset, isFixed);
+            inst.tpDiv.css({ position: ($.timepicker._inDialog && $.blockUI ?
+			    'static' : (isFixed ? 'fixed' : 'absolute')), display: 'none',
+                left: offset.left + 'px', top: offset.top + 'px'
+            });
+            if ( ! inst.inline ) {
+                var showAnim = $.timepicker._get(inst, 'showAnim');
+                var duration = $.timepicker._get(inst, 'duration');
+
+                var postProcess = function () {
+                    $.timepicker._timepickerShowing = true;
+                    var borders = $.timepicker._getBorders(inst.tpDiv);
+                    inst.tpDiv.find('iframe.ui-timepicker-cover'). // IE6- only
+					css({ left: -borders[0], top: -borders[1],
+					    width: inst.tpDiv.outerWidth(), height: inst.tpDiv.outerHeight()
+					});
+                };
+
+                // Fixed the zIndex problem for real (I hope) - FG - v 0.2.9
+                inst.tpDiv.css('zIndex', $.timepicker._getZIndex(input) +1);
+
+                if ($.effects && $.effects[showAnim]) {
+                    inst.tpDiv.show(showAnim, $.timepicker._get(inst, 'showOptions'), duration, postProcess);
+                }
+                else {
+                    inst.tpDiv[showAnim || 'show']((showAnim ? duration : null), postProcess);
+                }
+                if (!showAnim || !duration) { postProcess(); }
+                if (inst.input.is(':visible') && !inst.input.is(':disabled')) { inst.input.focus(); }
+                $.timepicker._curInst = inst;
+            }
+        },
+
+        // This is a copy of the zIndex function of UI core 1.8.??
+        // Copied in the timepicker to stay backward compatible.
+        _getZIndex: function (target) {
+            var elem = $( target ), position, value;
+            while ( elem.length && elem[ 0 ] !== document ) {
+                position = elem.css( "position" );
+                if ( position === "absolute" || position === "relative" || position === "fixed" ) {
+                    value = parseInt( elem.css( "zIndex" ), 10 );
+                    if ( !isNaN( value ) && value !== 0 ) {
+                        return value;
+                    }
+                }
+                elem = elem.parent();
+            }
+        },
+
+        /* Generate the time picker content. */
+        _updateTimepicker: function (inst) {
+            inst.tpDiv.empty().append(this._generateHTML(inst));
+            this._rebindDialogEvents(inst);
+
+        },
+
+        _rebindDialogEvents: function (inst) {
+            var borders = $.timepicker._getBorders(inst.tpDiv),
+                self = this;
+            inst.tpDiv
+			.find('iframe.ui-timepicker-cover') // IE6- only
+				.css({ left: -borders[0], top: -borders[1],
+				    width: inst.tpDiv.outerWidth(), height: inst.tpDiv.outerHeight()
+				})
+			.end()
+            // after the picker html is appended bind the click & double click events (faster in IE this way
+            // then letting the browser interpret the inline events)
+            // the binding for the minute cells also exists in _updateMinuteDisplay
+            .find('.ui-timepicker-minute-cell')
+                .unbind()
+                .bind("click", { fromDoubleClick:false }, $.proxy($.timepicker.selectMinutes, this))
+                .bind("dblclick", { fromDoubleClick:true }, $.proxy($.timepicker.selectMinutes, this))
+            .end()
+            .find('.ui-timepicker-hour-cell')
+                .unbind()
+                .bind("click", { fromDoubleClick:false }, $.proxy($.timepicker.selectHours, this))
+                .bind("dblclick", { fromDoubleClick:true }, $.proxy($.timepicker.selectHours, this))
+            .end()
+			.find('.ui-timepicker td a')
+                .unbind()
+				.bind('mouseout', function () {
+				    $(this).removeClass('ui-state-hover');
+				    if (this.className.indexOf('ui-timepicker-prev') != -1) $(this).removeClass('ui-timepicker-prev-hover');
+				    if (this.className.indexOf('ui-timepicker-next') != -1) $(this).removeClass('ui-timepicker-next-hover');
+				})
+				.bind('mouseover', function () {
+				    if ( ! self._isDisabledTimepicker(inst.inline ? inst.tpDiv.parent()[0] : inst.input[0])) {
+				        $(this).parents('.ui-timepicker-calendar').find('a').removeClass('ui-state-hover');
+				        $(this).addClass('ui-state-hover');
+				        if (this.className.indexOf('ui-timepicker-prev') != -1) $(this).addClass('ui-timepicker-prev-hover');
+				        if (this.className.indexOf('ui-timepicker-next') != -1) $(this).addClass('ui-timepicker-next-hover');
+				    }
+				})
+			.end()
+			.find('.' + this._dayOverClass + ' a')
+				.trigger('mouseover')
+			.end()
+            .find('.ui-timepicker-now').bind("click",function(e) {
+                    $.timepicker.selectNow(e);
+            }).end()
+            .find('.ui-timepicker-deselect').bind("click",function(e) {
+                    $.timepicker.deselectTime(e);
+            }).end()
+            .find('.ui-timepicker-close').bind("click",function(e) {
+                    $.timepicker._hideTimepicker();
+            }).end();
+        },
+
+        /* Generate the HTML for the current state of the time picker. */
+        _generateHTML: function (inst) {
+
+            var h, m, row, col, html, hoursHtml, minutesHtml = '',
+                showPeriod = (this._get(inst, 'showPeriod') == true),
+                showPeriodLabels = (this._get(inst, 'showPeriodLabels') == true),
+                showLeadingZero = (this._get(inst, 'showLeadingZero') == true),
+                showHours = (this._get(inst, 'showHours') == true),
+                showMinutes = (this._get(inst, 'showMinutes') == true),
+                amPmText = this._get(inst, 'amPmText'),
+                rows = this._get(inst, 'rows'),
+                amRows = 0,
+                pmRows = 0,
+                amItems = 0,
+                pmItems = 0,
+                amFirstRow = 0,
+                pmFirstRow = 0,
+                hours = Array(),
+                hours_options = this._get(inst, 'hours'),
+                hoursPerRow = null,
+                hourCounter = 0,
+                hourLabel = this._get(inst, 'hourText'),
+                showCloseButton = this._get(inst, 'showCloseButton'),
+                closeButtonText = this._get(inst, 'closeButtonText'),
+                showNowButton = this._get(inst, 'showNowButton'),
+                nowButtonText = this._get(inst, 'nowButtonText'),
+                showDeselectButton = this._get(inst, 'showDeselectButton'),
+                deselectButtonText = this._get(inst, 'deselectButtonText'),
+                showButtonPanel = showCloseButton || showNowButton || showDeselectButton;
+            
+
+
+            // prepare all hours and minutes, makes it easier to distribute by rows
+            for (h = hours_options.starts; h <= hours_options.ends; h++) {
+                hours.push (h);
+            }
+            hoursPerRow = Math.ceil(hours.length / rows); // always round up
+
+            if (showPeriodLabels) {
+                for (hourCounter = 0; hourCounter < hours.length; hourCounter++) {
+                    if (hours[hourCounter] < 12) {
+                        amItems++;
+                    }
+                    else {
+                        pmItems++;
+                    }
+                }
+                hourCounter = 0; 
+
+                amRows = Math.floor(amItems / hours.length * rows);
+                pmRows = Math.floor(pmItems / hours.length * rows);
+
+                // assign the extra row to the period that is more densly populated
+                if (rows != amRows + pmRows) {
+                    // Make sure: AM Has Items and either PM Does Not, AM has no rows yet, or AM is more dense
+                    if (amItems && (!pmItems || !amRows || (pmRows && amItems / amRows >= pmItems / pmRows))) {
+                        amRows++;
+                    } else {
+                        pmRows++;
+                    }
+                }
+                amFirstRow = Math.min(amRows, 1);
+                pmFirstRow = amRows + 1;
+                hoursPerRow = Math.ceil(Math.max(amItems / amRows, pmItems / pmRows));
+            }
+
+
+            html = '<table class="ui-timepicker-table ui-widget-content ui-corner-all"><tr>';
+
+            if (showHours) {
+
+                html += '<td class="ui-timepicker-hours">' +
+                        '<div class="ui-timepicker-title ui-widget-header ui-helper-clearfix ui-corner-all">' +
+                        hourLabel +
+                        '</div>' +
+                        '<table class="ui-timepicker">';
+
+                for (row = 1; row <= rows; row++) {
+                    html += '<tr>';
+                    // AM
+                    if (row == amFirstRow && showPeriodLabels) {
+                        html += '<th rowspan="' + amRows.toString() + '" class="periods" scope="row">' + amPmText[0] + '</th>';
+                    }
+                    // PM
+                    if (row == pmFirstRow && showPeriodLabels) {
+                        html += '<th rowspan="' + pmRows.toString() + '" class="periods" scope="row">' + amPmText[1] + '</th>';
+                    }
+                    for (col = 1; col <= hoursPerRow; col++) {
+                        if (showPeriodLabels && row < pmFirstRow && hours[hourCounter] >= 12) {
+                            html += this._generateHTMLHourCell(inst, undefined, showPeriod, showLeadingZero);
+                        } else {
+                            html += this._generateHTMLHourCell(inst, hours[hourCounter], showPeriod, showLeadingZero);
+                            hourCounter++;
+                        }
+                    }
+                    html += '</tr>';
+                }
+                html += '</tr></table>' + // Close the hours cells table
+                        '</td>';          // Close the Hour td
+            }
+
+            if (showMinutes) {
+                html += '<td class="ui-timepicker-minutes">';
+                html += this._generateHTMLMinutes(inst);
+                html += '</td>';
+            }
+            
+            html += '</tr>';
+
+
+            if (showButtonPanel) {
+                var buttonPanel = '<tr><td colspan="3"><div class="ui-timepicker-buttonpane ui-widget-content">';
+                if (showNowButton) {
+                    buttonPanel += '<button type="button" class="ui-timepicker-now ui-state-default ui-corner-all" '
+                                   + ' data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" >'
+                                   + nowButtonText + '</button>';
+                }
+                if (showDeselectButton) {
+                    buttonPanel += '<button type="button" class="ui-timepicker-deselect ui-state-default ui-corner-all" '
+                                   + ' data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" >'
+                                   + deselectButtonText + '</button>';
+                }
+                if (showCloseButton) {
+                    buttonPanel += '<button type="button" class="ui-timepicker-close ui-state-default ui-corner-all" '
+                                   + ' data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" >'
+                                   + closeButtonText + '</button>';
+                }
+
+                html += buttonPanel + '</div></td></tr>';
+            }
+            html += '</table>';
+
+             /* IE6 IFRAME FIX (taken from datepicker 1.5.3, fixed in 0.1.2 */
+            html += ($.browser.msie && parseInt($.browser.version,10) < 7 && !inst.inline ?
+                '<iframe src="javascript:false;" class="ui-timepicker-cover" frameborder="0"></iframe>' : '');
+
+            return html;
+        },
+
+        /* Special function that update the minutes selection in currently visible timepicker
+         * called on hour selection when onMinuteShow is defined  */
+        _updateMinuteDisplay: function (inst) {
+            var newHtml = this._generateHTMLMinutes(inst);
+            inst.tpDiv.find('td.ui-timepicker-minutes').html(newHtml);
+            this._rebindDialogEvents(inst);
+                // after the picker html is appended bind the click & double click events (faster in IE this way
+                // then letting the browser interpret the inline events)
+                // yes I know, duplicate code, sorry
+/*                .find('.ui-timepicker-minute-cell')
+                    .bind("click", { fromDoubleClick:false }, $.proxy($.timepicker.selectMinutes, this))
+                    .bind("dblclick", { fromDoubleClick:true }, $.proxy($.timepicker.selectMinutes, this));
+*/
+
+        },
+
+        /*
+         * Generate the minutes table
+         * This is separated from the _generateHTML function because is can be called separately (when hours changes)
+         */
+        _generateHTMLMinutes: function (inst) {
+
+            var m, row, html = '',
+                rows = this._get(inst, 'rows'),
+                minutes = Array(),
+                minutes_options = this._get(inst, 'minutes'),
+                minutesPerRow = null,
+                minuteCounter = 0,
+                showMinutesLeadingZero = (this._get(inst, 'showMinutesLeadingZero') == true),
+                onMinuteShow = this._get(inst, 'onMinuteShow'),
+                minuteLabel = this._get(inst, 'minuteText');
+
+            if ( ! minutes_options.starts) {
+                minutes_options.starts = 0;
+            }
+            if ( ! minutes_options.ends) {
+                minutes_options.ends = 59;
+            }
+            for (m = minutes_options.starts; m <= minutes_options.ends; m += minutes_options.interval) {
+                minutes.push(m);
+            }
+            minutesPerRow = Math.round(minutes.length / rows + 0.49); // always round up
+
+            /*
+             * The minutes table
+             */
+            // if currently selected minute is not enabled, we have a problem and need to select a new minute.
+            if (onMinuteShow &&
+                (onMinuteShow.apply((inst.input ? inst.input[0] : null), [inst.hours , inst.minutes]) == false) ) {
+                // loop minutes and select first available
+                for (minuteCounter = 0; minuteCounter < minutes.length; minuteCounter += 1) {
+                    m = minutes[minuteCounter];
+                    if (onMinuteShow.apply((inst.input ? inst.input[0] : null), [inst.hours, m])) {
+                        inst.minutes = m;
+                        break;
+                    }
+                }
+            }
+
+
+
+            html += '<div class="ui-timepicker-title ui-widget-header ui-helper-clearfix ui-corner-all">' +
+                    minuteLabel +
+                    '</div>' +
+                    '<table class="ui-timepicker">';
+            
+            minuteCounter = 0;
+            for (row = 1; row <= rows; row++) {
+                html += '<tr>';
+                while (minuteCounter < row * minutesPerRow) {
+                    var m = minutes[minuteCounter];
+                    var displayText = '';
+                    if (m !== undefined ) {
+                        displayText = (m < 10) && showMinutesLeadingZero ? "0" + m.toString() : m.toString();
+                    }
+                    html += this._generateHTMLMinuteCell(inst, m, displayText);
+                    minuteCounter++;
+                }
+                html += '</tr>';
+            }
+
+            html += '</table>';
+
+            return html;
+        },
+
+        /* Generate the content of a "Hour" cell */
+        _generateHTMLHourCell: function (inst, hour, showPeriod, showLeadingZero) {
+
+            var displayHour = hour;
+            if ((hour > 12) && showPeriod) {
+                displayHour = hour - 12;
+            }
+            if ((displayHour == 0) && showPeriod) {
+                displayHour = 12;
+            }
+            if ((displayHour < 10) && showLeadingZero) {
+                displayHour = '0' + displayHour;
+            }
+
+            var html = "";
+            var enabled = true;
+            var onHourShow = this._get(inst, 'onHourShow');		//custom callback
+
+            if (hour == undefined) {
+                html = '<td><span class="ui-state-default ui-state-disabled">&nbsp;</span></td>';
+                return html;
+            }
+
+            if (onHourShow) {
+            	enabled = onHourShow.apply((inst.input ? inst.input[0] : null), [hour]);
+            }
+
+            if (enabled) {
+                html = '<td class="ui-timepicker-hour-cell" data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" data-hour="' + hour.toString() + '">' +
+                   '<a class="ui-state-default ' +
+                   (hour == inst.hours ? 'ui-state-active' : '') +
+                   '">' +
+                   displayHour.toString() +
+                   '</a></td>';
+            }
+            else {
+            	html =
+            		'<td>' +
+		                '<span class="ui-state-default ui-state-disabled ' +
+		                (hour == inst.hours ? ' ui-state-active ' : ' ') +
+		                '">' +
+		                displayHour.toString() +
+		                '</span>' +
+		            '</td>';
+            }
+            return html;
+        },
+
+        /* Generate the content of a "Hour" cell */
+        _generateHTMLMinuteCell: function (inst, minute, displayText) {
+        	 var html = "";
+             var enabled = true;
+             var onMinuteShow = this._get(inst, 'onMinuteShow');		//custom callback
+             if (onMinuteShow) {
+            	 //NEW: 2011-02-03  we should give the hour as a parameter as well!
+             	enabled = onMinuteShow.apply((inst.input ? inst.input[0] : null), [inst.hours,minute]);		//trigger callback
+             }
+
+             if (minute == undefined) {
+                 html = '<td><span class="ui-state-default ui-state-disabled">&nbsp;</span></td>';
+                 return html;
+             }
+
+             if (enabled) {
+	             html = '<td class="ui-timepicker-minute-cell" data-timepicker-instance-id="#' + inst.id.replace(/\\\\/g,"\\") + '" data-minute="' + minute.toString() + '" >' +
+	                   '<a class="ui-state-default ' +
+	                   (minute == inst.minutes ? 'ui-state-active' : '') +
+	                   '" >' +
+	                   displayText +
+	                   '</a></td>';
+             }
+             else {
+
+            	html = '<td>' +
+	                 '<span class="ui-state-default ui-state-disabled" >' +
+	                 	displayText +
+	                 '</span>' +
+                 '</td>';
+             }
+             return html;
+        },
+
+
+        /* Enable the date picker to a jQuery selection.
+           @param  target    element - the target input field or division or span */
+        _enableTimepicker: function(target) {
+            var $target = $(target),
+                target_id = $target.attr('id'),
+                inst = $.data(target, PROP_NAME);
+            
+            if (!$target.hasClass(this.markerClassName)) {
+                return;
+            }
+            var nodeName = target.nodeName.toLowerCase();
+            if (nodeName == 'input') {
+                target.disabled = false;
+                inst.trigger.filter('button').
+                    each(function() { this.disabled = false; }).end();
+            }
+            else if (nodeName == 'div' || nodeName == 'span') {
+                var inline = $target.children('.' + this._inlineClass);
+                inline.children().removeClass('ui-state-disabled');
+            }
+            this._disabledInputs = $.map(this._disabledInputs,
+                function(value) { return (value == target_id ? null : value); }); // delete entry
+        },
+
+        /* Disable the time picker to a jQuery selection.
+           @param  target    element - the target input field or division or span */
+        _disableTimepicker: function(target) {
+            var $target = $(target);
+            var inst = $.data(target, PROP_NAME);
+            if (!$target.hasClass(this.markerClassName)) {
+                return;
+            }
+            var nodeName = target.nodeName.toLowerCase();
+            if (nodeName == 'input') {
+                target.disabled = true;
+
+                inst.trigger.filter('button').
+                    each(function() { this.disabled = true; }).end();
+
+            }
+            else if (nodeName == 'div' || nodeName == 'span') {
+                var inline = $target.children('.' + this._inlineClass);
+                inline.children().addClass('ui-state-disabled');
+            }
+            this._disabledInputs = $.map(this._disabledInputs,
+                function(value) { return (value == target ? null : value); }); // delete entry
+            this._disabledInputs[this._disabledInputs.length] = $target.attr('id');
+        },
+
+        /* Is the first field in a jQuery collection disabled as a timepicker?
+        @param  target_id element - the target input field or division or span
+        @return boolean - true if disabled, false if enabled */
+        _isDisabledTimepicker: function (target_id) {
+            if ( ! target_id) { return false; }
+            for (var i = 0; i < this._disabledInputs.length; i++) {
+                if (this._disabledInputs[i] == target_id) { return true; }
+            }
+            return false;
+        },
+
+        /* Check positioning to remain on screen. */
+        _checkOffset: function (inst, offset, isFixed) {
+            var tpWidth = inst.tpDiv.outerWidth();
+            var tpHeight = inst.tpDiv.outerHeight();
+            var inputWidth = inst.input ? inst.input.outerWidth() : 0;
+            var inputHeight = inst.input ? inst.input.outerHeight() : 0;
+            var viewWidth = document.documentElement.clientWidth + $(document).scrollLeft();
+            var viewHeight = document.documentElement.clientHeight + $(document).scrollTop();
+
+            offset.left -= (this._get(inst, 'isRTL') ? (tpWidth - inputWidth) : 0);
+            offset.left -= (isFixed && offset.left == inst.input.offset().left) ? $(document).scrollLeft() : 0;
+            offset.top -= (isFixed && offset.top == (inst.input.offset().top + inputHeight)) ? $(document).scrollTop() : 0;
+
+            // now check if datepicker is showing outside window viewport - move to a better place if so.
+            offset.left -= Math.min(offset.left, (offset.left + tpWidth > viewWidth && viewWidth > tpWidth) ?
+			Math.abs(offset.left + tpWidth - viewWidth) : 0);
+            offset.top -= Math.min(offset.top, (offset.top + tpHeight > viewHeight && viewHeight > tpHeight) ?
+			Math.abs(tpHeight + inputHeight) : 0);
+
+            return offset;
+        },
+
+        /* Find an object's position on the screen. */
+        _findPos: function (obj) {
+            var inst = this._getInst(obj);
+            var isRTL = this._get(inst, 'isRTL');
+            while (obj && (obj.type == 'hidden' || obj.nodeType != 1)) {
+                obj = obj[isRTL ? 'previousSibling' : 'nextSibling'];
+            }
+            var position = $(obj).offset();
+            return [position.left, position.top];
+        },
+
+        /* Retrieve the size of left and top borders for an element.
+        @param  elem  (jQuery object) the element of interest
+        @return  (number[2]) the left and top borders */
+        _getBorders: function (elem) {
+            var convert = function (value) {
+                return { thin: 1, medium: 2, thick: 3}[value] || value;
+            };
+            return [parseFloat(convert(elem.css('border-left-width'))),
+			parseFloat(convert(elem.css('border-top-width')))];
+        },
+
+
+        /* Close time picker if clicked elsewhere. */
+        _checkExternalClick: function (event) {
+            if (!$.timepicker._curInst) { return; }
+            var $target = $(event.target);
+            if ($target[0].id != $.timepicker._mainDivId &&
+				$target.parents('#' + $.timepicker._mainDivId).length == 0 &&
+				!$target.hasClass($.timepicker.markerClassName) &&
+				!$target.hasClass($.timepicker._triggerClass) &&
+				$.timepicker._timepickerShowing && !($.timepicker._inDialog && $.blockUI))
+                $.timepicker._hideTimepicker();
+        },
+
+        /* Hide the time picker from view.
+        @param  input  element - the input field attached to the time picker */
+        _hideTimepicker: function (input) {
+            var inst = this._curInst;
+            if (!inst || (input && inst != $.data(input, PROP_NAME))) { return; }
+            if (this._timepickerShowing) {
+                var showAnim = this._get(inst, 'showAnim');
+                var duration = this._get(inst, 'duration');
+                var postProcess = function () {
+                    $.timepicker._tidyDialog(inst);
+                    this._curInst = null;
+                };
+                if ($.effects && $.effects[showAnim]) {
+                    inst.tpDiv.hide(showAnim, $.timepicker._get(inst, 'showOptions'), duration, postProcess);
+                }
+                else {
+                    inst.tpDiv[(showAnim == 'slideDown' ? 'slideUp' :
+					    (showAnim == 'fadeIn' ? 'fadeOut' : 'hide'))]((showAnim ? duration : null), postProcess);
+                }
+                if (!showAnim) { postProcess(); }
+                var onClose = this._get(inst, 'onClose');
+                if (onClose) {
+                    onClose.apply(
+                        (inst.input ? inst.input[0] : null),
+					    [(inst.input ? inst.input.val() : ''), inst]);  // trigger custom callback
+                }
+                this._timepickerShowing = false;
+                this._lastInput = null;
+                if (this._inDialog) {
+                    this._dialogInput.css({ position: 'absolute', left: '0', top: '-100px' });
+                    if ($.blockUI) {
+                        $.unblockUI();
+                        $('body').append(this.tpDiv);
+                    }
+                }
+                this._inDialog = false;
+            }
+        },
+
+
+
+        /* Tidy up after a dialog display. */
+        _tidyDialog: function (inst) {
+            inst.tpDiv.removeClass(this._dialogClass).unbind('.ui-timepicker');
+        },
+
+        /* Retrieve the instance data for the target control.
+        @param  target  element - the target input field or division or span
+        @return  object - the associated instance data
+        @throws  error if a jQuery problem getting data */
+        _getInst: function (target) {
+            try {
+                return $.data(target, PROP_NAME);
+            }
+            catch (err) {
+                throw 'Missing instance data for this timepicker';
+            }
+        },
+
+        /* Get a setting value, defaulting if necessary. */
+        _get: function (inst, name) {
+            return inst.settings[name] !== undefined ?
+			inst.settings[name] : this._defaults[name];
+        },
+
+        /* Parse existing time and initialise time picker. */
+        _setTimeFromField: function (inst) {
+            if (inst.input.val() == inst.lastVal) { return; }
+            var defaultTime = this._get(inst, 'defaultTime');
+
+            var timeToParse = defaultTime == 'now' ? this._getCurrentTimeRounded(inst) : defaultTime;
+            if ((inst.inline == false) && (inst.input.val() != '')) { timeToParse = inst.input.val(); }
+
+            if (timeToParse instanceof Date) {
+                inst.hours = timeToParse.getHours();
+                inst.minutes = timeToParse.getMinutes();
+            } else {
+                var timeVal = inst.lastVal = timeToParse;
+                if (timeToParse == '') {
+                    inst.hours = -1;
+                    inst.minutes = -1;
+                } else {
+                    var time = this.parseTime(inst, timeVal);
+                    inst.hours = time.hours;
+                    inst.minutes = time.minutes;
+                }
+            }
+
+
+            $.timepicker._updateTimepicker(inst);
+        },
+
+        /* Update or retrieve the settings for an existing time picker.
+           @param  target  element - the target input field or division or span
+           @param  name    object - the new settings to update or
+                           string - the name of the setting to change or retrieve,
+                           when retrieving also 'all' for all instance settings or
+                           'defaults' for all global defaults
+           @param  value   any - the new value for the setting
+                       (omit if above is an object or to retrieve a value) */
+        _optionTimepicker: function(target, name, value) {
+            var inst = this._getInst(target);
+            if (arguments.length == 2 && typeof name == 'string') {
+                return (name == 'defaults' ? $.extend({}, $.timepicker._defaults) :
+                    (inst ? (name == 'all' ? $.extend({}, inst.settings) :
+                    this._get(inst, name)) : null));
+            }
+            var settings = name || {};
+            if (typeof name == 'string') {
+                settings = {};
+                settings[name] = value;
+            }
+            if (inst) {
+                if (this._curInst == inst) {
+                    this._hideTimepicker();
+                }
+                extendRemove(inst.settings, settings);
+                this._updateTimepicker(inst);
+            }
+        },
+
+
+        /* Set the time for a jQuery selection.
+	    @param  target  element - the target input field or division or span
+	    @param  time    String - the new time */
+	    _setTimeTimepicker: function(target, time) {
+		    var inst = this._getInst(target);
+		    if (inst) {
+			    this._setTime(inst, time);
+    			this._updateTimepicker(inst);
+	    		this._updateAlternate(inst, time);
+		    }
+	    },
+
+        /* Set the time directly. */
+        _setTime: function(inst, time, noChange) {
+            var origHours = inst.hours;
+            var origMinutes = inst.minutes;
+            var time = this.parseTime(inst, time);
+            inst.hours = time.hours;
+            inst.minutes = time.minutes;
+
+            if ((origHours != inst.hours || origMinutes != inst.minuts) && !noChange) {
+                inst.input.trigger('change');
+            }
+            this._updateTimepicker(inst);
+            this._updateSelectedValue(inst);
+        },
+
+        /* Return the current time, ready to be parsed, rounded to the closest 5 minute */
+        _getCurrentTimeRounded: function (inst) {
+            var currentTime = new Date(),
+                currentMinutes = currentTime.getMinutes(),
+                // round to closest 5
+                adjustedMinutes = Math.round( currentMinutes / 5 ) * 5;
+            currentTime.setMinutes(adjustedMinutes);
+            return currentTime;
+        },
+
+        /*
+        * Parse a time string into hours and minutes
+        */
+        parseTime: function (inst, timeVal) {
+            var retVal = new Object();
+            retVal.hours = -1;
+            retVal.minutes = -1;
+
+            var timeSeparator = this._get(inst, 'timeSeparator'),
+                amPmText = this._get(inst, 'amPmText'),
+                showHours = this._get(inst, 'showHours'),
+                showMinutes = this._get(inst, 'showMinutes'),
+                optionalMinutes = this._get(inst, 'optionalMinutes'),
+                showPeriod = (this._get(inst, 'showPeriod') == true),
+                p = timeVal.indexOf(timeSeparator);
+
+            // check if time separator found
+            if (p != -1) {
+                retVal.hours = parseInt(timeVal.substr(0, p), 10);
+                retVal.minutes = parseInt(timeVal.substr(p + 1), 10);
+            }
+            // check for hours only
+            else if ( (showHours) && ( !showMinutes || optionalMinutes ) ) {
+                retVal.hours = parseInt(timeVal, 10);
+            }
+            // check for minutes only
+            else if ( ( ! showHours) && (showMinutes) ) {
+                retVal.minutes = parseInt(timeVal, 10);
+            }
+
+            if (showHours) {
+                var timeValUpper = timeVal.toUpperCase();
+                if ((retVal.hours < 12) && (showPeriod) && (timeValUpper.indexOf(amPmText[1].toUpperCase()) != -1)) {
+                    retVal.hours += 12;
+                }
+                // fix for 12 AM
+                if ((retVal.hours == 12) && (showPeriod) && (timeValUpper.indexOf(amPmText[0].toUpperCase()) != -1)) {
+                    retVal.hours = 0;
+                }
+            }
+            
+            return retVal;
+        },
+
+        selectNow: function(e) {
+
+            var id = $(e.target).attr("data-timepicker-instance-id"),
+                $target = $(id),
+                inst = this._getInst($target[0]);
+
+            //if (!inst || (input && inst != $.data(input, PROP_NAME))) { return; }
+            var currentTime = new Date();
+            inst.hours = currentTime.getHours();
+            inst.minutes = currentTime.getMinutes();
+            this._updateSelectedValue(inst);
+            this._updateTimepicker(inst);
+            this._hideTimepicker();
+        },
+
+        deselectTime: function(e) {
+            var id = $(e.target).attr("data-timepicker-instance-id"),
+                $target = $(id),
+                inst = this._getInst($target[0]);
+            inst.hours = -1;
+            inst.minutes = -1;
+            this._updateSelectedValue(inst);
+            this._hideTimepicker();
+        },
+
+
+        selectHours: function (event) {
+            var $td = $(event.currentTarget),
+                id = $td.attr("data-timepicker-instance-id"),
+                newHours = $td.attr("data-hour"),
+                fromDoubleClick = event.data.fromDoubleClick,
+                $target = $(id),
+                inst = this._getInst($target[0]),
+                showMinutes = (this._get(inst, 'showMinutes') == true);
+
+            // don't select if disabled
+            if ( $.timepicker._isDisabledTimepicker($target.attr('id')) ) { return false; }
+
+            $td.parents('.ui-timepicker-hours:first').find('a').removeClass('ui-state-active');
+            $td.children('a').addClass('ui-state-active');
+            inst.hours = newHours;
+
+            // added for onMinuteShow callback
+            var onMinuteShow = this._get(inst, 'onMinuteShow');
+            if (onMinuteShow) {
+                // this will trigger a callback on selected hour to make sure selected minute is allowed. 
+                this._updateMinuteDisplay(inst);
+            }
+
+            this._updateSelectedValue(inst);
+
+            inst._hoursClicked = true;
+            if ((inst._minutesClicked) || (fromDoubleClick) || (showMinutes == false)) {
+                $.timepicker._hideTimepicker();
+            }
+            // return false because if used inline, prevent the url to change to a hashtag
+            return false;
+        },
+
+        selectMinutes: function (event) {
+            var $td = $(event.currentTarget),
+                id = $td.attr("data-timepicker-instance-id"),
+                newMinutes = $td.attr("data-minute"),
+                fromDoubleClick = event.data.fromDoubleClick,
+                $target = $(id),
+                inst = this._getInst($target[0]),
+                showHours = (this._get(inst, 'showHours') == true);
+
+            // don't select if disabled
+            if ( $.timepicker._isDisabledTimepicker($target.attr('id')) ) { return false; }
+
+            $td.parents('.ui-timepicker-minutes:first').find('a').removeClass('ui-state-active');
+            $td.children('a').addClass('ui-state-active');
+
+            inst.minutes = newMinutes;
+            this._updateSelectedValue(inst);
+
+            inst._minutesClicked = true;
+            if ((inst._hoursClicked) || (fromDoubleClick) || (showHours == false)) {
+                $.timepicker._hideTimepicker();
+                // return false because if used inline, prevent the url to change to a hashtag
+                return false;
+            }
+
+            // return false because if used inline, prevent the url to change to a hashtag
+            return false;
+        },
+
+        _updateSelectedValue: function (inst) {
+            var newTime = this._getParsedTime(inst);
+            if (inst.input) {
+                inst.input.val(newTime);
+                inst.input.trigger('change');
+            }
+            var onSelect = this._get(inst, 'onSelect');
+            if (onSelect) { onSelect.apply((inst.input ? inst.input[0] : null), [newTime, inst]); } // trigger custom callback
+            this._updateAlternate(inst, newTime);
+            return newTime;
+        },
+        
+        /* this function process selected time and return it parsed according to instance options */
+        _getParsedTime: function(inst) {
+
+            if (inst.hours == -1 && inst.minutes == -1) {
+                return '';
+            }
+
+            if ((inst.hours < 0) || (inst.hours > 23)) { inst.hours = 12; }
+            if ((inst.minutes < 0) || (inst.minutes > 59)) { inst.minutes = 0; }
+
+            var period = "",
+                showPeriod = (this._get(inst, 'showPeriod') == true),
+                showLeadingZero = (this._get(inst, 'showLeadingZero') == true),
+                showHours = (this._get(inst, 'showHours') == true),
+                showMinutes = (this._get(inst, 'showMinutes') == true),
+                optionalMinutes = (this._get(inst, 'optionalMinutes') == true),
+                amPmText = this._get(inst, 'amPmText'),
+                selectedHours = inst.hours ? inst.hours : 0,
+                selectedMinutes = inst.minutes ? inst.minutes : 0,
+                displayHours = selectedHours ? selectedHours : 0,
+                parsedTime = '';
+
+            if (showPeriod) { 
+                if (inst.hours == 0) {
+                    displayHours = 12;
+                }
+                if (inst.hours < 12) {
+                    period = amPmText[0];
+                }
+                else {
+                    period = amPmText[1];
+                    if (displayHours > 12) {
+                        displayHours -= 12;
+                    }
+                }
+            }
+
+            var h = displayHours.toString();
+            if (showLeadingZero && (displayHours < 10)) { h = '0' + h; }
+
+            var m = selectedMinutes.toString();
+            if (selectedMinutes < 10) { m = '0' + m; }
+
+            if (showHours) {
+                parsedTime += h;
+            }
+            if (showHours && showMinutes && (!optionalMinutes || m != 0)) {
+                parsedTime += this._get(inst, 'timeSeparator');
+            }
+            if (showMinutes && (!optionalMinutes || m != 0)) {
+                parsedTime += m;
+            }
+            if (showHours) {
+                if (period.length > 0) { parsedTime += this._get(inst, 'periodSeparator') + period; }
+            }
+            
+            return parsedTime;
+        },
+        
+        /* Update any alternate field to synchronise with the main field. */
+        _updateAlternate: function(inst, newTime) {
+            var altField = this._get(inst, 'altField');
+            if (altField) { // update alternate field too
+                $(altField).each(function(i,e) {
+                    $(e).val(newTime);
+                });
+            }
+        },
+
+        /* This might look unused but it's called by the $.fn.timepicker function with param getTime */
+        /* added v 0.2.3 - gitHub issue #5 - Thanks edanuff */
+        _getTimeTimepicker : function(input) {
+            var inst = this._getInst(input);
+            return this._getParsedTime(inst);
+        },
+        _getHourTimepicker: function(input) {
+            var inst = this._getInst(input);
+            if ( inst == undefined) { return -1; }
+            return inst.hours;
+        },
+        _getMinuteTimepicker: function(input) {
+            var inst= this._getInst(input);
+            if ( inst == undefined) { return -1; }
+            return inst.minutes;
+        }
+
+    });
+
+
+
+    /* Invoke the timepicker functionality.
+    @param  options  string - a command, optionally followed by additional parameters or
+    Object - settings for attaching new timepicker functionality
+    @return  jQuery object */
+    $.fn.timepicker = function (options) {
+
+        /* Initialise the time picker. */
+        if (!$.timepicker.initialized) {
+            $(document).mousedown($.timepicker._checkExternalClick).
+			find('body').append($.timepicker.tpDiv);
+            $.timepicker.initialized = true;
+        }
+
+        var otherArgs = Array.prototype.slice.call(arguments, 1);
+        if (typeof options == 'string' && (options == 'getTime' || options == 'getHour' || options == 'getMinute' ))
+            return $.timepicker['_' + options + 'Timepicker'].
+			    apply($.timepicker, [this[0]].concat(otherArgs));
+        if (options == 'option' && arguments.length == 2 && typeof arguments[1] == 'string')
+            return $.timepicker['_' + options + 'Timepicker'].
+                apply($.timepicker, [this[0]].concat(otherArgs));
+        return this.each(function () {
+            typeof options == 'string' ?
+			$.timepicker['_' + options + 'Timepicker'].
+				apply($.timepicker, [this].concat(otherArgs)) :
+			$.timepicker._attachTimepicker(this, options);
+        });
+    };
+
+    /* jQuery extend now ignores nulls! */
+    function extendRemove(target, props) {
+        $.extend(target, props);
+        for (var name in props)
+            if (props[name] == null || props[name] == undefined)
+                target[name] = props[name];
+        return target;
+    };
+
+    $.timepicker = new Timepicker(); // singleton instance
+    $.timepicker.initialized = false;
+    $.timepicker.uuid = new Date().getTime();
+    $.timepicker.version = "0.2.9";
+
+    // Workaround for #4055
+    // Add another global to avoid noConflict issues with inline event handlers
+    window['TP_jQuery_' + tpuuid] = $;
+
+})(jQuery);
+”ò¿Ÿ§  ï       ªl‡Ù      extend     ™¬ä'
+      timepicker     èæ_„      version    ¢VA´      0.2.9      Ä_tä	      PROP_NAME      2oº      tpuuid     uÙ.      getTime    –([Q
+      Timepicker     .`      debug	      ≈ù|^      _curInst
+   o˚	      _isInline      )Dü9      _disabledInputs    £Äjc      _timepickerShowing     Ò¸Í	      _inDialog      Ôª.!      _dialogClass   L
+5      ui-timepicker-dialog   R®v
+      _mainDivId     ¬í[∂      ui-timepicker-div      @Sﬂú      _inlineClass   ›˝d:      ui-timepicker-inline   ∏  ‰      _currentClass      «¬yO      ui-timepicker-current      -ØT‚      _dayOverClass      èbzs      ui-timepicker-days-cell-over   ∏∑¯ì      regional    .      hourText   √œÛ‡      Hour   )ÒOB
+      minuteText     ˛–/z      Minute     ªÅÅ      amPmText   ôòüD      closeButtonText    B=à†      Done    Ω#•9      nowButtonText!      9HSè      deselectButtonText"     "Œãö      Deselect#   'é;'	      _defaults$      ìpÅ5      showOn%     KÃÌ      focus&      ˙U~      button'     ÷tõ      showAnim(   ÂÑU"      fadeIn)     Q˜ú      showOptions*    b	P”
+      appendText+     ’O.˚
+      beforeShow,     hcºa      onSelect-   YÕ˙T      onClose.    ˜ŸØ˚      timeSeparator/      ÇWh      periodSeparator0    ‘ì˙
+      showPeriod1     W?óa      showPeriodLabels2   ∑ø—ª      showLeadingZero3    J	      showMinutesLeadingZero4     B◊ÖM      altField5   ∑Ø      defaultTime6    *π      now7    «ˇF
+      myPosition8     wiV¯      left top9   ∂JÁ
+      atPosition:     Æ˙]À      left bottom;    }Wô}
+      onHourShow<     øú<–      onMinuteShow=   W8i      starts>     –hçk      ends?   szÇﬁ      interval@   ”Qn$      rowsA   l§_˛	      showHoursB      A|∑      showMinutesC    ∞}Å       optionalMinutesD    hxâo      showCloseButtonE    K˘eö      showNowButtonF      ∆)ô~      showDeselectButtonG     RΩã      tpDivH      l‡åÔ	      <div id="I      i<`      " class="ui-timepicker ui-widget ui-helper-clearfix ui-corner-all " style="display: none"></div>J   ﬁÆô«      markerClassNameK    e¨%ú      hasTimepickerL      =X˚      logM    ˛Q1      consoleN    üWóà      _widgetTimepickerO      ∆°!Å      setDefaultsP    —ôKö      settingsQ   ◊eÃœ      extendRemoveR   ‡Á’|      _attachTimepickerS      ˙èá      inlineSettingsT     •+ß9      attrNameU   ≠‡;	      attrValueV      4>ÙE      getAttributeW   Ω«7o      time:X      ºoò      errY    U5_      nodeNameZ   RâDo      toLowerCase[    Tünì      inline\     ú≥ÊŸ      div]    ±4PB      span^   g‡      uuid_   qÆ˚9      inst`   ?ö∏$      _newInsta   {ﬂ{ä      _connectTimepickerb     ds1      _setTimeFromFieldc      —áD•      _inlineTimepickerd      ≤÷Q>      ([^A-Za-z0-9_-])e   {¶ÓŒ      \\$1f   ◊uÈ      <div class="g   b@_4       ui-timepicker ui-widget  ui-helper-clearfix"></div>h   ‹B-      appendi     ˘!p¬      triggerj    7ÑÉz      hasClassk   pá§<      _attachmentsl   Bå|      addClassm   ù∫”      keydownn    <;°‡
+      _doKeyDowno     KH`      keyupp      ®÷˚˜      _doKeyUpq   ‡Õ      bindr   Ô!Gy      setData.timepickers     II∑P      eventt      B¸ø;      keyu    \[˚      getData.timepickerv     «
+†a      _getw   6ó(Å      datax   A«c
+      _getInsty   †ñ«      handledz    â‚Ô	      _keyEvent{      ≠5      keyCode|    ÂÓ      _hideTimepicker}    §à7"      _updateSelectedValue~   
+@•&      ctrlKey    S∆ÿ≤      _showTimepickerÄ    B9∫¿      preventDefaultÅ     ı/F/      stopPropagationÇ    4y‘Í      _updateTimepickerÉ      GöΩ      isRTLÑ      *N∑∆      removeÖ     [~B=      <span class="Ü      Ø∏a≠      _appendClassá   +®¢      ">à     ŸÂ°      </span>â    çÕ”O      beforeä     ç≥T      afterã      ı˛«Æ      unbindå     JƒI      focus.timepickerç   më      bothé   ÃólB      click.timepickerè   g≠U∞
+      _lastInputê     r=ì      divSpanë    HáíK      showí   •_œ”
+      parentNodeì     ÎıπO      _isDisabledTimepickerî      mêÅ      stopï   À≤Ê      lastValñ    ªYx+      _posó   Ãw◊      _findPosò   Bãwå      offsetHeightô   ∑+Sÿ      isFixedö    Õv=      parentsõ    >ü      cssú    »Åí      positionù   å≤ÜX      fixedû      “ßf∞      browserü    t9,¨      opera†      ∏OÄ      document°   ï,Øp      documentElement¢    |c…r
+      scrollLeft£     ìGÎ	      scrollTop§      ı]á      left•   $√Á      top¶    H<*ê      absoluteß   e}ü      display®    ü‡˚Å      block©      <`(+      -1000px™    c$9±	      collision´      ≠Zöˆ      flip¨   y25“      _hoursClicked≠      ˇú±]      _minutesClickedÆ    q;®º      _checkOffsetØ   cGó      blockUI∞    ,Ω      none±   ¿
+7      duration≤   K«™ï      postProcess≥    èa      borders¥    µ\ÄË      _getBordersµ    gcäJ      iframe.ui-timepicker-cover∂     ÎƒJ˚      width∑      QÒ=i
+      outerWidth∏     ∑…≈      heightπ     k]2      outerHeight∫    f˜      zIndexª     ¬íÆ
+      _getZIndexº     WuW1      effectsΩ    SZK#      :visibleæ   Vw{	      :disabledø      dö!      elem¿   Ï-k     °Ã^3 relative¡   ˛Ë˘2      parent¬     ∏™˝      empty√      π˜	=      _generateHTMLƒ      €=«¡      _rebindDialogEvents≈    ¡§\l      self∆   	—Í      .ui-timepicker-minute-cell«     ü™‚X      click»      §kÿ∂      fromDoubleClick…    üÑO      selectMinutes       êı      dblclickÀ   Ò“][      .ui-timepicker-hour-cellÃ   ™„Æ      selectHoursÕ    gtë      .ui-timepicker td aŒ    †©˝c      mouseoutœ   ˆ+      removeClass–    ;¥>      ui-state-hover—     6CY>	      className“      ⁄Eú¡      indexOf”    À|ï      ui-timepicker-prev‘     |IO•      ui-timepicker-prev-hover’   \f/í      ui-timepicker-next÷     à√w      ui-timepicker-next-hover◊   y˜ãÑ	      mouseoverÿ      NÙ      .ui-timepicker-calendarŸ    qL◊A       a⁄     z%˝ˆ      .ui-timepicker-now€     ú∑†'	      selectNow‹      ﬂ°L      .ui-timepicker-deselect›    Õ7 Ê      deselectTimeﬁ   :ﬁ>0      .ui-timepicker-closeﬂ   Ï%N¬      row‡    P{Ò      col·    ‘„X      html‚   h›∂T	      hoursHtml„      q¬V      minutesHtml‰    Ê∆=Ê      amRowsÂ     <s‰      pmRowsÊ     ;≠¿      amItemsÁ    ÑJªB      pmItemsË    hÛºB
+      amFirstRowÈ     Õı
+      pmFirstRowÍ     8qwü      hours_optionsÎ      %7?ˆ      hoursPerRowÏ    ˜hpà      hourCounterÌ    ÌÁMÁ	      hourLabelÓ      è˜Ÿv      showButtonPanelÔ    Ñu2      push   ËŒ&˙      ceilÒ   `-Ñó      floorÚ      €U ≥      minÛ    Kk.      maxÙ    h6DèG      <table class="ui-timepicker-table ui-widget-content ui-corner-all"><tr>ˆ    ≥Ù7S      <div class="ui-timepicker-title ui-widget-header ui-helper-clearfix ui-corner-all">˘    hÉÆ      <tr>˙   lC      <th rowspan="˚      X¡ÂÍ      " class="periods" scope="row">¸     í‡      </th>˝      ”Än      _generateHTMLHourCell˛      ∏ë¯      </tr>      ˘É.      </td>     !Ø\¢"      <td class="ui-timepicker-minutes">    ßÅŒ      _generateHTMLMinutes  ·ﬁ<      buttonPanel   °TpL      <tr><td colspan="3"><div class="ui-timepicker-buttonpane ui-widget-content">  Ügü
+      \\\\  çäç      " >	   C†Ä	      </button>     ^ãk      </div></td></tr>  Á«Ä      </table>  5∂™‰      msie  SÃTU      <iframe src="javascript:false;" class="ui-timepicker-cover" frameborder="0"></iframe>     †	Úk      _updateMinuteDisplay  ‘£à      newHtml   äÖ´      td.ui-timepicker-minutes  ‚e…}      minutes_options   !4ê©      minutesPerRow     :ˆ      minuteCounter     æ@      minuteLabel   &9!Ï      round     g¶
+g      displayText   8«Œ      _generateHTMLMinuteCell   ∑ÄÅ      displayHour   hË?D      enabled   pªT˚G      <td><span class="ui-state-default ui-state-disabled">&nbsp;</span></td>   ®ªÍB      <td class="ui-timepicker-hour-cell" data-timepicker-instance-id="#    Å¥"Á      " data-hour="      Â	Ö8      ui-state-active!   T	{>	      </a></td>$     §gj∏       ui-state-active %     18à|D      <td class="ui-timepicker-minute-cell" data-timepicker-instance-id="#&  Ø•éÌ      " data-minute="(   Ôõo!      _enableTimepicker)     §é%q      $target*   ﬂ(∏˝	      target_id+     A¢Ωê      attr,  ûzÉw      disabled-  >	≈      filter.    
+}N      children/  Ü÷®C      ui-state-disabled0     9Ã      map1   ¬iv      _disableTimepicker2    ·~@H      tpWidth3   DÍ¨      tpHeight4  «ÛƒO
+      inputWidth5    pAJë      inputHeight6   {vÁ”	      viewWidth7     ïß˘G      clientWidth8   ª∂e
+      viewHeight9    À˙∏      clientHeight:  ˛ .      abs;   ﬂN#9      obj<   Ñ€ËW      hidden=    'JØ(      nodeType>  x X‚      previousSibling?   Ñ'n      nextSibling@   íY∑‚      convertA   Nÿ≠      thinB  G®ıÑ      mediumC    üÇ%˘      thickD     RË˜«      border-left-widthE     ûØ6H      border-top-widthF  O¯ät      _checkExternalClickG   z•°≈      _triggerClassH     Â'…¥      _tidyDialogI   üvÙ}      hideJ  #+≈ò	      slideDownK     ¡Ÿ™W      slideUpL   –cH:      fadeOutM   &⁄õ      valN   ÙMÉ#      _dialogInputO  rQ`π      -100pxP    îWŒ	      unblockUIQ     òh;      bodyR  7¨ -      .ui-timepickerS    Çb†)      Missing instance data for this timepickerT     *†N8      timeToParseU   -0˘T      _getCurrentTimeRoundedV    }:CÂ      getHoursW  *™∏?
+      getMinutesX    ∆›9ô      timeValY   (¿ŸT	      parseTimeZ     G<¯‡      _optionTimepicker[     ÁÆèz      _setTimeTimepicker\    ªº{p      _setTime]  Á¯=<      _updateAlternate^  Üò:Ê      noChange_  Ò“1	      origHours`     öá˝3      origMinutesa   `Xg      minutsb    Á˛¡      changec    Ëﬂ      currentTimed   D2∫      currentMinutese    ŒÄ+      adjustedMinutesf   ÀmK<
+      setMinutesg    ÁÑ≈û      retValh    6ôfÿ      substri    Mcu      timeValUpperj  ¨‚s◊      toUpperCasek   ˙ C-      data-timepicker-instance-idl   +h^h      $tdm   ¸z◊Ω      currentTargetn     zc◊6      newHourso  9{ßÂ	      data-hourp     Äøå      .ui-timepicker-hours:firstq    "öc
+      newMinutesr    tÎÙ      data-minutes   †öœ      .ui-timepicker-minutes:firstt  ‡@73      newTimeu   ≤2œ]      _getParsedTimev    Æ$.K      periodw    ;°X      selectedHoursx     ﬂ&)      selectedMinutesy   ´/©      displayHoursz  o»bN
+      parsedTime{    z≥Ü◊      _getTimeTimepicker|    .:Î,      _getHourTimepicker}    0ØöÅ      _getMinuteTimepicker~   :yã      options   ˜Ã      initializedÄ   ◊Dô	      mousedownÅ     ıŸ˜Ø	      otherArgsÇ     ÿÖ Ã      sliceÉ     ƒPà±      getHourÑ   @L	      getMinuteÖ     ⁄|`õ      optionÜ     ¶      propsá     ¯2áâ      windowà    „…1ê
+      TP_jQuery_â    >Â/      jQueryä    vi`◊s      <td class="ui-timepicker-hours"><div class="ui-timepicker-title ui-widget-header ui-helper-clearfix ui-corner-all">ã   ‘µ"ô#      </div><table class="ui-timepicker">å   	üä      </tr></table></td>ç    `ÿn      <button type="button" class="ui-timepicker-now ui-state-default ui-corner-all"  data-timepicker-instance-id="#é    ∏⁄ÇÛs      <button type="button" class="ui-timepicker-deselect ui-state-default ui-corner-all"  data-timepicker-instance-id="#è   8Ò¸qp      <button type="button" class="ui-timepicker-close ui-state-default ui-corner-all"  data-timepicker-instance-id="#ê  }4§      "><a class="ui-state-default ë     #-tÀ4      <td><span class="ui-state-default ui-state-disabled í  CØâ      </span></td>ì  Ï—©Õ      " ><a class="ui-state-default î    Iˆ&Æ6      <td><span class="ui-state-default ui-state-disabled" >ï    ‚@˜      _connectTimepicker/<ñ  Z-ÚK      _attachments/<ó    39l˛      _inlineTimepicker/<ò   rçˆ      _showTimepicker/<ö     óÔ°Ô      _rebindDialogEvents/<õ     ∂eN      _enableTimepicker/<ú   S"wú'      _enableTimepicker/this._disabledInputs<ù   ùSw7      _disableTimepicker/<û  åäô (      _disableTimepicker/this._disabledInputs<°   #ÿ      _updateAlternate/<¢    j„xq      $.fn.timepicker£   ˇâu      $.fn.timepicker/<     G   /  I   G             Ô%,â                                                                 F                                                                                                                          
+           	      
+           
+                                                                                                                                                                                                                                                                                                                                                                                                    !                "      $           #      $           $                %      '           &      '           '                 (                 )                 *                 +      -           ,                 -                .      0           /                 0                 1      3                            2                 3                 4                 5                 6                 7                 8                 9                 :                 ;                 <                 =                 >                ?      B           @                 A                 B                 C                D      G           E      ≥Oåc            	             $ `t `  P  P  PQ  P  `ã  `á  `              ã                 Ü {                   ã                 ã               P  ã                 `P  PS  PT  PU  PY  P[  P_  P  `ã  `á  `          X  P              [  ç ã                 _  P  ã                s  t  P              s  t  ã               s  _  y  ã               s  _               `_  *  É  $  &  ã                                 _  Pê  ã                s  t  P              s  t  ã                 _  P+  ô  P•  '  ±  ≤                ã                 ≥                ø  ú  P              _  ã               _  P≥  ≈  Pã                 ã                 ã                e               e               e  #   "         _  ‡  ã   Ì  Â    @  Í  E  0  ‚  Ê  Á  B  ﬂ  Ï  2  ‰     È  D     ·  ˙   Ó  !  1  A  Î  F  „  h  Ë  m              _   ã               _  m  ﬂ  ·  @  m     3  <    ã   	            _  ˜   0  2   ·   ;  ã               _  l   ·   <  ã                 ) * P_  Y  [  ã                 ã                P               `) _  Y  [  ã                 ã                P              * i  ã   
+            _  •  ô  2 3 4 5 6 8 ã               ; _  É  ú  ã               ø  @              P              s  )               _  P'  ±  ≤  -  ã                 ã               _  ã                           X              _  {  ã               _  5  T X   ã                 {  P  _  P  ã                   _  ã               _    ^ _ ` ã               _  c d e    
+         _  X g .    A  B  C  0  p  i ã               e  ç ) _  c ã               e  ç ) _  ã   
+   	         s  l ç n »  ) _  B  <  ã   	            s  l ç q »  ) _  A  ã               _  t ,  ã               _  v 0  2  A  B  C    w x y z h  m  ã               _  t P4  ã                i  e                _  ã                 _  ã                 _  ã               ~ PÅ P   ã                 ã   Ø¬0∞d                         IÙ$KEÆ˙ö                    !     ë    $  &  '  )  *  +  ,  -  .  /  0  1  2  3  4  5  7  9  ;  <  ˙   m  @  A  B  C  D  E  F             
+    =  >         =  >  ?                    /   Î     J  L  N  O  R  `  a  n  p  k  c    ª  Ç  ƒ  √    ˝   ( 1 ì  Æ  ó  ¥  F |  H x  v  b  Z [ \ U Y €  ›  Ã  …  }  u ] { | }                                                  ç   [  G             
+     §  •         ú  ß  •         ¢ ù ™           ú  ß  §  •           §  •  ∂  ∏           §  •  ∂  ∏           »          »          »          »          A B C       ú  §  •                                  á&’™ç!´!G   D    íÔ‰D                             m    ª   w ﬂ•@`FÄ (ˇˇˇˇPPÄ®  ]=π…®    '              Ä       Ω  Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ 	  ﬂ5Œ 
+  ﬂm   Œ   ﬂm   Œ   ﬂ¡   ·J   ‰¡   J   9   9      <   <	   w ﬂ	   Œ   ﬂª
+   Ä„  Å  ·J   ‰s  Œ   ﬂ¡   ·J   ‰¡   J   9      <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m    <!   m"   <#   m$   <%   m&   <'   m(   <)   m*   <+   m,   <-   m.   </   m0   <1   m2   <3   m4   <5   m6   <7   m8   <9   m:   <;   m<   <=   m>   <?   m@   <A   mB   <C   mD   <E   mF   <G   mH   <I   mJ   <K   mL   <M   mN   <O   mP   <Q   mR   <S   mT   <U   mV   <W   mX   <Y   mZ   <[   m\   <]   m^   <_   m`   <a   mb   <c   md   <e   mf   <g   mh   <i   mj   <k   w ﬂ¡   Jl   mm   L	   ﬂ¡   ¡   Ä„  Å  L	   ﬂ¡   J	   Ln   ﬂ¡   J	   ª
+   Ä„  Å  ·J   ‰s  Lo   ﬂ¡   J	      L   ﬂªp   q   ¡   &¡   Nﬂ•Ω@`	
+ˇˇˇ„PD`+`î PIY`	
+E[	J^	Jc	Jj	Jr	JÄ  ï	JÄ  †	JÄ  ≥	JÄ  ’	JÄ  ‹	JÄ  ¯	JÄ 	JÄ o	JÄ ~	JÄ Ñ	JÄ π	JÄ E	JÄ W	JÄ ö	JÄ  	JÄ Ó	JÄ 	JÄ  	JÄ )	JÄ ?	JÄ L	JÄ V	JÄ c	JÄ ã	JÄ ì	JÄ ù	JÄ £	JÄ ≈	JÄ ﬁJÄ Ë	JÄ ˜	JÄ 	JÄ ,	JÄ ;	JÄ F	JÄ g	JÄ Ñ	JÄ ë	JÄ Ã	JÄ ◊	 	JÄ ‡	JYPDÄ Ó`ï0Ä  `P)`ë `î P
+P)`ï `
+PÄÄÄ4  ÌVŸú4  i               I       ﬁÕ   ﬂæ   L   ﬂæ   L   ﬂæ   L   ﬂæ   h    L   ﬂæ   L   ﬂæ   L   ﬂæ      L   ﬂæ   	   L
+   ﬂæ      L   ﬂæ      L   ﬂæ      L   ﬂæ   h    L   ﬂæ   J   9      <      <   h      i       i   <      <      <      <   L    ﬂæ   9!   "   <#   <$   %   <&   9'   <(       <)   <*   <+   <,   -   <.   /   <0   <1   <2   <3   <4       <5   6   <7   8   <9   :   <;   <<   <=   9>   <?   <@   <A   9B   <?   7<@   <C   <D   <E   <F   <G   <H   <I   <J   <K   LL   ﬂ¡   ·JM   ‰æ   JL   æ   J   J    w ﬂæ   ¡    N   æ   J
+   &O   &s LP   ﬂ•&	`+	`+	`+	`/	`+	`+	`/	`/	`/	`/	`O	`/	`.**û **ê@	`)J&**J&&F"**&&&&*J+J-J0&F3%&L7%&'L<G>&&FC&&LH	`		ˇˇˇÈPDJ	`
+ê ˇˇˇP)PÄx   )ç x   C                        ‹Õ   ﬂﬁÕ  ﬂæ  J   ö(   ó   ª   J   ·J   ‰   æ   w ﬂó   •,`ì `ñ ˇˇˇˆP)	PÄ8   gœÃ8                           ﬁÕ   ﬂæ   J   ¢•&`)	Ql   7Lcùl   7                       ﬁÕ   ﬂ¡    æ   J   º  ù   ó   ﬂ9   ó   w ﬂæ   ¢•&`	ò ˇˇˇÔP$`$	Qà  ßp3DX  Ä  '              1      $Ω  Œ   ﬂΩ Œ   ﬂ‹Œ 
+  ﬂﬁŒ   ﬂ5Œ   ﬂŒ   ﬂ¡   J   ^ò   _`õ≥   ó   Œ   ¡   ·J   ‰   ¡   &s Œ   ﬂ¡   öt   ó   ¡   ù   ó   ﬂ9   ó	   Œ   ﬂ´¡   ¡   ∫    ¡   z Ëã   Nﬂô*   ó    §≠–   ≥   ﬂ¡  ¡  ¡  Nﬂ—ó   ﬂôJˇˇˇó   a¡   J   ·J   ‰s  Œ   ﬂ¡   	   ù   ó   ﬂ¡   
+   ó   Œ   ﬂ¡   J   õ9   ó   ¡   ·J   &.L   ﬂ¡      ¡   J   &L   ﬂó   ¡   ·J   ‰∫    ¡   s ¡   s Œ 	  ﬂ¡ 	  ∫   ·J   ‰9   ¡   ù   ó#   ﬂ9   ó$   ¡   ù   ó%   ﬂ9   ó&   s L   ﬂ¡      ö>   ó*   ¡   ·J   ‰¡   ¡ 	  w ﬂ¡   ·J   ‰¡ 	  w ﬂô3   ó.   ¡   ö$   ó/   ¡   ·J   ‰¡   ¡ 	  w ﬂó1   •ß@"`'"`ù ˇˇˇ%!`
+ˇˇˇÈP)`/`†!`ê  ˇˇˇ˚Pó #+`ó@L`ë P)`¨@`î `î `
+ñ@`ˇˇˇ˛PˇˇˇÏP)`ë ö ö ˇˇˇÂP)`ï `ˇˇˇÂPD`ˇˇˇÓP.`/`ˇˇˇÊPI 	PÄÄà  h     —      ˇˇˇˇ       †   $         9   ª   ‹   SmÊ‹   ë                       ﬁÕ  ﬂº  KJ   ·J   ‰l      s Õ   ﬂ9   æ   <   º  <   º <   º õ   ó	   æ  J   ô(   ó
+   ¡    	   æ  J
+   &   &s ó   <   ¢•&`ë 
+ˇˇˇ¯P(`%	((† ê ˇˇˇÌPM	QÄÄÄ∏  a.p∏                        Ω Œ   ﬂﬁÕ  ﬂ¡   º  s Õ   ﬂ¡   ¡   h    s L   ﬂ¡   ¡   h    s L   ﬂæ   ·J   ‰æ  J   s ö   ó    ¢ó   æ  ·J   ‰æ   ¡   w ﬂæ   ·J   ‰æ  J   s ·J   ‰æ  J   s ·J	   ‰æ  J
+   s ·J   ‰   m   s ·J   ‰   m   w ﬂ¡  ·J   ‰º  ¡  ¡   w ﬂ•/`ˇˇˇˇP(`ˇˇˇ˛P)`ˇˇˇ˛P)`	ˇˇˇ˜P"`A	F`ˇˇˇÏP$`	ˇˇˇ˜P*	ˇˇˇ¯P*	ˇˇˇ˙P*,
+ˇˇˇÂPJ,
+ˇˇˇÂPD`ˇˇˇËP$	PÄÄ<   J≥ík<                            ¡   J   º º Nﬂ• `í PÄP   ¯v⁄∆P                          ﬁÕ   ﬂæ   ·J   ‰¡   º s ¢•&`ˇˇˇıP#QÄL  å·L  ´               %       ﬁÕ  ﬂ¡   J   ·J   ‰º  J   s Õ   ﬂÕ  ﬂæ   L   ﬂ¡   J   J   ö‘   ó   º  J   ·	ü+   ó
+   ·üB   ó   ·ün   ó   †É   ó   ¡   J   ·J   ‰w  ﬂÕ  ﬂôi   ó   ¡   J   ·J   ‰æ   w ﬂ¡   J   ·J   ‰w  ﬂ¢ô/   ó   ¡   J   ·J   ‰w  ﬂô   ó   Õ  ﬂó   ô`   ó   º  J   $ú   ó   ﬂº  J	   ó   ö(   ó   ¡   J   ·J
+   ‰æ  w ﬂô   ó    Õ  ﬂó    æ  ö&   ó!   º  ·J   ‰w  ﬂº  ·J   ‰w  ﬂó%   •&`ë ˇˇˇ˜P(`&`+`ô `º `ë P$`&` `ë "ˇˇˇÎP$`ë PD`A	A`*`ë P$`*`ï@`≠ `ë ˇˇˇP> `K`.`
+P$`
+PI	PÄÄú   +¥É\ú   T                 
+       ¡   J   ·J   ‰º  J   s Õ   ﬂ¡   J   ·J   ‰æ   w ﬂ¡   J   ·J   ‰æ   w ﬂ• `ë ˇˇˇ˜P(`ë ˇˇˇÓP$`ë ˇˇˇÓP$	P–  áÍVo–          
+       0       Ω  Œ   ﬂﬁÕ  ﬂæ  ·J   ‰º    s Õ   ﬂæ  ·J   ‰º    s Õ  ﬂº J   ö   ó   º J   ·J   ‰w  ﬂó	   æ   öw   ó
+   º ¡      æ  J   &   &æ   &	   &s L   ﬂ¡   ·æ  ö   ó   
+   ô   ó      ó   K‰º J   w ﬂó   ¡   ·J   ‰   æ  J   w ﬂº J   ö   ó   º J   ·J   ‰w  ﬂó   æ  ·J   ‰º    s Õ  ﬂæ     ù   ó!   ﬂæ     ó"   ö(   ó#   ¡   ·J   ‰   æ  J   w ﬂó&   æ     ù   ó(   ﬂæ     ó)   öG   ó*   æ  ·J   ‰º    s Õ  ﬂ¡   æ  s ·J   ‰   m   w ﬂó0   •/`
+ˇˇˇ˚P(`
+ˇˇˇ˚P(`í `P)`.`	ê ˇˇˇ—P)`Ø "ˇˇˇˇPI`ë !	ˇˇˇÂP$`í `PI`
+ˇˇˇ˚P(`Æ `ë 	ˇˇˇÁPI`Æ `
+ˇˇˇ˚P(`ˇˇˇˇP"ˇˇˇÁPI	PÄÄƒ   ¬ı÷+ƒ   É                          ¡  J   J   ú"   ó   ﬂ¡  J   J   ¡   Kó   ö$   ó   ¡  J   ·J   ‰w  ﬂô&   ó   ¡  J   ·J   ‰¡   Kw ﬂó   ¢• `© >ó `ë P.`ë ˇˇˇP)`!Qå  7,?å  ˜                       Ω Œ   ﬂﬁÕ  ﬂ¡   º  s Õ   ﬂæ   ·J   ‰æ  J   s ö   ó    ¢ó   æ   ·J   ‰æ  J   s ·J   ‰¡   J   s ·J   ‰   m   s ·J   ‰	   m
+   w ﬂ¡  ·J   ‰º  ¡  ¡   w ﬂæ  ·J   ‰¡   w ﬂæ  ·J   ‰¡   w ﬂ¡   J   ·J   ‰w  ﬂ•/`ˇˇˇˇP(`	ˇˇˇ˜P-`A	F`	ˇˇˇ˜P
+&
+ˇˇˇ˘P*,
+ˇˇˇÂPJ/
+ˇˇˇÂPD
+`ˇˇˇËPD`ˇˇˇÓP$`ˇˇˇÓP$`ë P$	PÄÄ<   J≥ík<                            ¡   J   º º Nﬂ• `í PÄP   ¯v⁄∆P                          ﬁÕ   ﬂæ   ·J   ‰¡   º s ¢•&`ˇˇˇıP#QÄ
+  ﬂˆÏ
+  Î                ·       º  J   ù   ó   ﬂº  ó   Ã  ﬂº  J   ·J   ‰s     ö&   ó   ¡      º  J   s KÃ  ﬂó
+   ¡  J   ·J   ‰º  s ù   ó   ﬂ¡  J   J   º  ó   ö   ó    ¢ó   ¡  J   ·J	   ‰w  ﬂ¡  J   ·J
+   ‰º  s Œ   ﬂ¡  J   J   ú    ó   ﬂ¡  J   J   ¡   ó   ö+   ó   ¡  J   J   J   ·J   ‰w ﬂó$   ¡  J   ·J   ‰¡      s Õ   ﬂ¡   ¡   J   æ   ö7   ó)   æ   ·J   ‰º  h   º  i    ¡   i   s ô   ó,   9   ó-   w ﬂ¡   L   ﬂ¡  J   º  L   ﬂ¡  J   ·J   ‰¡   w ﬂ¡  J   J   ö   ó7   º     L   ﬂó8   ¡  J   J   õP   ó;   ¡  J   ¡  J   ·J   ‰º  s L   ﬂ¡  J   J   /‚Kº  J   &.NﬂóG   Œ   ﬂ¡   º  s ·J   ‰s  ·J   ‰m   w ﬂ¡   ú   óN   ﬂ¡  J   J   óP   öV   óQ   ¡  J   J   /‚Kª    J!   J"   '.Nﬂ¡  J   J   /‚Kª    J!   J#   '.Nﬂóc   9$   ¡  J   J   K<%   ¡  J   J   K<&   Õ  ﬂ¡  J   L   ﬂ¡   J   ·J'   ‰9(   )   <*   +   <,   -   <&   w ﬂ¡  J   ·J.   ‰¡   w ﬂ¡   J/   ú!   ó{   ﬂ¡  J0   J*   1   ó   öÕ   óÄ   ¡   J   ·J*   ‰92   ¡   J   <3   ¡  J   ·J   ‰¡   4   s <5   ¡  J   ·J   ‰¡   6   s <7   8   <9   w ﬂ¡   J   ·J:   ‰s  Õ  ﬂ¡  J   h   æ  J&   i    æ  J%   i   L   ﬂóó   ¡   L;   ﬂ¡   L<   ﬂ¡  J   ·J=   ‰¡   æ  ¡   s Õ  ﬂ¡   J   ·J'   ‰9>   ¡  J   J   ú   ó¢   ﬂ¡  J?   ó£   ö   ó§   @   ô-   ó§   ¡   ö   ó•   A   ô   ó•   )   ó•   <*   B   <,   æ  J%   C   &<%   æ  J&   C   &<&   w ﬂ¡   J/   õ  ó∞   ¡  J   ·J   ‰¡   D   s Õ  ﬂ¡  J   ·J   ‰¡   E   s Õ  ﬂmF   Õ  ﬂ¡   J   ·J'   ‰G   ¡  J   ·JH   ‰º  s &w ﬂ¡  JI   ú   ó¿   ﬂ¡  JI   æ  Kó¬   öN   ó√   ¡   J   ·JJ   ‰æ  ¡  J   ·J   ‰¡   K   s æ  æ  w ﬂôZ   ó…   ¡   J   ·æ  ù   óÀ   ﬂJ   óÀ   K‰æ  ö   óÕ   æ  ô   óÕ   óÕ   æ  w ﬂóŒ   æ  ù   ó–   ﬂæ  ó—   ö   ó“   æ   w  ﬂó”   ¡   J   ·JL   ‰M   s ú%   ó◊   ﬂ¡   J   ·JL   ‰N   s ó€   ö   ó‹   ¡   J   ·JO   ‰w  ﬂóﬂ   ¡  J   ¡   L   ﬂó·   • `ü `Pì `ˇˇˇıP.`ë #ˇˇˇÍPù ;ì 	`A_	F`ë PD`ë ˇˇˇ˜P)`© 2ï `ù PI`ë 
+ˇˇˇ˚P(`
+ô 
+ˇˇˇÎPó ˇˇˇ◊P$`,`ì@`ë ˇˇˇÓPD`ô `ì `ô `õ *ˇˇˇ˜P)`§@`'`ˇˇˇˇP
+P
+ˇˇˇ˚PD`Æ `¶ `´@#`ñ õ@%`ë@'`ë 
+
+
+ˇˇˇ“P$`ë ˇˇˇÓPD,`ñ • `ë %/ë 
+ˇˇˇ˙P(ë 
+ˇˇˇ˙PH3J-PD5`ë P(`ô@;`,`L@`ë #ˇˇˇÂP(`ë ≥ 6∆ î î@APDE`î  `ë 
+ˇˇˇ˚P( `ë 
+ˇˇˇ˚PHI#`JS`ñ ë ˇˇˇıPˇˇˇÂPDU`≥ `ë 
+ë 
+ˇˇˇ˚P
+ˇˇˇøP>X `¶  ¢ ˇˇˇ·PI[`ê î `.`ñ Pñ Pì `ë P)`ö@_	PÄÄx   „∆7*x   =                        ﬁÕ   ﬂ¡   ¡   æ   s ·J   ‰   s    .Œ   ﬂ¡   ¢•&`ˇˇˇ˛PPë ` &QÄÄÄ   ‹T   ®                         ¡  J   L   ﬂ¡  J   ·J   ‰¡   J   s Õ   ﬂ¡   J   ·J   ‰   s ·J   ‰9   æ   K<	   æ   K<
+   ¡   J   ·J   ‰s  <   ¡   J   ·J   ‰s  <   w ﬂ• `ë #`ë 
+ˇˇˇÙP(`ñ P*
+  ,
+ë Pë PHPDPÄÄú  äPs å                        ¡    º  s Õ   ﬂò   æ   J   ú   ó   ﬂæ   Kª   ó   öÿ   ó   æ   ·J   ‰   s Õ  ﬂæ     ù*   ó   ﬂæ     ù   ó   ﬂæ     ó   ö`   ó   ª    æ   ·J   ‰	   s 
+s Õ  ﬂª
+    æ  s ú   ó   ﬂæ  ó   ö   ó   æ  ¢ó   æ   ·J   ‰s  Õ   ﬂôˇˇˇó   • `ˇˇˇ˛P(fö ï `ê P(`√ `ê PˇˇˇÒP(`ˇˇˇ˘P§ `D	F
+`Pí@	PÄÄÄú              ê   ä}Jê   G                	       ﬁÕ   ﬂº  J   ·J   ‰s  ·J   ‰æ   ·J   ‰º  s w ﬂæ   ·J   ‰º  w ﬂ•&`P
+ˇˇˇÚPˇˇˇÙP$`ˇˇˇÏPD	PÄÄÄ  ≠uÿK  ˙        
+       p       Ω  Œ   ﬂﬁÕ  ﬂ¡  J   ·J   ‰¡   J   s Õ   ﬂæ  Œ   ﬂ¡   J   ·J   ‰   s ·J   ‰9   æ   K<   æ   K<	   ¡   J   ·J
+   ‰s  <   ¡   J   ·J   ‰s  <   s ·J   ‰s  ·J   ‰   s ·J   ‰s  ·J   ‰   9   <   ¡  ·J   ‰¡  J   J   æ  s s ·J   ‰   9   <   ¡  ·J   ‰¡  J   J   æ  s s ·J   ‰s  ·J   ‰   s ·J   ‰s  ·J   ‰   9   <   ¡  ·J   ‰¡  J   J   æ  s s ·J   ‰   9   <   ¡  ·J   ‰¡  J   J   æ  s s ·J   ‰s  ·J   ‰   s ·J   ‰s  ·J   ‰   m   s ·J   ‰    m!   s ·J   ‰s  ·J   ‰"   æ  J#   &$   &s ·J%   ‰    s ·J   ‰s  ·J   ‰&   s ·J   ‰   m'   s ·J   ‰s  ·J   ‰(   s ·J   ‰   m)   s ·J   ‰s  ·J   ‰*   s ·J   ‰   m+   s ·J   ‰w  ﬂ•/`ë 
+ˇˇˇÙP(`*`ë U*
+  ,	ë Pë PHPJPJU*P* 
+ˇˇˇﬁPˇˇˇ’P*#
+ˇˇˇﬁPˇˇˇ”P*P*U*P* 
+ˇˇˇ‡Pˇˇˇ’P*#
+ˇˇˇ‡Pˇˇˇ”P*P*U*P*
+ˇˇˇÔPJ
+ˇˇˇÓPJ%P*
+ê ˇˇˇıP*U*P*U(ˇˇˇÛPJ+P*U-ˇˇˇÛPJ.P*U*ˇˇˇÛPJ1P$	PÄÄ  î,åÌ  ≤                        ﬁÕ   ﬂ¡   æ   s ·J   ‰   w ﬂæ   J   ·J   ‰   s ˇö'   ó   ¡   æ   s ·J   ‰   w ﬂó   æ   J   ·J   ‰   s ˇö'   ó   ¡   æ   s ·J   ‰   w ﬂó   •&	`ˇˇˇˇPP$`ï Pê %`ˇˇˇˇPP)`ï Pê %`ˇˇˇˇPP)P–  Z;F≥–  K               %        ﬁÕ   ﬂ¡   ·J   ‰¡   J   ö%   ó   ¡   J   ·J   ‰s  Kô   ó   ¡   J   Kó	   s õÎ   ó   ¡   æ   s ·J   ‰   s ·J   ‰	   s ·J
+   ‰   w ﬂ¡   æ   s ·J   ‰   w ﬂæ   J   ·J   ‰   s ˇö'   ó   ¡   æ   s ·J   ‰   w ﬂó   æ   J   ·J   ‰   s ˇö'   ó"   ¡   æ   s ·J   ‰   w ﬂó%   •&`• P† ˇˇˇ—P-`ˇˇˇˇPP#P
+P$`ˇˇˇˇPP$`ï Pê %`ˇˇˇˇPP)`ï Pê %`ˇˇˇˇPPIPÄÄL   d—ÏL                            ¡  J   ·J   ‰º  w ﬂ• `ë ˇˇˇˆP$PÄÄÄL   Œ(+’L                            ¡  J   ·J   ‰º  w ﬂ• `ë ˇˇˇÛP$PÄÄÄD   Kd£D                            ¡  J   ·J   ‰w  ﬂ• `ë P$PÄÄÄ®  –≥uh  ≤     "   )       —      ﬁÕ  ﬂ   Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º  	   s Õ  ﬂÕ  ﬂÕ  ﬂÕ
+  ﬂÕ  ﬂÕ   ﬂÕ  ﬂª
+    s  Õ  ﬂæ  ·J   ‰º     s Õ  ﬂÕ  ﬂÕ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ù   ó&   ﬂæ  ù   ó'   ﬂæ  ó'   Õ  ﬂæ  J   Õ  ﬂò(   æ  æ  J   ö-   ó+   æ  ·J   ‰æ  w ﬂæ  0(Õ  ﬂôƒˇˇˇó/   ª   ·J   ‰æ  J   æ  +s Õ  ﬂæ  ö»  ó5   Õ  ﬂò5   æ  æ  J   öU   ó8   æ  æ  Kö   ó;   æ
+  0(Õ
+  ﬂô   ó=   æ  0(Õ  ﬂó?   æ  0(Õ  ﬂôúˇˇˇóA   Õ  ﬂª   ·J   ‰æ
+  æ  J   +æ  *s Õ  ﬂª   ·J   ‰æ  æ  J   +æ  *s Õ  ﬂæ  æ  æ  &öä   óP   æ
+  úM   óQ   ﬂæ  ù=   óS   ﬂæ  ù-   óU   ﬂæ  ú   óV   ﬂæ
+  æ  +æ  æ  + óY   ö   óZ   æ  0(Õ  ﬂô   ó\   æ  0(Õ  ﬂó^   ª   ·J   ‰æ  s Õ   ﬂæ  &Õ  ﬂª   ·J   ‰ª   ·J   ‰æ
+  æ  +æ  æ  +s s Õ  ﬂój      Õ  ﬂæ  ö'  ók   æ     æ  &   &&.Õ  ﬂÕ  ﬂòn   æ  æ  öÿ  óp   æ     &.Õ  ﬂæ  æ   ú   ós   ﬂæ  ós   ö<   ót   æ      æ  ·J!   ‰s  &"   &æ  K&#   &&.Õ  ﬂó|   æ  æ  ú   ó~   ﬂæ  ó~   ö<   ó   æ      æ  ·J!   ‰s  &"   &æ  K&#   &&.Õ  ﬂóá   Õ   ﬂòá   æ   æ  ö»   óâ   æ  ú+   óä   ﬂæ  æ  ú   óå   ﬂæ  æ  K óé   ö8   óè   æ  æ  ·J$   ‰º  ¡   æ  æ  s &.Õ  ﬂôB   óí   æ  æ  ·J$   ‰º  æ  æ  Kæ  æ  s &.Õ  ﬂæ  0(Õ  ﬂóò   æ   0(Õ   ﬂô.ˇˇˇóö   æ  %   &.Õ  ﬂæ  0(Õ  ﬂô˛ˇˇóù   æ  &   &.Õ  ﬂóû   æ  öF   óü   æ  '   &.Õ  ﬂæ  æ  ·J(   ‰º  s &.Õ  ﬂæ  )   &.Õ  ﬂó§   æ  %   &.Õ  ﬂæ  ö  ó¶   *   Õ  ﬂæ  öH   óß   æ  +   º  J,   ·J-   ‰l.   /   s &0   &æ  &1   &&.Õ  ﬂóØ   æ  öH   ó∞   æ  2   º  J,   ·J-   ‰l3   /   s &0   &æ  &1   &&.Õ  ﬂó∏   æ  öH   óπ   æ  4   º  J,   ·J-   ‰l5   /   s &0   &æ  &1   &&.Õ  ﬂó¡   æ  æ  6   &&.Õ  ﬂó√   æ  7   &.Õ  ﬂæ  ¡   J8   J9   ú<   ó«   ﬂª:    ¡   J8   J;   
+s ú   óÕ   ﬂº  J<   óœ   ö   ó–   =   ô   ó–      ó–   &.Õ  ﬂæ  ¢•F@`*`
+ˇˇˇ˚P*%`
+ˇˇˇ˚P*$`
+ˇˇˇ˚P*`
+ˇˇˇ˚P* `
+ˇˇˇ˚P*`
+ˇˇˇ˚P(`
+ˇˇˇ˚P(`&`&`&`&`&`&`.!`
+ˇˇˇ˚P(`&`&`
+ˇˇˇ˚P(#`
+ˇˇˇ˚P(#`
+ˇˇˇ˚P(!`
+ˇˇˇ˚P(!`
+ˇˇˇ˚P(&`
+ˇˇˇ˚P(&`
+ˇˇˇ˚P(#`¨@ `fî `ˇˇˇ˙PD E`ï@#`	ˇˇˇÏPH%`.`fî `ñ `ï0* `ê@&C`ï@.`F0`
+
+ˇˇˇ·P(`
+
+ˇˇˇ·PH4`	ê@6`ê £  
+
+ï `ï `ê@<`ˇˇˇ¸P(`+`	
+
+ˇˇˇ‡PˇˇˇˆPMB`JD`NF`IHML`	f/`ê@O`£ `	P
+0ô@S`£ `	P
+0ô@V`	f/`ì ´ `#ˇˇˇÕPî `#	ˇˇˇƒP*`ê@V7`ï@^`ê@L,`ï@``ï@d`.`ê `"ˇˇˇÎP*`ï@j`ê@m`.#`*`.`)J
+ˇˇˇ¯P*&ó@t`.`)J
+ˇˇˇ¯P*&ó@y`.`)J
+ˇˇˇ¯P*&ó@`ö `ê `§ $ë ˇˇˇ˜Pë &ò† `$	QÄÄ®         '  A          £  i          Ñ  ◊          ô  Á  †   Iø©‹†   U                	       ﬁÕ  ﬂæ  ·J   ‰º  s Õ   ﬂº  J   ·J   ‰   s ·J   ‰æ   w ﬂæ  ·J   ‰º  w ﬂ•&`ˇˇˇÎP(`î P
+&ˇˇˇ˚P$`ˇˇˇÏPD	PÄ¨  èÓ7l  (               Y      ﬁÕ  ﬂ   Õ  ﬂæ  ·J   ‰º     s Õ  ﬂª    s  Õ  ﬂæ  ·J   ‰º     s Õ  ﬂÕ  ﬂÕ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ	  ﬂæ  ·J   ‰º     s Õ
+  ﬂæ  J	   õ   ó   æ  L	   ﬂó   æ  J
+   õ   ó   æ  ;L
+   ﬂó   æ  J	   Õ   ﬂò   æ   æ  J
+   ö6   ó   æ  ·J   ‰æ   w ﬂæ   æ  J   &.Õ   ﬂôªˇˇˇó   ª   ·J   ‰æ  J   æ  +
+\è¬ı(\ﬂ?&s Õ  ﬂæ	  úf   ó"   ﬂæ	  ·J   ‰º  J   ö   ó%   º  J   Kô   ó'   ó'   h   º  J   i    º  J   i   s ó,   ö√   ó-   Õ  ﬂò-   æ  æ  J   öü   ó0   æ  æ  KÕ   ﬂæ	  ·J   ‰º  J   ö   ó4   º  J   Kô   ó6   ó6   h   º  J   i    æ   i   s ö   ó:   º  æ   L   ﬂô   ó;   æ  &.Õ  ﬂôRˇˇˇó<   æ     æ
+  &   &&.Õ  ﬂÕ  ﬂÕ  ﬂò?   æ  æ  ö  óA   æ     &.Õ  ﬂòB   æ  æ  æ  *ö    óE   æ  æ  KÕ   ﬂ   Õ  ﬂæ   ¡   öe   óH   æ   
+ú   óJ   ﬂæ  óJ   ö#   óK      æ   ·J   ‰s  &ô   óN   æ   ·J   ‰s  óP   Õ  ﬂóP   æ  æ  ·J   ‰º  æ   æ  s &.Õ  ﬂæ  0(Õ  ﬂô'ˇˇˇóU   æ     &.Õ  ﬂæ  0(Õ  ﬂôŸ˛ˇˇóX   æ     &.Õ  ﬂæ  ¢•F `*`
+ˇˇˇ˚P(`.#`
+ˇˇˇ˚P(!`&!`&+`
+ˇˇˇ˚P* `
+ˇˇˇ˚P(`
+ˇˇˇ˚PH`ì `ê@`ì `ë@`fî `ˇˇˇ˚PDI`û@`	ˇˇˇÈPH`/&∑ $ˇˇˇ«Pî@`fî `.`¨ $	ˇˇˇ»P-`-`JI`ñ@)`)M.`&`	f/`ê fê `.'`*`ê `™ 9Pô Pí@7`%ˇˇˇﬂP*`ï@:`ê@/(`ï@=`ê@?`$	Q¨           J            ≥          
+  ﬁ          ·  ,    IÎ∑p  ]        
+       3       ﬁÕ  ﬂº Õ   ﬂº ú   ó   ﬂº ó   ö   ó   º 'Õ   ﬂó   æ   ú   ó   ﬂº ó   ö   ó   Õ   ﬂó   æ   
+ú   ó	   ﬂº ó	   ö   ó
+      æ   &Õ   ﬂó      Õ  ﬂÕ  ﬂæ  ·J   ‰º     s Õ  ﬂº ¡   ö   ó      Õ  ﬂæ  ¢ó   æ  öV   ó   æ  ·J   ‰º  J   ö   ó   º  J   Kô   ó   ó   h   º i    s Õ  ﬂó   æ  öõ   ó      º  J	   ·J
+   ‰l      s &   &º ·J   ‰s  &   &º º  J   ö   ó$      ô   ó$      ó$   &   &æ   ·J   ‰s  &   &Õ  ﬂô_   ó*      º º  J   ö   ó-      ô   ó-      ó-   &   &æ   ·J   ‰s  &   &Õ  ﬂó3   æ  ¢•F`(`£ `ê@`£ `L	`§ `O`*`&`
+ˇˇˇ˚PH`ê `*`D-	F`.`¨ $ˇˇˇ‘PM`.`N
+ˇˇˇ¯P
+*
+PJ≠&Pï0" `E&≠&Pê@,`$	QÄÄÄ  ¬÷l;  |        	               ﬁÕ  ﬂ   Õ   ﬂÕ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  öc   ó   æ  ·J   ‰º  J   ö   ó   º  J   Kô   ó   ó   h   º  J   i    º i   s Õ  ﬂó   º ¡   ö   ó      Õ   ﬂæ   ¢ó   æ  öê   ó      º  J	   ·J
+   ‰l      s &   &º ·J   ‰s  &   &º º  J   ö   ó      ô   ó      ó   &   &º &   &Õ   ﬂô   ó      º &   &Õ   ﬂó    æ   ¢•&`*`&!`
+ˇˇˇ˚P(`N`¨ $ˇˇˇ…PM	`
+ê `*`D	F`.`P
+ˇˇˇ¯P
+,
+PJ
+≠&ï0@`Eê@`$	QÄ   1±gó   Ä        
+       (      ﬁÕ  ﬂ¡   º  s Õ   ﬂæ   ·J   ‰   s Œ   ﬂ¡  ·J   ‰º  ¡  s Õ  ﬂæ   ·J   ‰æ  J   s õ   ó	    ¢ó	   º  J   ·J   ‰s  Õ  ﬂæ     öK   ó   º  L	   ﬂæ  J
+   ·J   ‰   s ·J   ‰m   s ·J   ‰w  ﬂôx   ó   æ     ù   ó   ﬂæ     ó   öJ   ó   æ   ·J   ‰   æ  J   &s Õ  ﬂæ  ·J   ‰s  ·J   ‰   w ﬂó#   æ  ¡  ·J   ‰æ  J   m   s L   ﬂ•&`ˇˇˇˇP(`ê P)`ˇˇˇÛPH`	ˇˇˇ˜P-`A	F`P(`î `*`ï P*ˇˇˇ˚P
+,PN`Æ `
+ˇˇˇÒP(`PPI`ê )E&PI	PÄÄ<   Ü:v<                          ﬁÕ   ﬂæ   L   ﬂ•`PÄÄÄT   Õ^wT   (                         º  ¡   ö   ó   ô   ó   º  ó   ¢• 
+`£ QÄÄD  D√ƒ‘D  §        
+       ,      Ω  Œ   ﬂﬁÕ  ﬂ¡   ¡   s Õ   ﬂ¡  ·J   ‰¡   ¡  s Õ  ﬂæ   ·J   ‰æ  J   s õ   ó    ¢ó   ¡   J   ·J   ‰s  Õ  ﬂæ     öM   ó   ¡   L   ﬂæ  J   ·J	   ‰
+   s ·J   ‰m   s ·J   ‰w  ﬂôx   ó   æ     ù   ó   ﬂæ     ó   öJ   ó   æ   ·J   ‰   æ  J   &s Õ  ﬂæ  ·J   ‰s  ·J   ‰   w ﬂó!   æ  ¡  ·J   ‰æ  J   m   s L   ﬂæ  J   æ  J   J   æ   ·J   ‰   s Nﬂ•/`ˇˇˇˇP(`ˇˇˇÛP(`	ˇˇˇ˜P-`A	F`ë P(`î `L
+`ï P*ˇˇˇ˚P
++PN`Æ `
+ˇˇˇÒP(`PPI`ê )E&PI`ß <P%	PÄ<   jH•@<                          ﬁÕ   ﬂæ   L   ﬂ•`PÄÄÄT   —G©T   (                         º  ¡   ö   ó   ô   ó   º  ó   ¢• 
+`£ QÄÄ‡   ˇ}–   ~                      ﬁÕ  ﬂº  õ   ó   ¢ó   Õ   ﬂò   æ   æ  J   J   ö=   ó   æ  J   æ   Kº  ö   ó	   ¢ó	   æ   0(Õ   ﬂôØˇˇˇó   ¢•&``A	F `fô ``A	F>`ï@`!	QÄ‡              V   <  è19<  S               j       ﬁÕ  ﬂº  J   ·J   ‰s  Õ   ﬂº  J   ·J   ‰s  Õ  ﬂº  J   ö!   ó   º  J   ·J   ‰s  ô   ó   ó   Õ  ﬂº  J   ö!   ó   º  J   ·J   ‰s  ô   ó   ó   Õ  ﬂª   J   J   ¡    ª   s ·J   ‰s  &Õ  ﬂª   J   J	   ¡    ª   s ·J
+   ‰s  &Õ  ﬂº ·J   æ  ·J   ‰º     s ö   ó$   æ   æ  'ô   ó%   ó%   '.L   ﬂº ·J   º ú+   ó)   ﬂº J   º  J   ·J   ‰s  J   ó/   ö'   ó0   ¡    ª   s ·J   ‰s  ô   ó4   ó4   '.L   ﬂº ·J   º ú0   ó8   ﬂº J   º  J   ·J   ‰s  J   æ  &ó?   ö'   ó@   ¡    ª   s ·J
+   ‰s  ô   óD   óD   '.L   ﬂº ·J   ª   ·J   ‰º J   º J   æ   &æ  ú   óN   ﬂæ  æ   óO   ö0   óP   ª   ·J   ‰º J   æ   &æ  's ô   óV   óV   s '.L   ﬂº ·J   ª   ·J   ‰º J   º J   æ  &æ  ú   óa   ﬂæ  æ  ób   ö'   óc   ª   ·J   ‰æ  æ  &s ô   óg   óg   s '.L   ﬂº ¢•&`P(`P(`° Pò `° Pò `'ˇˇˇ˛P
+P)`(ˇˇˇ˛P
+PI`î ˇˇˇ˚Pë !ù `ü *Pû ˇˇˇ˛P
+Põ `ü )Põ ˇˇˇ˛P
+Põ@`ï 
+î î î 
+ˇˇˇ‰Pì@!PK`ï î î ê ˇˇˇÒPì@ PK`#	QÄÄd  œä%£T  ı                      ﬁÕ  ﬂæ  ·J   ‰º  s Õ   ﬂæ  ·J   ‰æ      s Õ  ﬂò   º  ú.   ó   ﬂº  J      ù   ó   ﬂº  J   ó
+   ö>   ó   º  æ  ö   ó      ô   ó      ó   KÃ  ﬂôãˇˇˇó   ¡    º  s ·J	   ‰s  Õ  ﬂh   æ  J
+   i    æ  J   i   ¢•&`ˇˇˇ˜P(`
+	ˇˇˇ˚P(f¿ `π@`ˇˇˇˇP
+P(`.	QÄÄÄd         8   z   ∏   :^∏   a          	              m   Õ   ﬂh   ª    æ    º  ·J   ‰   s s s i    ª    æ    º  ·J   ‰   s s s i   ¢• `J`PˇˇˇÛPˇˇˇıP(PˇˇˇÛPˇˇˇıP(	QÄÄ`   €@K¢`   2                         9   <   <   <   º  Kù   ó   ﬂº  ó   ¢• `		û Qº  ,ÓÃº  Q                +       ¡   J   J   õ   ó    ¢ó   ¡    º  J   s Õ   ﬂæ   KJ   ¡   J   J   ú÷   ó   ﬂæ   ·J   ‰   ¡   J   J   &s J   ú°   ó   ﬂæ   ·J	   ‰¡   J   J
+   s úx   ó   ﬂæ   ·J	   ‰¡   J   J   s úO   ó   ﬂ¡   J   J   ú5   ó"   ﬂ¡   J   J   ú   ó%   ﬂ¡   J   ó&   ó'   ö   ó(   ¡   J   ·J   ‰w  ﬂó+   • `ô `A		F`ˇˇˇˇP(`õ ê ê ˇˇˇÚPï ˇˇˇ˜P/ˇˇˇ˜P/(” `ë P)	PP  íí]áP  ]               G      ﬁÕ  ﬂæ  J   Œ   ﬂ¡   ù6   ó   ﬂº  ú(   ó   ﬂ¡   ¡  ·J   ‰º  ¡  s ó   ö   ó    ¢ó   æ  J   öÁ  ó
+   æ  ·J   ‰¡      s Õ   ﬂæ  ·J   ‰¡      s Õ  ﬂm   Õ  ﬂ¡  J   ú   ó   ﬂ¡  J   æ   Kó   öN   ó   ¡   J	   ·J
+   ‰æ   ¡  J   ·J   ‰¡      s æ  æ  w ﬂôë   ó   ¡   J	   ·æ      ö   ó      ô2   ó   æ      ö   ó      ô   ó   
+   ó   K‰æ   ö   ó!   æ  ô   ó!   ó!   æ  w ﬂó"   æ   õ   ó#   æ   w  ﬂó$   æ  ·J   ‰¡      s Õ  ﬂæ  öô   ó'   æ  ·J   ‰¡   J   ö   ó*   ¡   J   Kô   ó,   ó,   h   ¡   J   ö#   ó/   ¡   J   ·J   ‰s  ô   ó2      ó2   i    ¡   i   w ﬂó3   æ  L   ﬂæ  L   ﬂæ  J   öá   ó7   æ  J   ·J   ‰9      <      <      <    w ﬂ¡  J!   ö<   ó@   ¡  ·J"   ‰w  ﬂ¡   #   s ·J$   ‰æ  J	   w ﬂóF   æ  L   ﬂóG   •&`/`§ ˇˇˇÙPì `A#	F`ì  `
+
+ˇˇˇ˚P( `
+
+ˇˇˇ˚P(#`J
+`≥ `ë 
+ë 
+ˇˇˇ˚P
+ˇˇˇøP> `Æ 9— ˇˇˇ·PI``.`
+
+ˇˇˇ˚P(`.`+∞ 
+• Pú JPI`+`+`ì `ê 
+
+
+ˇˇˇŸP$`î `P$`P
+	ˇˇˇ˘PI!`ê@#	PÄ`   Æ%µ}`   ,                       ﬁÕ   ﬂ¡  J   ·J   ‰¡   w ﬂæ   L   ﬂ•&`ë ˇˇˇÙP$`+PÄd   `ÈÃ2d   2                       ﬁÕ   ﬂº  J   ·J   ‰æ   J   s ·J   ‰   w ﬂ•&`	ˇˇˇÙPP$	P§   ë~âSÑ   >                       $´¡   ·J   ‰º  ¡   s ¢ô   ó    §≠∞±   ﬂ±   ﬂ   ß“ó   •!`ˇˇˇÛPC	N+`L	PÄÄ§   î      &      ˇˇˇˇ              x   mÊ”.x   L                       ﬁÕ   ﬂº  J   º K¡   ö   ó   º  J   º Kô   ó   æ   J   º Kó   ¢•&`ê® 	Qt  Ë1µXt  œ        	       .       ﬁÕ  ﬂº  J   ·J   ‰s  º  J   ö   ó    ¢ó   æ  ·J   ‰º     s Õ   ﬂæ      ö    ó
+   æ  ·J   ‰º  s ô   ó   æ   ó   Õ  ﬂº  J   ú#   ó   ﬂº  J   ·J   ‰s  	   ó   ö!   ó   º  J   ·J   ‰s  Õ  ﬂó   æ  ª
+   !ö=   ó   º  æ  ·J   ‰s  L   ﬂº  æ  ·J   ‰s  L   ﬂôç   ó    º  æ  L   Õ  ﬂæ  	   ö%   ó#   º  ˇL   ﬂº  ˇL   ﬂôH   ó%   æ  ·J   ‰º  æ  s Õ  ﬂº  æ  J   L   ﬂº  æ  J   L   ﬂó+   ¡   J   ·J   ‰º  w ﬂ•&`P	ì `A	F`
+ˇˇˇ˚PH`ü 3ˇˇˇÈPõ `§ %Pò `PM`ê `P)`Pì `ë `î `+`ï  `ˇˇˇP(`í `ó@`ë ˇˇˇÓP$	PÄÄÄ<  ÔÎa0<  ®               &       ﬁÕ  ﬂæ  ·J   ‰º  s Õ   ﬂøú   ó   ﬂº ó   öΩ   ó   º    ö2   ó   ¡   ·J   ‰9   ¡   J   J   s ôw   ó   æ   öc   ó   º    ö,   ó   ¡   ·J   ‰9   æ   J	   s ô   ó   æ  ·J
+   ‰æ   º s ó   ô   ó   ó   ¢ó   º ù   ó   ﬂ9   ó   Õ  ﬂº ö    ó   9   Õ  ﬂæ  º º Nﬂó   æ   ö`   ó   æ  J   æ   ö   ó    æ  ·J   ‰w  ﬂó"   ¡    æ   J	   æ  w ﬂæ  ·J   ‰æ   w ﬂó&   •&`ˇˇˇ˜P(`î `ü &ˇˇˇıP-7≤ 	ˇˇˇıP-ˇˇˇıPò@	F`ù `/`*`ë@`.`	/`PI`	ˇˇˇP$`ˇˇˇÓPI	P»   ˙9ˆv»   o                	       ﬁÕ  ﬂæ  ·J   ‰º  s Õ   ﬂæ   öI   ó   æ  ·J   ‰æ   º w ﬂæ  ·J   ‰æ   w ﬂæ  ·J   ‰æ   º w ﬂó	   •&`ˇˇˇ˜P(`.`ˇˇˇÒP$`ˇˇˇÓP$`ˇˇˇÈPIPÄP  ∑÷°ûP  ‰                       ﬁÕ  ﬂº  J   Õ   ﬂº  J   Õ  ﬂæ  ·J   ‰º  º s Ã ﬂº  º J   L   ﬂº  º J   L   ﬂæ   º  J   ù   ó   ﬂæ  º  J   ó   ú   ó   ﬂº ó   ö"   ó   º  J   ·J   ‰   w ﬂó   æ  ·J   ‰º  w ﬂæ  ·J	   ‰º  w ﬂ•&`-`-`ˇˇˇP'`ë `ë@`ò ô ì `î PI
+`ˇˇˇÓP$`ˇˇˇÎP$	PÄÄ§   Ÿeƒ§   \                        ª   Ä„  Å  Õ   ﬂæ   ·J   ‰s  Õ  ﬂª   ·J   ‰æ  +s *Õ  ﬂæ   ·J   ‰æ  w ﬂæ   ¢• `í "`PH#`ˇˇˇ˘P+`ˇˇˇıP$`$	QË  Z„ÑË  „     
+          J       ﬁÕ	  ﬂª   Ä„  Å  Õ   ﬂæ   ˇL   ﬂæ   ˇL   ﬂæ	  ·J   ‰º     s Õ  ﬂæ	  ·J   ‰º     s Õ  ﬂæ	  ·J   ‰º     s Õ  ﬂæ	  ·J   ‰º     s Õ  ﬂæ	  ·J   ‰º  	   s Õ  ﬂæ	  ·J   ‰º  
+   s Õ  ﬂº ·J   ‰æ  s Õ  ﬂæ  ˇö^   ó   æ   ª    º ·J   ‰æ  s 
+s L   ﬂæ   ª    º ·J   ‰æ  &s 
+s L   ﬂôô   ó    æ  ú   ó!   ﬂæ  ù   ó#   ﬂæ  ó#   ö'   ó$   æ   ª    º 
+s L   ﬂôE   ó'   æ  ú   ó)   ﬂæ  ó)   ö"   ó*   æ   ª    º 
+s L   ﬂó-   æ  öÏ   ó.   º ·J   ‰s  Õ  ﬂæ   J   ú;   ó3   ﬂæ  ú,   ó4   ﬂæ  ·J   ‰æ  K·J   ‰s  s ˇó:   ö   ó;   æ   ·J   &.L   ﬂó>   æ   J   ú;   óA   ﬂæ  ú,   óB   ﬂæ  ·J   ‰æ  K·J   ‰s  s ˇóH   ö   óI   æ   L   ﬂóJ   æ   ¢•&`í `,`L!`
+ˇˇˇ˚P(`
+ˇˇˇ˚P(`
+ˇˇˇ˚P(`
+ˇˇˇ˚P(#`
+ˇˇˇ˚P(`
+ˇˇˇ˚P*`
+ˇˇˇ¯PH`ë `
+ˇˇˇˆPˇˇˇÔP)`
+
+ˇˇˇ˘PˇˇˇÔPì@`£ `
+ˇˇˇ˜Pì@`£ `
+ˇˇˇ˜PN`.$`
+P(`± <PˇˇˇÏPï `ô@!`± =PˇˇˇÏPï `ê@&`$	QÄÄÄD  $·7D  Œ         	              ﬁÕ  ﬂ¡    º  J   s ·J   ‰   s Õ   ﬂ¡    æ   s Õ  ﬂæ  ·J   ‰æ  Ks Õ  ﬂª   Ä„  Å  Õ  ﬂæ  æ  ·J   ‰s  L   ﬂæ  æ  ·J   ‰s  L	   ﬂæ  ·J
+   ‰æ  w ﬂæ  ·J   ‰æ  w ﬂæ  ·J   ‰w  ﬂ•F`ˇˇˇˇPP(`ˇˇˇˇP(`ˇˇˇ˜PH`í `P)`P)`ˇˇˇÎP$`ˇˇˇÓP$`P$	P   ≈sV∂   ë                       ﬁÕ  ﬂ¡    º  J   s ·J   ‰   s Õ   ﬂ¡    æ   s Õ  ﬂæ  ·J   ‰æ  Ks Õ  ﬂæ  ˇL   ﬂæ  ˇL   ﬂæ  ·J   ‰æ  w ﬂæ  ·J   ‰w  ﬂ•&`ˇˇˇˇPP(`ˇˇˇˇP(`ˇˇˇ˜P(`,`,`ˇˇˇÎP$`P$	P»  	˜ñ»  ˜     	          0       ﬁÕ  ﬂ¡    º  J   s Õ   ﬂæ   ·J   ‰   s Õ  ﬂæ   ·J   ‰   s Õ  ﬂº  J   J   Õ  ﬂ¡    æ  s Õ  ﬂæ  ·J   ‰æ  Ks Õ  ﬂæ  ·J   ‰æ  	   s Õ  ﬂ¡   J
+   ·J   ‰æ  ·J   ‰   s s ö   ó   ¢ó   æ   ·J   ‰   s ·J   ‰   s ·J   ‰   w ﬂæ   ·J   ‰   s ·J   ‰   w ﬂæ  æ  L   ﬂæ  ·J   ‰æ     s Õ  ﬂæ  ö   ó#   æ  ·J   ‰æ  w ﬂó%   æ  ·J   ‰æ  w ﬂæ  L   ﬂæ  J   ù    ó*   ﬂæ  ù   ó+   ﬂæ  ó,   ö   ó-   ¡   J
+   ·J   ‰w  ﬂó0   ¢•&`ˇˇˇˇP(`ê P(`ê P(#`í `ˇˇˇˇP(`ˇˇˇ˜P( `
+	ˇˇˇ˚PJ
+`ë #ê Pˇˇˇ‚P.`A	F`ê P&P
+P$`ê PP$`N `
+	ˇˇˇ˚P(`N`ˇˇˇÎPI`ˇˇˇÎPD`+`∏ `ë PI`!	QÄÄÄt  ìj|t  ∑               +       ﬁÕ  ﬂ¡    º  J   s Õ   ﬂæ   ·J   ‰   s Õ  ﬂæ   ·J   ‰   s Õ  ﬂº  J   J   Õ  ﬂ¡    æ  s Õ  ﬂæ  ·J   ‰æ  Ks Õ  ﬂæ  ·J   ‰æ  	   s Õ  ﬂ¡   J
+   ·J   ‰æ  ·J   ‰   s s ö   ó   ¢ó   æ   ·J   ‰   s ·J   ‰   s ·J   ‰   w ﬂæ   ·J   ‰   s ·J   ‰   w ﬂæ  æ  L   ﬂæ  ·J   ‰æ  w ﬂæ  L   ﬂæ  J   ù    ó%   ﬂæ  ù   ó&   ﬂæ  ó'   ö!   ó(   ¡   J
+   ·J   ‰w  ﬂ¢ó+   ¢•&`ˇˇˇˇP(`ê P(`ê P(#`í `ˇˇˇˇP(`ˇˇˇ˜P(`
+	ˇˇˇ˚PJ
+`ë #ê Pˇˇˇ‚P.`A	F`ê P(P
+P$`ê PPD`.`ˇˇˇÎPD`+`∏ `ë PD`A	F`!	QÄÄÄt  ©,Ü¨t  ˝                       ﬁÕ  ﬂæ  ·J   ‰º  s Õ   ﬂº  J   ö9   ó   º  J   ·J   ‰æ   w ﬂº  J   ·J   ‰   w ﬂó
+   æ  ·J   ‰º     s Õ  ﬂæ  ö[   ó   æ  ·J   ‰º  J   ö   ó   º  J   Kô   ó   ó   h   æ   i    º  i   w ﬂó   æ  ·J	   ‰º  æ   w ﬂæ   ¢•&`ˇˇˇÒP(`í `ˇˇˇ¸P$`î PI`
+ˇˇˇ˚P(``¨ $		ˇˇˇÀP)`ˇˇˇÈP$`$	QÄL  ﬂc˝åL  4               \       ﬁÕ  ﬂº  J   ˇú   ó   ﬂº  J   ˇó   ö   ó      ¢ó   º  J   ù   ó	   ﬂº  J   ó   ö   ó   º  L   ﬂó   º  J   ù   ó   ﬂº  J   ;ó   ö   ó   º  L   ﬂó      Õ   ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º     s Õ  ﬂæ  ·J   ‰º  	   s Õ  ﬂæ  ·J   ‰º  
+   s Õ  ﬂº  J   ö   ó'   º  J   ô   ó(   ó(   Õ  ﬂº  J   ö   ó*   º  J   ô   ó+   ó+   Õ  ﬂæ  ö   ó,   æ  ô   ó,   ó,   Õ	  ﬂ   Õ
+  ﬂæ  ö}   ó-   º  J   ö   ó0   Õ	  ﬂó0   º  J   ö   ó3   æ  KÕ   ﬂô3   ó4   æ  KÕ   ﬂæ	  ö   ó7   æ	  '.Õ	  ﬂó8   æ	  ·J   ‰s  Õ  ﬂæ  ú   ó;   ﬂæ	  
+ó<   ö   ó=      æ  &Õ  ﬂó>   æ  ·J   ‰s  Õ  ﬂæ  
+ö   óB      æ  &Õ  ﬂóC   æ  ö   óD   æ
+  æ  &.Õ
+  ﬂóE   æ  ú0   óF   ﬂæ  ú!   óG   ﬂæ  ù   óI   ﬂæ  óJ   ö+   óK   æ
+  æ  ·J   ‰º     s &.Õ
+  ﬂóN   æ  ú!   óO   ﬂæ  ù   óQ   ﬂæ  óR   ö   óS   æ
+  æ  &.Õ
+  ﬂóT   æ  öE   óU   æ   J   ö0   óX   æ
+  æ  ·J   ‰º     s æ   &&.Õ
+  ﬂó\   æ
+  ¢•F`∞ `E8	F`Ø (`ê `Ø ,`O	`*`
+ˇˇˇ˚P*$`
+ˇˇˇ˚P*`
+ˇˇˇ˚P* `
+ˇˇˇ˚P*$`
+ˇˇˇ˚P*`
+ˇˇˇ˚P(!`Ø #`Ø  `ß `J`.`î `L`ï `ï0 `+`ë `í@$`P(`• *`
+O'`P(`ë `
+O*`.`î@-`û • `ˇˇˇ˚PO0`• `î@3`.`ï `ˇˇˇ˚P ë@7`$	QÄÄÄ§   Âû§   [                       Ω Œ   ﬂﬁÕ  ﬂæ  ·J   ‰º     s Õ   ﬂæ   ö'   ó   ¡   æ   s ·J   ‰m   w ﬂó   •/`
+ˇˇˇ˚P(`.`ˇˇˇˇP
+ˇˇˇ˚PI	PÄÄÄT   ¡5tT                            ¡   º s ·J   ‰¡   w ﬂ• `ˇˇˇˇP
+ˇˇˇ¸P$Pl   ¨·˜l   0                       ﬁÕ  ﬂæ  ·J   ‰º  s Õ   ﬂæ  ·J   ‰æ   s ¢•&`ˇˇˇ˜P(`ˇˇˇÒP#	QÄÄÑ   {ìòÑ   C                       ﬁÕ  ﬂæ  ·J   ‰º  s Õ   ﬂæ   ¡   ö   ó   ˇ¢ó   æ   J   ¢•&`ˇˇˇ˜P(`ê `B	F`)	QÄÄÑ   Fê#vÑ   C                       ﬁÕ  ﬂæ  ·J   ‰º  s Õ   ﬂæ   ¡   ö   ó   ˇ¢ó   æ   J   ¢•&`ˇˇˇ˜P(`ê `B	F`)	QÄÄ»  ƒÖVç»                 @       Ω  Œ   ﬂ‹Õ   ﬂﬁÕ  ﬂ¡  J   J   õk   ó   ¡   ª   s ·J   ‰¡  J   J   s ·J   ‰   s ·J   ‰¡  J   J	   w ﬂ¡  J   L   ﬂó   ª
+   J   J   ·J   ‰æ   s Œ   ﬂ¡   úB   ó   ﬂ¡      ù,   ó   ﬂ¡      ù   ó   ﬂ¡      ó   öZ   ó   ¡  J      ¡   &   &K·J   ‰¡  J   h   æ  Ki    ·J   ‰¡   s s ¢ó)   ¡      ú/   ó+   ﬂæ   J   ú   ó.   ﬂæ   K   ó1   öZ   ó2   ¡  J      ¡   &   &K·J   ‰¡  J   h   æ  Ki    ·J   ‰¡   s s ¢ó=   æ  ·J   ‰m   s ¢•ï@`ô `ˇˇˇˇP
+ˇˇˇˆP*U
+ˇˇˇ˘P$`ñ@	`ñ ˇˇˇ˚P)`ÿ `î 
+í ˇˇˇ˘Pˇˇˇ‚PCF`≠ 0ú `î 
+í ˇˇˇ˘Pˇˇˇ‚PCF	`ˇˇˇ˚PCQÄÄ‡   Ä¶‡   í                        ﬁÕ   ﬂ¡   ö\   ó   ¡  J      ¡   &   &K·J   ‰¡  J   h   æ   i    ·J   ‰¡   s w ô'   ó   ¡  J   ·J   ‰æ   ¡   w ó   ﬂ•&`ë £ 
+ê ˇˇˇ˘PˇˇˇÂP-#ï ˇˇˇËP)	PÄÄÄÏ   9È.ü‹   â                       ¡   ·J   ‰º  º w ﬂº ^ò   _`õ\   ó   Õ   º æ   Kù   ó   ﬂº æ   K¡   ó	   ö   ó
+   º  æ   º æ   KNﬂó   ﬂô°ˇˇˇó   aº  ¢• 	`	ˇˇˇÒP$`ñ ˇˇˇÙ$`ù &ï `ñ@	L	`#QÄÄÄÏ            d   3ıÿ  `  	  
+                                 @        0	        è     "  !  ê     @%  $  &  (  '    @)  *  +  ,  -  :  .     /  0  1  2  3  4  6  5  8  7  :  9  ;  <    @=  >  ˙     @?  m  @  A  B  C  D  E  F  #     H  I  G    `     `  M  L     ê     `G    `#    @  `#  V  W  	  @†     `Y  Z  \  ]  ç ^  Y `  $     
+  @  @  @P    a  b  c  	  `ç ⁄     Pe    @  [  G  f    g    `P    `v  
+  `h  i  j  J  k  l  m  n  o  p  q  r  	  pu  
+  pw    `  x    z    {  |  }  ~    Ä  Å    `  x    b  Ç    `    è  |      `v  *  É  h  Ñ  Ö  Ü  á  à  â  ä  ã  å    i  $  %  ç  q  &  é    p  `P    `v    `j  J  l  h  G  q  r    pu    pw  b  Ç  ë    `õ  ú  ù    `    ¥  G  ∞   µ  õ    @§  •  ∑  ∂  π  ∏    `  Y  Z    í    ì  è  |  x  	  G  î  v  +  P       @ï  b    ê   P  ñ  ó  ò  ö  å     pû  ü  †  °  ¢  £    @§  •  õ    @¶  ú  ®  ß  ©  Ç  [  í u    @ 7  ¢ 9  ù ´  ™  •  ¨  ≠  Æ    @Ø    ù  ∞  a '  ±    p∫  ª  º  ë  )  ú Ω  æ  %    `I  †  õ  ú  ¶  ¿  ù  ±  ∫  (  ¡    `G  ¬  h  √  ƒ    `œ  –  —  “  ”  ‘  ’  ÷    `ì  [  G  ¡    ö  ÿ  ∞   a  œ  –  l  —  “  ”  ‘  ’  ÷    `  €    `  ›    `  |    `  ¥  G  ∞   µ  õ    @§  •  ∑  ∂  π  ∏  î   ∆  ã  q  «    @»  ƒ  …       @À    @Ã    @Õ  Œ    p◊    p.    Ÿ  i  ⁄    p‹    pﬁ    p  `ê   v  0  1  2  A  B    @  Ä  ˙     D    E     F  !  =  >  Ô  Ñ    I  Ò  Ú  Û  Ù  ä ã ˘  ˙  "  ˚  ¸  ˝  ˛  å      ç ç ⁄    P\   	 é   Pè   P  û   ±    [      ` G  ∞    ·  ƒ  !  `ê   v  @  Ä  m  3  <    =  >  Ô  ?  Ñ   I       ˙   ˆ  ã ˘  0  "   ˛   "  `0  ê   v  ;         ç ⁄    P\   "  ê ˙     á  ! ë $    í #  `ê   v  <       ˙    % ç ⁄    P\  & "  ì m     ! î í %  `, &  `$  `+ ç w  j  J  Y  Z    , i  - &  å   #  pî   \  ]  . .    œ  / 0   $  p(  `, )  `'  `w  j  J  Y  Z    , i  - &  å   &  pî   \  ]  . .    l  / 0   '  pI  + ç *  `  I  +  `G  ∑  π    †  °  7 ¢  9 £  §  v  É  •  •  Ñ  Ú  : ,  `x  v  É  0  < = > ? •  §  •  .  `  @A B C -  `,  p∞  õ  D E /  `  	    ç   ö  #  I  j  J  G     Ø  |  1  `  H 	  0  `	  w    v  '  ±  /  pº  G  I   )  J K (  L -       M ê   è    N õ    @¶  ú  0  §  O •  Ø  P Q h  2  `G  œ    ã  R 3  `w  4  `S 5  `P  #  6  `  M ï  v  5  6  U [  ê   É  V ˙   W m  Y   Ç  7  `x  n        @  #       @P  v    @  @	  |  Ç  8  `x  \ Ç  ] 9  `˙   m  Y a   i  b Ç  }  :  `É  W Ñ   f ;  `}  ˙   m  v  .    A  B  C  0  “  ±  h j <  `  + k x  É  V ˙   W m  }  Ç  |  =  `  + k x  ˙   m  }  |  >  `m + k o w  »  x  v  B    ì  ç ö  p ∞   a  œ    . l  ˙   <   }  ¨  ≠  |  ?  `m + k r w  »  x  v  A    ì  ç ö  s ∞   a  œ    . l  m  }  ≠  ¨  |  @  `u   M i  b v  ,     ] A  `˙   m  ê   v  0  2  A  B  C    "  0  .  I  /  C  `M B  `v  4  å   @  pD  `x  u E  `x  ˙   F  `x  m  H  `  _       L   R  G  `   †  Ä F ∞   Q h  G  Ä  √  Ç 6     É Ñ _       L   Ö I  w  å   E  p  `  pF  p   í   @  @      É    √    @K  J    pL    pN    pO    pR    p`    pa    pn    pp    pk    pc    p    pª    pÇ    pƒ    p√    p   p    p˝  !  p "  p( %  p1 (  pì  )  pÆ  *  pó  +  p¥  -  pF .  p|  0  pH 1  px  2  pv  3  pb  4  pZ 5  p[ 6  p\ 7  pU 8  pY 9  p€  :  p›  ;  pÃ  <  p…  =  p}  >  pu ?  p] A  p{ B  p| C  p} ◊ D  p ^  á à    `  pâ ˇXÑ,                ∫  r                 Q           S      L        Y      N        [      O        ^      R        w      `        á      a        É      ï       Ö      ï       ò      n        •      p        ±      k        ´      ñ       Ã      c        »      ó              ó       Ó   P           €      ò       ﬂ      ≤        >     ª        J     Ç        u  ,   ƒ        P  	   ö       Y     ö       l     ö       o     ö       r     ö       °  >   √        ﬂ            Ê                 ˝                    2     (       /     õ       1     ú       O     1       L     ù       N     û       j     ì        m     Æ        Ä     ó        ë     ¥        å     @       ó     F       ´  %   |        ß     ≤        –     H       ÷     x        ⁄     v        ›     b        Ô     Z       ˇ     [         
+   \            U            Y       #     €        0  	   ›        9     Ã        U     …        o  
+   }        y     u       ã     ]       â     °       ê     {       ì     |       ñ     }       †     ¢       ô     £       Q      Q        ùH©¿      ÷Í      ÷Í                Ç.É   Í  z   Í                E  ~  2  ~                 u  ‘  l  ‘  o               ˝  ,  Ù  ,  t   %            !  ç    ç  {             É.©  È"  †  È"  É   %           6#  %  -#  %  ¶             Ç{%  >(  r%  >(  ±   &            '  x'  '  x'  ∫   5           ∞'  (  ß'  (  Ω   5           Ç(  N-  y(  N-  ƒ               Ω-  t.  ¥-  t.  Ê             ÇÀ.  Ÿ3  ¬.  Ÿ3  Ì                ∂2  ª3  ≠2  ª3  ˛   =           Ç94  ¿6  14  ¿6  	  $            >5  ñ5  65  ñ5    4           ª5  6  ≥5  6    7          Äû7  ÑI  ï7  ÑI    #           =  {=  ˝<  {=  7  .             9E  ≠F  0E  ≠F  f  ,             ,J  VL  #J  VL  Ä             ∞L  4M  ßL  4M  è  %          Ç_M  ßW  VM  ßW  ï  '           ]R  |S  TR  |S  ≠               üS  ëU  ñS  ëU  ≤  !             -V  qV  %V  qV  æ  >            ºV  W  ¥V  W  ¡  C            KW  îW  CW  îW  ƒ  @           X  -r  X  -r     !           ˛r  »u  ır  »u  V  (           ´v  !Å  ¢v  !Å  h  (           ÉÅ  $à  zÅ  $à  ´  )           àà  ¬ç  à  ¬ç  €  +          Ç|é  "í  té  "í  ˇ  $           bê  ê  Zê  ê    "             Œë  í  ∆ë  í              Ç‹í  îñ  ‘í  îñ    %           Ñî  †î  |î  †î  "  "             Óï  "ñ  Êï  "ñ  *             ¢ó  ¶ò  ôó  ¶ò  1  )            ô  Ìù  ˜ò  Ìù  :              Eû  ∂ü  <û  ∂ü  P             ò†  ≥°  è†  ≥°  ]              ≈†  &°  º†  &°  ^  $            ¢  ˚£  ¢  ˚£  g  '          Çü§  *´  ñ§  *´  t  #           ı•  l¶  Ï•  l¶  z  ,            Ä´  ‰´  w´  ‰´  ú              ≠  ›≠  ¸¨  ›≠  §             6Æ  ∑Æ  -Æ  ∑Æ  Æ             Ø  ˇ≤  Ø  ˇ≤  ¥  %           Hzµ  ü∏  rµ  ü∏  ÷  $           rπ  C∫  jπ  C∫  Ô  "           à∫  wº  Ä∫  wº  ˘              Ω  Bæ  ¯º  Bæ    *           ±æ  V≈  ®æ  V≈               v≈  å«  n≈  å«  =             Ø«  Ï»  ß«  Ï»  L             …  öŒ  …  öŒ  W             øŒ  å”  ∂Œ  å”  x  !           ∏”  ë’  Ø”  ë’  ï  (           $÷  øﬁ  ÷  øﬁ  ¢  !          Ç<ﬂ  J‡  4ﬂ  J‡  ›  #            Ïﬂ  .‡  ‰ﬂ  .‡  ‡  *           ·  é·  ·  é·  Ë  &           µ·  K‚  ≠·  K‚  Ï  %           t‚  „  l‚  „  Ò  '          Ç%‰  GË  ‰  GË  ˇ              mÁ  >Ë  dÁ  >Ë    #             ëË  sÈ  |Ë  sÈ              5°›µY∆‘Æz;∏b      g¯ﬁ˚g¯ﬁ˚Hıg¯Âx   \    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/jquery.ui.timepicker.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:08:02 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|378aa053-fc1b-10f8-001f-25c6ba2a4495|
+Accept-Ranges: bytes
+ETag: W/"60118-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 60118
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:08:02 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|378aa053-fc1b-10f8-001f-25c6ba2a4495|
+Accept-Ranges: bytes
+ETag: W/"60118-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 60118
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=87
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 625 net-response-time-onstop 682 alt-data 1;60118,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  ∑í

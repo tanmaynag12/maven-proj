@@ -681,3 +681,208 @@ git branch -M main
 git remote add origin https://github.com/deepikaCs7/hello-maven12.git
 git push -u origin main
 sudo update-alternatives --config java
+[200~sudo systemctl stop jenkins && sudo systemctl disable jenkins && sudo apt remove --purge jenkins -y && sudo deluser --remove-home jenkins && sudo delgroup jenkins && sudo rm -rf /var/lib/jenkins /etc/jenkins /var/log/jenkins /usr/lib/jenkins /var/cache/jenkins /run/jenkins && sudo systemctl daemon-reload && dpkg -l | grep jenkins
+sudo systemctl stop jenkins && sudo systemctl disable jenkins && sudo apt remove --purge jenkins -y && sudo deluser --remove-home jenkins && sudo delgroup jenkins && sudo rm -rf /var/lib/jenkins /etc/jenkins /var/log/jenkins /usr/lib/jenkins /var/cache/jenkins /run/jenkins && sudo systemctl daemon-reload && dpkg -l | grep jenkins
+sudo apt remove --purge git -y && sudo apt autoremove -y && sudo apt autoclean && rm -rf ~/.gitconfig ~/.git-credentials ~/.ssh/id_rsa ~/.ssh/id_rsa.pub ~/.ssh/known_hosts
+sudo update-alternatives --config java
+mvn archetype:generate -DgroupId=com.example -DartifactId=hello-maven -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false 
+-X
+mvn archetype:generate -DgroupId=com.example -DartifactId=hlo--maven -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+cd hello-maven
+desk
+cd desktop
+cd Desktop
+./
+cd ~/Desktop/
+cd -
+cd ~/student-devops@aimll502pc006-HP-Pro-Tower-280-G9-PCI-Desktop-PC
+cd hlo--maven
+mvn package
+mvn clean 
+cd ..
+sudo update-alternatives --config java
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+sudo apt update && sudo apt install git -y
+git --version
+git config --global user.name "shrivas"
+git config --global user.email "shna22ainds@cmrit.ac.in"
+git config --global init.defaultBranch main
+ssh-keygen -t rsa -b 4096 -C "shna22ainds@cmrit.ac.in" -f ~/.ssh/id_rsa -N ""
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_rsa
+cat ~/.ssh/id_rsa.pub
+ssh -T git@github.com
+curl -H "Authorization: token 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"      -d '{"name":"hello-maven", "private":false}' \
+curl -H "Authorization: token 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"      -d '{"name":"hello-maven", "private":false}'      https://api.github.com/user/repos
+echo "# hello-maven" >> README.md
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/shrivas-cmrit/hello-maven.git
+git push -u origin main
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+clear
+curl -H "Authorization: token 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"      -d '{"name":"hello-maven", "private":false}'      https://api.github.com/user/repos
+curl -H "Authorization: token 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"      -d '{"name":"hello-maven", "private":false}'      https://api.github.com/user/repos
+curl -H "Authorization: token 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"      -d '{"name":"hello-maven", "private":false}'      https://api.github.com/user/repos
+cd hello-maven
+echo "# hello-maven" >> README.md
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/shrivas-cmrit/hello-maven.git
+git push -u origin main
+sudo update-alternatives --config java
+sudo apt update &amp;&amp; sudo apt install git -y
+sudo apt update && sudo apt install git -y
+git --version
+ssh -T git@github.com
+java -version
+mvn archetype:generate -DgroupId=com.example -DartifactId=hello-maven -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false 
+cd hello-maven
+mvn package 
+sudo update-alternatives --config java
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo apt update
+sudo apt install jenkins -y
+sudo apt update
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo systemctl stop jenkins && sudo systemctl disable jenkins && sudo apt remove --purge jenkins -y && sudo deluser --remove-home jenkins && sudo delgroup jenkins && sudo rm -rf /var/lib/jenkins /etc/jenkins /var/log/jenkins /usr/lib/jenkins /var/cache/jenkins /run/jenkins && sudo systemctl daemon-reload && dpkg -l | grep jenkins
+sudo update-alternatives --config java
+sudo systemctl stop jenkins && sudo systemctl disable jenkins && sudo apt remove --purge jenkins -y && sudo deluser --remove-home jenkins && sudo delgroup jenkins && sudo rm -rf /var/lib/jenkins /etc/jenkins /var/log/jenkins /usr/lib/jenkins /var/cache/jenkins /run/jenkins && sudo systemctl daemon-reload && dpkg -l | grep jenkins
+sudo apt update
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+sudo apt update && sudo apt install git -y
+git -version
+git --version
+git config --global user.name "Ro-glitch-code "
+git config --global user.email "kpr1325432@gmail.com"
+git config --global init.defaultBranch main
+ssh-keygen -t rsa -b 4096 -C "kpr1325432@gmail.com" -f ~/.ssh/id_rsa -N ""
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_rsa
+cat ~/.ssh/id_rsa.pub
+sudo update-alternatives --config java
+sudo apt update && sudo apt install git -y
+git --version
+sudo update-alternatives --config java
+mvn archetype:generate -DgroupId=com.example -DartifactId=hello-maven -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+cd hello-maven
+mvn package
+mvn clean package 
+sudo update-alternatives --config java
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc 
+https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+udo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+sudo apt install udo
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+sudo systemctl status jenkins
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+sudo update-alternatives --config java
+mvn archetype:generate -DgroupId=com.example -DartifactId=hello-maven -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false 
+cd hello-maven
+mvn package // to check if maven project works in local system
+mvn package
+mvn clean package
+sudo update-alternatives --config java
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+jenkins --version
+sudo systemctl stop jenkins &amp;&amp; \
+sudo systemctl stop jenkins &amp;&amp; 
+sudo systemctl stop jenkins && sudo systemctl disable jenkins && sudo apt remove --purge jenkins -y && sudo deluser --remove-home jenkins && sudo delgroup jenkins && sudo rm -rf /var/lib/jenkins /etc/jenkins /var/log/jenkins /usr/lib/jenkins /var/cache/jenkins /run/jenkins && sudo systemctl daemon-reload && dpkg -l | grep jenkins
+sudo update-alternatives --config java
+mvn archetype:generate -DgroupId=com.example -DartifactId=hello-maven -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false 
+sudo update-alternatives --config java
+mvn archetype:generate -DgroupId=com.example -DartifactId=hello-maven -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+cd hello-maven
+mvn package
+ls
+mvn clean 
+ls
+java version
+java --version
+sudo apt update
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo update-alternatives --config java
+sudo apt update
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo apt update
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo apt update
+sudo apt install openjdk-21-jdk -y
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins -y
+sudo systemctl status jenkins
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+sudo systemctl status jenkins
+ansible-playbook -i hosts.ini setup.yaml --ask-become-pass
+sudo apt update
+sudo apt upgrade -y
+sudo apt install ansible -y
+ansible --version
+gedit hosts.ini
+gedit setup.yaml
+sudo apt update 
+sudo apt upgrade -y 
+sudo apt install ansible -y 
+ansible --version 
+gedit hosts.ini
+gedit  setup.yaml
+ansible-playbook -i hosts.ini setup.yaml --ask-become-pass

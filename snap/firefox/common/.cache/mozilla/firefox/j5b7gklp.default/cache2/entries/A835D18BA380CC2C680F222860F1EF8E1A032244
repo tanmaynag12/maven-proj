@@ -1,0 +1,2927 @@
+function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == typeof i ? i : String(i); }
+function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != typeof i) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+class SideBarStudentDashboard extends React.Component {
+  constructor() {
+    super();
+    this.state = {
+      customer: $('#customerHelper').val(),
+      error: false,
+      CourseType: $('#courseType').val(),
+      studentId: $('#studentId').val(),
+      studentName: $('#studentName').val(),
+      SubCourseType: $('#SubCourseType').val(),
+      studentLockStatus: $('#studentLockStatus').val()
+    };
+  }
+  componentDidMount() {
+    getAcademicInformation(this.state.studentId);
+    getAdmissionLink(this.state.studentId);
+  }
+  render() {
+    const {
+      error,
+      customer,
+      CourseType,
+      studentId,
+      studentName,
+      SubCourseType,
+      studentLockStatus
+    } = this.state;
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ProfileInfo, {
+      studentName: studentName,
+      studentId: studentId,
+      studentLockStatus: studentLockStatus
+    }), /*#__PURE__*/React.createElement(StudentDashboardList1, {
+      customer: customer,
+      CourseType: CourseType,
+      SubCourseType: SubCourseType
+    }));
+  }
+}
+$(document).ready(function () {
+  ReactDOM.render( /*#__PURE__*/React.createElement(SideBarStudentDashboard, null), document.getElementById('sideBarStudentDashboard'));
+});
+const faIcon = (cls, style) => {
+  return /*#__PURE__*/React.createElement("i", {
+    className: cls == 'spinner' ? "fa fa-spinner fa-pulse fa-fw" : cls,
+    "aria-hidden": "true",
+    style: style
+  });
+};
+class MiddleBoxStudentDashboard extends React.Component {
+  constructor() {
+    super();
+    _defineProperty(this, "isProfileUpdated", () => {
+      var hdnUserRole = $('#hdnUserRole').val();
+      var url = 'checkProfileImage.json';
+      if (hdnUserRole == "student" || hdnUserRole == "Student") {
+        url = 'stu_checkProfileImage.json';
+      }
+      $.ajax({
+        url: url,
+        dataType: 'json',
+        junoSpinner: true,
+        success: function (json) {
+          if (!json.isImage) {
+            var boiler = '<div class="thumbnail" id="stdProfileImage2342" style="height:120px;width:120px;margin-left:20px"><img src="getStudentProfileImage.json?id=-1249993431" alt="Photo" name="Photo" style="background-color: #FFFFFF" width="120px" height="120px" border="1" align="right"><br></div>';
+            boiler += '&nbsp&nbsp&nbsp&nbsp&nbsp<div class="btn btn-info" style="width:110px;height:20px">Upload Image<input style="margin-top:-40px;margin-left:-35px;opacity:0;" type="file" name="fileData" id="profilePictureUpload" onclick="stdProfilePic();" accept="image/*"></div>';
+            $('#profileImgModalBodyDiv').html(boiler);
+            $('#profileImgModal').modal('show').css({
+              'margin-left': function () {
+                return -($(this).width() / 2);
+              }
+            });
+          }
+        }.bind(this)
+      });
+    });
+    _defineProperty(this, "handleCloseprofile", () => {
+      this.setState({
+        handleClose: false
+      });
+    });
+    this.state = {
+      isLoaded: false,
+      announcementArr: [],
+      assestmentArr: [],
+      TaskArr: [],
+      placementArr: [],
+      jobTray: [],
+      customer: $('#customerHelper').val(),
+      error: false,
+      CourseType: $('#courseType').val(),
+      studentId: $('#studentId').val(),
+      studentName: $('#studentName').val(),
+      SubCourseType: $('#SubCourseType').val(),
+      isProfileUploadModal: true,
+      handleClose: true
+    };
+    this.fetchAnnouncement = this.fetchAnnouncement.bind(this);
+    this.fetchAttedance = this.fetchAttedance.bind(this);
+    this.fetchAssignments = this.fetchAssignments.bind(this);
+    this.fetchJobTrayForStudent = this.fetchJobTrayForStudent.bind(this);
+  }
+  fetchAnnouncement() {
+    var hdnUserRole = $('#hdnUserRole').val();
+    var url = 'getUnreadStudentAnnouncement.json';
+    if (hdnUserRole == "student" || hdnUserRole == "Student") {
+      url = 'stu_getUnreadStudentAnnouncement.json';
+    }
+    $.ajax({
+      url: url,
+      dataType: 'json',
+      async: false,
+      beforeSend: function () {},
+      complete: function () {},
+      success: function (jArray) {
+        if (jArray.length > 0) {
+          this.setState({
+            announcementArr: jArray[0]
+          });
+          $("#announcementCount").text(jArray[0]["count"]);
+          $("#countAnnouncement").text(jArray[0]["count"]);
+          if (jArray[0]["count"] == 0) $("#NoticeCounter").hide();else $("#NoticeCounter").html(jArray[0]["count"]).show();
+          $("#countAnnouncement").html(jArray[0]["count"]).show();
+        }
+      }.bind(this),
+      error: function () {
+        return;
+      }
+    });
+  }
+  fetchAttedance() {
+    var hdnUserRole = $('#hdnUserRole').val();
+    var url = 'getStudentAttendancePercentageSP.json';
+    if (hdnUserRole == "student" || hdnUserRole == "Student") {
+      url = 'stu_getStudentAttendancePercentageSP.json';
+    }
+    $.ajax({
+      //	url:'getStudentAttendancePercentage.json',
+      url: url,
+      dataType: 'text',
+      async: false,
+      beforeSend: function () {},
+      complete: function () {},
+      success: function (per) {
+        if ($('#customerHelper').val() == "NIET" && ($('#studentLockStatus').val() == "true" || $('#studentLockStatus').val() == true)) {
+          $("#attendencePer").text("-");
+        } else if (per != "Problem") {
+          $("#attendencePer").text(per + "%");
+        } else {
+          $("#attendencePer").text("-");
+        }
+        this.fetchAssignments();
+      }.bind(this),
+      error: function () {
+        jAlert("Something went wrong, Please try after some time", "Error");
+      }
+    });
+  }
+  fetchAssignments() {
+    var hdnUserRole = $('#hdnUserRole').val();
+    var url = 'getStudentAssignments.json';
+    if (hdnUserRole == "student" || hdnUserRole == "Student") {
+      url = 'stu_getStudentAssignments.json';
+    }
+    $.ajax({
+      url: url,
+      dataType: 'json',
+      async: false,
+      beforeSend: function () {},
+      complete: function () {},
+      success: function (jArray) {
+        if (jArray != null) {
+          $("#assignmentCount").text(jArray["CountAssignment"]);
+          $("#assignmentPostIds").val(jArray["postIds"]);
+        } else {
+          $("#assignmentCount").text('-');
+        }
+        getPlacementDetail('');
+      },
+      error: function () {
+        jAlert("Something went wrong, Please try after some time", "Error");
+      }
+    });
+  }
+  fetchJobTrayForStudent() {
+    var hdnUserRole = $('#hdnUserRole').val();
+    var url = 'getStudentJobTrayAlerts.json';
+    if (hdnUserRole == "student" || hdnUserRole == "Student") {
+      url = 'stu_getStudentJobTrayAlerts.json';
+    }
+    $.ajax({
+      url: url,
+      dataType: 'json',
+      beforeSend: function () {
+        $('#jobTrayRefereshImage').html('Updating...');
+      },
+      complete: function () {
+        $('#jobTrayRefereshImage').html('Reload');
+      },
+      success: function (jArray) {
+        var notificationJArray = jArray[0];
+        if (notificationJArray.length > 0) {
+          $("#taskCount").text(notificationJArray.length);
+        } else {
+          $("#taskCount").text("0");
+        }
+        this.setState({
+          TaskArr: notificationJArray
+        });
+      }.bind(this)
+    });
+  }
+  viewAnnouncemnet() {
+    //alert(flag);
+    $("#divalumpost").hide();
+    let SearchWord = "";
+    let filterFlag = "unread";
+    $('#announcementDetails').html('');
+    getUnreadAnnouncement();
+    getUnreadStudentMessage();
+    $.ajax({
+      url: 'getStudentAnnouncement.json',
+      dataType: 'json',
+      data: {
+        SearchWord: searchKeyword,
+        filterFlag: filterFlag
+      },
+      async: false,
+      beforeSend: function () {
+        //$("#"+divId).html('<div id="divPostLoading" style="text-align: center;width: 100%;"><i class="fa fa-spinner fa-pulse fa-fw fa-4x" style="color:#0b4971"></i></div>');
+      },
+      complete: function () {},
+      success: function (jArray) {
+        if (document.getElementById('tabResult') != null) {
+          ReactDOM.unmountComponentAtNode(document.getElementById('tabResult'));
+        }
+        ReactDOM.render( /*#__PURE__*/React.createElement(StudentAnnouncement, {
+          announcementArr: jArray
+        }), document.getElementById('tabResult'));
+      },
+      error: function () {
+        return;
+      }
+    });
+  }
+  getJobTrayAlerts() {
+    if (document.getElementById('tabResult') != null) {
+      ReactDOM.unmountComponentAtNode(document.getElementById('tabResult'));
+    }
+    $('#tabResult').show('slow');
+    $('#divalumpost').hide();
+    /*ReactDOM.render(<React.Fragment>{faIcon("fa fa-spinner fa-pulse fa-fw",{fontSize: '15px',color:'#0b4971'})}</React.Fragment>,
+    		  document.getElementById('tabResult'));*/
+    ReactDOM.render( /*#__PURE__*/React.createElement(StudentTasks, {
+      jobTray: this.state.TaskArr
+    }), document.getElementById('tabResult'));
+  }
+  componentDidMount() {
+    this.isProfileUpdated();
+    this.fetchAnnouncement();
+    this.fetchAttedance();
+    this.fetchJobTrayForStudent();
+    showTodaysConflictTimetableForStudent();
+    getbooksIssuedCount();
+    studentSubjectCount();
+    showTodaysTimetableForStudent();
+  }
+  componentWillUnmount() {
+    console.log("Unmount");
+  }
+  render() {
+    const {
+      error,
+      isLoaded,
+      items,
+      customer,
+      CourseType,
+      studentId,
+      studentName,
+      isProfileUploadModal,
+      handleClose
+    } = this.state;
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(MiddleBox, {
+      CourseType: CourseType,
+      customer: customer,
+      state: this
+    }));
+  }
+}
+$(document).ready(function () {
+  ReactDOM.render( /*#__PURE__*/React.createElement(MiddleBoxStudentDashboard, null), document.getElementById('middleBoxStudentDashboard'));
+});
+function ProfileInfo(props) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "avatar-container homeSection profileDash"
+  }, /*#__PURE__*/React.createElement("img", {
+    className: "pull-left",
+    width: "64px",
+    height: "150px",
+    src: 'getStudentProfileImage.json',
+    alt: "Photo",
+    id: "studentProfilePhoto",
+    name: "Photo",
+    style: {
+      backgroundColor: '#FFFFFF',
+      maxHeight: '270px'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "studentDesc"
+  }, /*#__PURE__*/React.createElement("span", null, props.studentName), /*#__PURE__*/React.createElement("br", null), props.studentLockStatus == "true" || props.studentLockStatus == true ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'red'
+    }
+  }, "LOCKED") : null), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("small", {
+    style: {
+      color: 'gray'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    id: "rollNo"
+  })));
+}
+function MiddleBox(props) {
+  const styles = {
+    borderRadius: '5px',
+    backgroundColor: '#fff !important',
+    cursor: 'pointer',
+    textAlign: 'center',
+    marginLeft: '10px',
+    paddingTop: '10px'
+  };
+  let BoxClassName = "avatar-container homeSection EvtDashboard   span2  text-center";
+  let CustomizeMiddleBox;
+  let Placement;
+  let quickLink;
+  let SubjectList;
+  let boxId = 3;
+  let studDashboardLblStudSide = $('#studDashboardLblStudSide').val() == '' || $('#studDashboardLblStudSide').val() == undefined || $('#studDashboardLblStudSide').val() == "false" || $('#studDashboardLblStudSide').val() == null || $('#studDashboardLblStudSide').val() == false ? false : true;
+  if (props.CourseType == "COURSE_TYPE_SCHOOL") {
+    if (!(props.customer == "IMT_NAGPUR" || props.customer == "IMT_GAZIABAD" || props.customer == "IMT_HYDERABAD")) {
+      if (props.CourseType == "COURSE_TYPE_SCHOOL") {
+        $(".home_work").show();
+        CustomizeMiddleBox = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+          className: BoxClassName,
+          style: styles,
+          id: 'stud' + boxId++,
+          onClick: e => {
+            showAssignmentPage();
+            changeBulletinBar(e);
+          }
+        }, /*#__PURE__*/React.createElement("h3", {
+          className: "NewuniformFontStylesBold",
+          style: {
+            display: 'inline',
+            margin: '2px'
+          }
+        }), /*#__PURE__*/React.createElement("h2", {
+          className: "EvtDashboardTxt panelDash uniformFontStyles"
+        }, "Home Work"), /*#__PURE__*/React.createElement("input", {
+          id: "assignmentPostIds",
+          type: "hidden",
+          value: "0"
+        })));
+      } else {
+        $(".assignments").show();
+        CustomizeMiddleBox = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+          className: BoxClassName,
+          id: 'stud' + boxId++,
+          style: styles,
+          onClick: e => {
+            showAssignmentPage();
+            changeBulletinBar(e);
+          }
+        }, /*#__PURE__*/React.createElement("h3", {
+          className: "NewuniformFontStylesBold",
+          style: {
+            display: 'inline',
+            margin: '2px'
+          },
+          id: "assignmentCount"
+        }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+          fontSize: '15px',
+          color: '#0b4971'
+        })), /*#__PURE__*/React.createElement("h2", {
+          className: "EvtDashboardTxt panelDash uniformFontStyles"
+        }, " Assignments"), /*#__PURE__*/React.createElement("input", {
+          id: "assignmentPostIds",
+          type: "hidden",
+          value: "0"
+        })));
+      }
+    } else {
+      $(".assessments").show();
+      CustomizeMiddleBox = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        className: BoxClassName,
+        style: styles,
+        id: 'stud' + boxId++,
+        onClick: e => {
+          showAssignmentPage();
+          changeBulletinBar(e);
+        }
+      }, "if(!(props.CourseType == \"COURSE_TYPE_SCHOOL\"))", /*#__PURE__*/React.createElement("h3", {
+        className: "NewuniformFontStylesBold",
+        style: {
+          display: 'inline',
+          margin: '2px'
+        },
+        id: "assignmentCount"
+      }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+        fontSize: '15px',
+        color: '#0b4971'
+      })), "else", /*#__PURE__*/React.createElement("h3", {
+        className: "NewuniformFontStylesBold",
+        style: {
+          display: 'inline',
+          margin: '2px'
+        }
+      }), /*#__PURE__*/React.createElement("h2", {
+        className: "EvtDashboardTxt panelDash uniformFontStyles"
+      }, "Assessment"), /*#__PURE__*/React.createElement("input", {
+        id: "assignmentPostIds",
+        type: "hidden",
+        value: "0"
+      })));
+    }
+  } else {
+    $(".assessments").show();
+    CustomizeMiddleBox = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: BoxClassName,
+      id: 'stud' + boxId++,
+      style: styles,
+      onClick: e => {
+        showAssignmentPage();
+        changeBulletinBar(e);
+      }
+    }, /*#__PURE__*/React.createElement("h3", {
+      className: "NewuniformFontStylesBold",
+      style: {
+        display: 'inline',
+        margin: '2px'
+      },
+      id: "assignmentCount"
+    }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+      fontSize: '15px',
+      color: '#0b4971'
+    })), /*#__PURE__*/React.createElement("h2", {
+      className: "EvtDashboardTxt panelDash uniformFontStyles"
+    }, "Assessment"), /*#__PURE__*/React.createElement("input", {
+      id: "assignmentPostIds",
+      type: "hidden",
+      value: "0"
+    })));
+  }
+  let Task;
+  if (!(props.customer == "IMT_NAGPUR" || props.customer == "IMT_GAZIABAD" || props.customer == "IMT_HYDERABAD")) {
+    $(".task").show();
+    Task = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: BoxClassName,
+      id: 'stud' + boxId++,
+      style: styles,
+      onClick: e => {
+        props.state.getJobTrayAlerts();
+        changeBulletinBar(e);
+      }
+    }, /*#__PURE__*/React.createElement("h3", {
+      className: "NewuniformFontStylesBold",
+      style: {
+        display: 'inline',
+        margin: '2px'
+      },
+      id: "taskCount"
+    }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+      fontSize: '15px',
+      color: '#0b4971'
+    })), /*#__PURE__*/React.createElement("h2", {
+      className: "EvtDashboardTxt panelDash uniformFontStyles"
+    }, studDashboardLblStudSide == true || studDashboardLblStudSide == "true" ? 'Feedback' : 'Task')));
+  }
+  if (props.customer == "IMT_NAGPUR" || props.customer == "IMT_GAZIABAD" || props.customer == "IMT_HYDERABAD" || props.customer == "INDIRA_PUNE" || props.customer == "MATSUNIVERSITY" || props.customer == "HPTELIBRARY" || props.customer == "HPTU" || props.customer == "JDGROUP" || props.customer == "MIT" || props.customer == "XISS" || props.customer == "WESCHOOL" || props.customer == "ABS" || props.customer == "RAMAIAH" || props.customer == "RAMAIAH_UNIVERSITY" || props.customer == "SPIT" || props.customer == "MGMU" || props.customer == "REVA_UNIVERSITY" || props.customer == "SIES") {
+    if (props.CourseType != "COURSE_TYPE_SCHOOL") {
+      Placement = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        className: BoxClassName,
+        id: 'stud' + boxId++,
+        style: styles,
+        onClick: e => {
+          window.location.replace('registerforPlacements.htm');
+          changeBulletinBar(e);
+        }
+      }, /*#__PURE__*/React.createElement("h3", {
+        className: "NewuniformFontStylesBold",
+        style: {
+          display: 'inline',
+          margin: '2px'
+        },
+        id: "companyCountPlc"
+      }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+        fontSize: '15px',
+        color: '#0b4971'
+      })), /*#__PURE__*/React.createElement("h2", {
+        className: "EvtDashboardTxt panelDash uniformFontStyles"
+      }, "Placement")));
+    }
+  }
+  let AddmisionLink;
+  let Transport;
+  if (props.customer == "DYPATIL") {
+    AddmisionLink = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("table", {
+      style: {
+        width: '100%'
+      }
+    }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+      style: {
+        display: 'none',
+        backgroundColor: '#e0e0e0',
+        borderTop: '2px solid rgb(127,127,127)',
+        borderBottom: '2px solid rgb(127,127,127)',
+        borderLeft: '2px solid rgb(127,127,127)',
+        borderRight: '2px solid rgb(127,127,127)',
+        cursor: 'pointer',
+        verticalAlign: 'middle'
+      },
+      id: "transDiv",
+      className: "span12 text-center"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "icon icon-hand-right "
+    }), "\xA0\xA0", /*#__PURE__*/React.createElement("a", {
+      id: "redirectAdmissionLink"
+    }, /*#__PURE__*/React.createElement("b", {
+      style: {
+        fontSize: '13px',
+        textDecoration: 'underline',
+        verticalAlign: 'middle'
+      },
+      className: "fg-black"
+    }, "Click here for Next Year Admissions "), " ", /*#__PURE__*/React.createElement("i", {
+      style: {
+        fontSize: '13px',
+        textDecoration: 'underline',
+        verticalAlign: 'middle'
+      }
+    })))))));
+  }
+  if (props.customer == "DES" || props.customer == "SIES") {
+    $(".subject_list").show();
+    SubjectList = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: BoxClassName,
+      id: 'stud' + boxId++,
+      style: styles,
+      onClick: e => {
+        getStudentSubjectList();
+        changeBulletinBar(e);
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: "img/study-process.png"
+    }), " ", /*#__PURE__*/React.createElement("h3", {
+      className: "NewuniformFontStylesBold",
+      style: {
+        display: 'inline',
+        margin: '2px'
+      },
+      id: "subjectListCountNew"
+    }), /*#__PURE__*/React.createElement("h2", {
+      className: "EvtDashboardTxt panelDash uniformFontStyles"
+    }, "Course List")), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("table", {
+      style: {
+        width: '100%'
+      }
+    }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+      style: {
+        display: 'none',
+        backgroundColor: '#e0e0e0',
+        borderTop: '2px solid rgb(127,127,127)',
+        borderBottom: '2px solid rgb(127,127,127)',
+        borderLeft: '2px solid rgb(127,127,127)',
+        borderRight: '2px solid rgb(127,127,127)',
+        cursor: 'pointer',
+        verticalAlign: 'middle'
+      },
+      id: "transDiv",
+      className: "span12 text-center"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "icon icon-hand-right "
+    }), "\xA0\xA0", /*#__PURE__*/React.createElement("a", {
+      id: "redirectAdmissionLink"
+    }, /*#__PURE__*/React.createElement("b", {
+      style: {
+        fontSize: '13px',
+        textDecoration: 'underline',
+        verticalAlign: 'middle'
+      },
+      className: "fg-black"
+    }, "Click here for Next Year Admissions "), " ", /*#__PURE__*/React.createElement("i", {
+      style: {
+        fontSize: '13px',
+        textDecoration: 'underline',
+        verticalAlign: 'middle'
+      }
+    })))))));
+  } else {
+    if (props.CourseType != "COURSE_TYPE_SCHOOL") {
+      if (!(props.customer == "INDIRA_PUNE" || props.customer == "MATSUNIVERSITY" || props.customer == "HPTELIBRARY" || props.customer == "HPTU" || props.customer == "JDGROUP" || props.customer == "MIT" || props.customer == "XISS" || props.customer == "WESCHOOL" || props.customer == "ABS" || props.customer == "RAMAIAH" || props.customer == "RAMAIAH_UNIVERSITY" || props.customer == "SPIT" || props.customer == "MGMU" || props.customer == "REVA_UNIVERSITY" || props.customer == "SIES")) {
+        if (props.customer == "IMT_NAGPUR" || props.customer == "IMT_GAZIABAD" || props.customer == "IMT_HYDERABAD") {
+          $(".subject").show();
+          SubjectList = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+            className: BoxClassName,
+            id: 'stud' + boxId++,
+            style: styles,
+            onClick: e => {
+              showSubjectDetails();
+              changeBulletinBar(e);
+            }
+          }, /*#__PURE__*/React.createElement("h3", {
+            style: {
+              display: 'inline',
+              margin: '2px'
+            },
+            className: "NewuniformFontStylesBold",
+            id: "subjectListCountNew"
+          }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+            fontSize: '15px',
+            color: '#0b4971'
+          })), /*#__PURE__*/React.createElement("h2", {
+            className: "EvtDashboardTxt panelDash uniformFontStyles"
+          }, " Subjects")), " ");
+        } else {
+          if (props.customer == "STJOHNS" || props.customer == "WESCHOOL" || props.customer == "VCET") {
+            Placement = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+              className: BoxClassName,
+              id: 'stud' + boxId++,
+              style: styles,
+              onClick: e => {
+                window.location = "manageDocument.json";
+              }
+            }, /*#__PURE__*/React.createElement("i", {
+              className: "fa fa-folder-open-o fa-2x"
+            }), /*#__PURE__*/React.createElement("h2", {
+              className: "EvtDashboardTxt panelDash uniformFontStyles"
+            }, "DMS")));
+          } else if (props.customer != "XLRI") {
+            $(".placement").show();
+            Placement = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+              className: BoxClassName,
+              id: 'stud' + boxId++,
+              style: styles,
+              onClick: e => {
+                getPlacementDetail(1);
+                changeBulletinBar(e);
+              }
+            }, /*#__PURE__*/React.createElement("h3", {
+              className: "NewuniformFontStylesBold",
+              style: {
+                display: 'inline',
+                margin: '2px'
+              },
+              id: "companyCount"
+            }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+              fontSize: '15px',
+              color: '#0b4971'
+            })), /*#__PURE__*/React.createElement("h2", {
+              className: "EvtDashboardTxt panelDash uniformFontStyles"
+            }, "Placement")));
+          }
+          if (props.customer == "SRM_SIKKIM") {
+            quickLink = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+              className: BoxClassName,
+              id: 'stud' + boxId++,
+              style: styles,
+              onClick: e => {
+                quickLinksPopup(props);
+              }
+            }, /*#__PURE__*/React.createElement("i", {
+              className: "fa fa-external-link fa-x"
+            }), /*#__PURE__*/React.createElement("h2", {
+              className: "EvtDashboardTxt panelDash uniformFontStyles"
+            }, "Quick Links")));
+          }
+        }
+      }
+    } else {
+      if (props.customer != "INDIRA_PUNE") {
+        $(".transport").show();
+        Transport = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+          className: BoxClassName,
+          id: 'stud' + boxId++,
+          style: styles,
+          onClick: e => {
+            getTransportDetail(1);
+            changeBulletinBar(e);
+          }
+        }, /*#__PURE__*/React.createElement("h3", {
+          className: "NewuniformFontStylesBold",
+          style: {
+            display: 'inline',
+            margin: '2px'
+          },
+          id: "TransportCount"
+        }, "-"), /*#__PURE__*/React.createElement("h2", {
+          className: "EvtDashboardTxt panelDash uniformFontStyles"
+        }, "Transport")), " ");
+      }
+    }
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: '5px',
+      backgroundColor: '#fff !important',
+      cursor: 'pointer',
+      textAlign: 'center',
+      marginLeft: '0px',
+      paddingTop: '10px'
+    },
+    id: "stud1",
+    className: BoxClassName,
+    onClick: e => {
+      props.state.viewAnnouncemnet();
+      changeBulletinBar(e);
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "NewuniformFontStylesBold",
+    style: {
+      display: 'inline',
+      margin: '2px'
+    },
+    id: "announcementCount"
+  }), /*#__PURE__*/React.createElement("h2", {
+    className: "EvtDashboardTxt ann panelDash uniformFontStyles"
+  }, "Announcements")), /*#__PURE__*/React.createElement("div", {
+    style: styles,
+    className: BoxClassName,
+    id: "stud2",
+    onClick: e => {
+      showAttendencePage();
+      changeBulletinBar(e);
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "NewuniformFontStylesBold",
+    style: {
+      display: 'inline',
+      margin: '2px'
+    },
+    id: "attendencePer"
+  }), /*#__PURE__*/React.createElement("h2", {
+    className: "EvtDashboardTxt panelDash uniformFontStyles"
+  }, studDashboardLblStudSide == true || studDashboardLblStudSide == "true" ? 'LS attendance' : 'Attendance', " ")), CustomizeMiddleBox, Task, Placement, SubjectList, Transport, AddmisionLink, quickLink);
+}
+function StudentTasks(props) {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "accordion",
+    id: "accordionExample",
+    style: {
+      width: '100%'
+    }
+  }, props.jobTray.map((posts, i) => {
+    let action;
+    let posted;
+    if (posts.isRead == "false") {
+      if (posts.actionurl != "") {
+        if (posts.actionurl.split(':')[0] == "call") {
+          action = /*#__PURE__*/React.createElement("a", {
+            className: "btn btn-success btn-mini",
+            style: {
+              margin: '5px',
+              paddingLeft: '10px'
+            },
+            onclick: posts.actionurl.split(':')[1]
+          }, "check");
+        } else {
+          action = /*#__PURE__*/React.createElement("a", {
+            className: "btn btn-success btn-mini",
+            style: {
+              margin: '5px',
+              paddingLeft: '10px'
+            },
+            href: posts.actionurl
+          }, "check");
+        }
+      }
+    }
+    let assignTime = "";
+    let assignDate = "";
+    if (posts.JobAssignedTime != "" && posts.JobAssignedTime != undefined && posts.JobAssignedTime != null) {
+      assignTime = 'on ' + posts.JobAssignedTime;
+    }
+    if (posts.JobAssignedDate != "" && posts.JobAssignedDate != undefined && posts.JobAssignedDate != null) {
+      assignDate = $.datepicker.formatDate('M dd, yy', new Date(posts.JobAssignedDate));
+    }
+    if (posts.byUsername != "" && posts.byUsername != undefined && posts.byUsername != null) {
+      posted = /*#__PURE__*/React.createElement("span", null, assignTime + " ", " ", assignDate + "  ", /*#__PURE__*/React.createElement("b", null, " By " + posts.byUsername));
+    } else {
+      posted = /*#__PURE__*/React.createElement("span", null, assignTime + " ", " ", assignDate);
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      className: "accordion-group",
+      key: i
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "accordion-heading"
+    }, /*#__PURE__*/React.createElement("a", {
+      className: "accordion-toggle",
+      "data-toggle": "collapse",
+      "data-parent": "#accordionExample",
+      href: '#accordion_' + i,
+      "aria-expanded": "false"
+    }, /*#__PURE__*/React.createElement("strong", null, posts.JobHeading), /*#__PURE__*/React.createElement("span", {
+      style: {
+        float: 'right'
+      }
+    }, posted))), /*#__PURE__*/React.createElement("div", {
+      id: 'accordion_' + i,
+      className: "accordion-body collapse"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "accordion-inner"
+    }, posts.JobDescription, /*#__PURE__*/React.createElement("span", {
+      style: {
+        float: 'right'
+      }
+    }, action))));
+  })));
+}
+function StudentAnnouncement(props) {
+  if (props.announcementArr.length == 0) {
+    return /*#__PURE__*/React.createElement("h4", {
+      style: {
+        textAlign: 'center',
+        fontSize: '14px',
+        padding: '5px'
+      }
+    }, "No  Announcements");
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "accordion",
+    id: "accordionExample1",
+    style: {
+      width: '98%'
+    }
+  }, props.announcementArr.map((obj, i) => {
+    let posted = /*#__PURE__*/React.createElement("span", null, "On  ", obj.createdDate, " by ", /*#__PURE__*/React.createElement("b", null, obj.employeeName));
+    let annoucemnetHdr;
+    try {
+      annoucemnetHdr = /*#__PURE__*/React.createElement("strong", null, decodeURIComponent(obj.heading));
+    } catch (e) {
+      annoucemnetHdr = /*#__PURE__*/React.createElement("strong", null, obj.heading);
+    }
+    let div = "div";
+    return /*#__PURE__*/React.createElement("div", {
+      className: "accordion-group",
+      key: i
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "accordion-heading"
+    }, /*#__PURE__*/React.createElement("a", {
+      className: "accordion-toggle",
+      "data-toggle": "collapse",
+      "data-parent": "#accordionExample1",
+      onClick: e => {
+        viewAnnouncementDetailNew(obj.announcementId);
+      },
+      href: '#accordion_' + obj.announcementId,
+      "aria-expanded": "false"
+    }, /*#__PURE__*/React.createElement("strong", null, annoucemnetHdr), /*#__PURE__*/React.createElement("span", {
+      style: {
+        float: 'right'
+      }
+    }, posted))), /*#__PURE__*/React.createElement("div", {
+      id: 'accordion_' + obj.announcementId,
+      className: "accordion-body collapse"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "accordion-inner"
+    }, /*#__PURE__*/React.createElement("div", {
+      id: 'announcementBody-' + obj.announcementId
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "footer",
+      style: {
+        float: 'right',
+        marginBottom: '10px'
+      }
+    }, /*#__PURE__*/React.createElement("a", {
+      title: "Move to Trash",
+      onClick: e => {
+        removeStudentAnnouncement(obj.announcementId, div, obj.isPermanent);
+        setReadAnnouncement(obj.announcementId);
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: "img/trash.png"
+    }))))));
+  })));
+}
+function changeBulletinBar(ele) {
+  var EvtDashboardTxt = $(ele.target).find('.EvtDashboardTxt').text();
+  var boiler = "";
+  if (EvtDashboardTxt == "Announcements") {
+    boiler += '<i  class="fa fa-bullhorn fa-lg" ></i>&nbsp;&nbsp' + EvtDashboardTxt;
+  } else if (EvtDashboardTxt == "Task") {
+    boiler += '<i class="fa fa-list-alt fa-lg"></i>&nbsp;&nbsp' + EvtDashboardTxt;
+  } else if (EvtDashboardTxt == "Placement") {
+    boiler += '<i class="fa fa-handshake-o fa-lg"></i>&nbsp;&nbsp' + EvtDashboardTxt;
+  } else {
+    boiler += '<i class="fa fa-inbox fa-lg"></i>&nbsp;&nbsp;BULLETIN BOARD</span>';
+  }
+  $('#currentSelection').html(boiler);
+}
+class BulletinBoard extends React.Component {
+  constructor() {
+    super();
+    this.state = {
+      customer: $('#customerHelper').val()
+    };
+  }
+  render() {
+    let ComposeAndShare;
+    const {
+      customer
+    } = this.state;
+    if (!(customer == "IMT_NAGPUR" || customer == "IMT_GAZIABAD" || customer == "IMT_HYDERABAD")) {
+      ComposeAndShare = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, " | "), /*#__PURE__*/React.createElement("a", {
+        id: "bulletinStatus",
+        className: "compose",
+        onClick: e => {
+          bulletinStatus(e);
+        }
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fa fa-envelope fa-lg"
+      }), "\xA0Compose\xA0"), /*#__PURE__*/React.createElement("a", {
+        id: "bulletinStatus",
+        style: {
+          display: 'none'
+        },
+        className: "compose",
+        onClick: e => {
+          bulletinStatus(e);
+        }
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fa fa-times-circle fa-lg"
+      })));
+    }
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("legend", {
+      className: "buletinCls",
+      style: {
+        width: '97%'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '11px'
+      },
+      id: "currentSelection"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-inbox fa-lg"
+    }), "\xA0\xA0BULLETIN BOARD"), /*#__PURE__*/React.createElement("span", {
+      className: "pull-right",
+      style: {
+        fontSize: '11px',
+        textTransform: 'none'
+      }
+    }, /*#__PURE__*/React.createElement("a", {
+      bulletintype: "Posts",
+      onClick: e => {
+        getAlumniPost(10);
+      }
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-bullhorn fa-lg"
+    }), "\xA0View All Posts\xA0"), ComposeAndShare))), /*#__PURE__*/React.createElement("br", null));
+  }
+}
+$(document).ready(function () {
+  ReactDOM.render( /*#__PURE__*/React.createElement(BulletinBoard, null), document.getElementById('BulletinBoard'));
+  ReactDOM.render( /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AlumniPost, null)), document.getElementById('divalumpost'));
+});
+function StudentDashboardList1(props) {
+  let CustomiseList;
+  let profileLink;
+  let syllabusLink;
+  let acadFeesLink;
+  const Linkstyle = {
+    height: '100%',
+    width: '100%'
+  };
+  var customerHelpStr = $('#customerHelper').val();
+  if (customerHelpStr == "IMT_NAGPUR" || customerHelpStr == "IMT_GAZIABAD" || customerHelpStr == "IMT_HYDERABAD") {
+    profileLink = "stu_studentProfileIMT.htm";
+    syllabusLink = "studentCourseFileNew.htm";
+  } else if (props.CourseType == "COURSE_TYPE_SCHOOL" && props.SubCourseType == "COURSE_TYPE_SCHOOL") {
+    profileLink = "schoolForm.htm";
+    syllabusLink = "studentCourseFileNew.htm";
+  } else {
+    profileLink = "stu_studentProfile.htm";
+    syllabusLink = "studentCourseFileNew.htm";
+  }
+  var newFeesAcdemicUiFlag = $('#newFeesAcdemicUiFlag').val() == '' || $('#newFeesAcdemicUiFlag').val() == undefined ? false : true;
+  var studDashboardLblStudSide = $('#studDashboardLblStudSide').val() == '' || $('#studDashboardLblStudSide').val() == undefined || $('#studDashboardLblStudSide').val() == "false" || $('#studDashboardLblStudSide').val() == null || $('#studDashboardLblStudSide').val() == false ? false : true;
+  if (customerHelpStr == "GOKHALE_INSTITUTE" || customerHelpStr == "MEGHE" || newFeesAcdemicUiFlag) {
+    acadFeesLink = 'studentAcademicFeesPayment.htm';
+  } else {
+    acadFeesLink = 'studentFinanceDetails.htm';
+  }
+  let HostelTr;
+  if (customerHelpStr != "SIES" && customerHelpStr != "XLRI" && customerHelpStr != "SRM_SIKKIM") {
+    HostelTr = /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-building fa-lg"
+    })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+      id: "a_hostel",
+      href: "studentHostelHomeDetails.htm"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: Linkstyle
+    }, "HOSTEL"))));
+  }
+  let CustomerSpecific;
+  if (customerHelpStr != "INDIRA_PUNE" && customerHelpStr != "IMT_NAGPUR" && customerHelpStr != "IMT_GAZIABAD" && customerHelpStr != "IMT_HYDERABAD") {
+    CustomerSpecific = /*#__PURE__*/React.createElement(React.Fragment, null, customerHelpStr != "XLRI" && customerHelpStr != "SRM_SIKKIM" && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-file-text fa-lg"
+    })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+      id: "a_leave",
+      href: "studentLeaveApplication.htm"
+    }, " ", /*#__PURE__*/React.createElement("div", {
+      style: Linkstyle
+    }, "LEAVE DETAILS")))), HostelTr, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-male fa-lg"
+    })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+      id: "a_mentor",
+      href: "stu_mentorCommunicationSmsEmail.htm"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: Linkstyle
+    }, "CONTACT MENTOR")))), customerHelpStr != "BITS_MESRA" && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-comments-o fa-lg"
+    })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+      id: "a_blogs",
+      href: "viewCommentBlog.htm"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: Linkstyle
+    }, "BLOGS")))));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "avatar-container homeSection stuSideBar "
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "table table-considered borderless"
+  }, /*#__PURE__*/React.createElement("tbody", {
+    className: "nav nav-list studDashli "
+  }, /*#__PURE__*/React.createElement("tr", {
+    className: "active"
+  }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-dashboard fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    href: "home.htm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, "DASHBOARD")))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-user fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_profile",
+    href: profileLink
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, "PROFILE")))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-book fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_syllabus",
+    href: syllabusLink
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, " SYLLABUS")))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-calendar fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_academicCalender",
+    href: "studentScheduleAcademicCalender.htm"
+  }, " ", /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, studDashboardLblStudSide === true ? "ACADEMIC CALENDAR" : "CALENDAR")))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-clock-o fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_timeTable",
+    href: "stu_StudentTimeTable.htm",
+    onClick: e => {
+      getTimeTableDetails();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, "TIME TABLE")))), customerHelpStr != "XLRI" && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-bar-chart fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_library",
+    href: "stu_studentLibraryDetails.htm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, studDashboardLblStudSide === true ? "DIGITAL LIBRARY" : /*#__PURE__*/React.createElement(React.Fragment, null, "LIBRARY(", /*#__PURE__*/React.createElement("span", {
+    id: "bookIssueCount"
+  }, "-"), ")"))))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-rupee fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_fees",
+    href: acadFeesLink
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, "FEES DETAILS")))), CustomerSpecific)));
+}
+function stdProfilePic() {
+  var Maxsize = 5242880;
+  $image_crop = $('#image_demo').croppie({
+    enableExif: true,
+    enableOrientation: true,
+    viewport: {
+      width: 200,
+      height: 200,
+      type: 'square' //circle
+    },
+    boundary: {
+      width: 300,
+      height: 300
+    }
+  });
+  $('#profilePictureUpload').on('change', function () {
+    var reader = new FileReader();
+    reader.onload = function (event) {
+      $image_crop.croppie('bind', {
+        url: event.target.result
+      }).then(function () {
+        console.log('jQuery bind complete');
+      });
+    };
+    reader.readAsDataURL(this.files[0]);
+    $('#uploadimageModal').modal('show');
+  });
+  $(function () {
+    $('.vanilla-rotate').on('click', function (ev) {
+      $image_crop.croppie('rotate', parseInt($(this).data('deg')));
+    });
+  });
+  $('.crop_image').click(function (event) {
+    $image_crop.croppie('result', {
+      type: 'canvas',
+      size: 'viewport'
+    }).then(function (response) {
+      console.log(response);
+      var base64ImageContent = response.replace(/^data:image\/(png|jpg);base64,/, "");
+      var blob = base64ToBlob(base64ImageContent, 'image/png');
+      var formData = new FormData();
+      formData.append('fileData', blob);
+      $.ajax({
+        url: "uploadStudentProfileImage.json",
+        type: "POST",
+        contentType: false,
+        processData: false,
+        data: formData,
+        name: 'fileData',
+        size: Maxsize,
+        onSubmit: function (data) {
+          //if(extension.toString().toLowerCase() == 'png' || extension.toString().toLowerCase() == 'jpg',extension.toString().toLowerCase() == 'jpeg'){
+          startLoading();
+          this.setData({
+            'fileSize': Maxsize
+          });
+        },
+        success: function (data) {
+          $('#uploadimageModal').modal('hide');
+          if (isNaN(data)) {
+            //showErrorMessage('File size is larger than specified',10000);
+            jAlert("File size is larger than specified !!");
+          } else {
+            var imageBoiler = '<img src="getStudentProfileImage.json?type=profile&someparam=' + data + '" alt="Photo" name="Photo" width="120px" height="120px" border="1" align="right" style="background-color: #FFFFFF" />';
+            $('#stdProfileImage2342').html(imageBoiler);
+            jAlert("Image uploaded successfully !!!");
+            imageStatus = true;
+            showSuccessMessage('Image uploaded. ', 10000);
+            $('#profileImgModal').modal('hide');
+          }
+          //$('#uploaded_image').html(data);
+          $image_crop.croppie('destroy');
+        }
+      });
+    });
+  });
+}
+function base64ToBlob(base64, mime) {
+  mime = mime || '';
+  var sliceSize = 1024;
+  var byteChars = window.atob(base64);
+  var byteArrays = [];
+  for (var offset = 0, len = byteChars.length; offset < len; offset += sliceSize) {
+    var slice = byteChars.slice(offset, offset + sliceSize);
+    var byteNumbers = new Array(slice.length);
+    for (var i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    var byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+  return new Blob(byteArrays, {
+    type: mime
+  });
+}
+let gpropVar = null;
+function quickLinksPopup(props) {
+  gpropVar = null;
+  $("#divalumpost").hide();
+  $('#tabResult').show();
+  gpropVar = props;
+  var bodyB = `	
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="https://online-degree.swayam2.ac.in/" target="_blank"><strong>LMS</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>Coursera</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="applyLinkForLiveSession();"><strong>Live Session</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>Participation Status</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>My Assignment Status</strong></a>
+	</div></div>
+	
+	`;
+  $('#tabResult').html(bodyB);
+}
+function applyLinkForLiveSession() {
+  try {
+    var studentCourse = $('#courseNameTemp').val();
+    if (gpropVar.customer == "SRM_SIKKIM" && studentCourse == "MBA") {
+      window.open("https://meet.google.com/ddu-rduf-nfg", "_blank");
+    } else if (gpropVar.customer == "SRM_SIKKIM" && studentCourse == "MCA") {
+      window.open("https://meet.google.com/ebv-evju-cko", "_blank");
+    } else {
+      jAlert("Link Not Mapped!");
+    }
+  } catch (e) {}
+}
+function underDevlopment() {
+  jAlert("Rolling Out Soon.");
+}        — x ˇˇ     20250331133932-8l”— µª"sG   https://erp.cmrit.ac.in/scriptReactCompiled/student/studentHomeReact.js      WΩ  function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == typeof i ? i : String(i); }
+function _toPrimitive(t, r) { if ("object" != typeof t || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != typeof i) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+class SideBarStudentDashboard extends React.Component {
+  constructor() {
+    super();
+    this.state = {
+      customer: $('#customerHelper').val(),
+      error: false,
+      CourseType: $('#courseType').val(),
+      studentId: $('#studentId').val(),
+      studentName: $('#studentName').val(),
+      SubCourseType: $('#SubCourseType').val(),
+      studentLockStatus: $('#studentLockStatus').val()
+    };
+  }
+  componentDidMount() {
+    getAcademicInformation(this.state.studentId);
+    getAdmissionLink(this.state.studentId);
+  }
+  render() {
+    const {
+      error,
+      customer,
+      CourseType,
+      studentId,
+      studentName,
+      SubCourseType,
+      studentLockStatus
+    } = this.state;
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ProfileInfo, {
+      studentName: studentName,
+      studentId: studentId,
+      studentLockStatus: studentLockStatus
+    }), /*#__PURE__*/React.createElement(StudentDashboardList1, {
+      customer: customer,
+      CourseType: CourseType,
+      SubCourseType: SubCourseType
+    }));
+  }
+}
+$(document).ready(function () {
+  ReactDOM.render( /*#__PURE__*/React.createElement(SideBarStudentDashboard, null), document.getElementById('sideBarStudentDashboard'));
+});
+const faIcon = (cls, style) => {
+  return /*#__PURE__*/React.createElement("i", {
+    className: cls == 'spinner' ? "fa fa-spinner fa-pulse fa-fw" : cls,
+    "aria-hidden": "true",
+    style: style
+  });
+};
+class MiddleBoxStudentDashboard extends React.Component {
+  constructor() {
+    super();
+    _defineProperty(this, "isProfileUpdated", () => {
+      var hdnUserRole = $('#hdnUserRole').val();
+      var url = 'checkProfileImage.json';
+      if (hdnUserRole == "student" || hdnUserRole == "Student") {
+        url = 'stu_checkProfileImage.json';
+      }
+      $.ajax({
+        url: url,
+        dataType: 'json',
+        junoSpinner: true,
+        success: function (json) {
+          if (!json.isImage) {
+            var boiler = '<div class="thumbnail" id="stdProfileImage2342" style="height:120px;width:120px;margin-left:20px"><img src="getStudentProfileImage.json?id=-1249993431" alt="Photo" name="Photo" style="background-color: #FFFFFF" width="120px" height="120px" border="1" align="right"><br></div>';
+            boiler += '&nbsp&nbsp&nbsp&nbsp&nbsp<div class="btn btn-info" style="width:110px;height:20px">Upload Image<input style="margin-top:-40px;margin-left:-35px;opacity:0;" type="file" name="fileData" id="profilePictureUpload" onclick="stdProfilePic();" accept="image/*"></div>';
+            $('#profileImgModalBodyDiv').html(boiler);
+            $('#profileImgModal').modal('show').css({
+              'margin-left': function () {
+                return -($(this).width() / 2);
+              }
+            });
+          }
+        }.bind(this)
+      });
+    });
+    _defineProperty(this, "handleCloseprofile", () => {
+      this.setState({
+        handleClose: false
+      });
+    });
+    this.state = {
+      isLoaded: false,
+      announcementArr: [],
+      assestmentArr: [],
+      TaskArr: [],
+      placementArr: [],
+      jobTray: [],
+      customer: $('#customerHelper').val(),
+      error: false,
+      CourseType: $('#courseType').val(),
+      studentId: $('#studentId').val(),
+      studentName: $('#studentName').val(),
+      SubCourseType: $('#SubCourseType').val(),
+      isProfileUploadModal: true,
+      handleClose: true
+    };
+    this.fetchAnnouncement = this.fetchAnnouncement.bind(this);
+    this.fetchAttedance = this.fetchAttedance.bind(this);
+    this.fetchAssignments = this.fetchAssignments.bind(this);
+    this.fetchJobTrayForStudent = this.fetchJobTrayForStudent.bind(this);
+  }
+  fetchAnnouncement() {
+    var hdnUserRole = $('#hdnUserRole').val();
+    var url = 'getUnreadStudentAnnouncement.json';
+    if (hdnUserRole == "student" || hdnUserRole == "Student") {
+      url = 'stu_getUnreadStudentAnnouncement.json';
+    }
+    $.ajax({
+      url: url,
+      dataType: 'json',
+      async: false,
+      beforeSend: function () {},
+      complete: function () {},
+      success: function (jArray) {
+        if (jArray.length > 0) {
+          this.setState({
+            announcementArr: jArray[0]
+          });
+          $("#announcementCount").text(jArray[0]["count"]);
+          $("#countAnnouncement").text(jArray[0]["count"]);
+          if (jArray[0]["count"] == 0) $("#NoticeCounter").hide();else $("#NoticeCounter").html(jArray[0]["count"]).show();
+          $("#countAnnouncement").html(jArray[0]["count"]).show();
+        }
+      }.bind(this),
+      error: function () {
+        return;
+      }
+    });
+  }
+  fetchAttedance() {
+    var hdnUserRole = $('#hdnUserRole').val();
+    var url = 'getStudentAttendancePercentageSP.json';
+    if (hdnUserRole == "student" || hdnUserRole == "Student") {
+      url = 'stu_getStudentAttendancePercentageSP.json';
+    }
+    $.ajax({
+      //	url:'getStudentAttendancePercentage.json',
+      url: url,
+      dataType: 'text',
+      async: false,
+      beforeSend: function () {},
+      complete: function () {},
+      success: function (per) {
+        if ($('#customerHelper').val() == "NIET" && ($('#studentLockStatus').val() == "true" || $('#studentLockStatus').val() == true)) {
+          $("#attendencePer").text("-");
+        } else if (per != "Problem") {
+          $("#attendencePer").text(per + "%");
+        } else {
+          $("#attendencePer").text("-");
+        }
+        this.fetchAssignments();
+      }.bind(this),
+      error: function () {
+        jAlert("Something went wrong, Please try after some time", "Error");
+      }
+    });
+  }
+  fetchAssignments() {
+    var hdnUserRole = $('#hdnUserRole').val();
+    var url = 'getStudentAssignments.json';
+    if (hdnUserRole == "student" || hdnUserRole == "Student") {
+      url = 'stu_getStudentAssignments.json';
+    }
+    $.ajax({
+      url: url,
+      dataType: 'json',
+      async: false,
+      beforeSend: function () {},
+      complete: function () {},
+      success: function (jArray) {
+        if (jArray != null) {
+          $("#assignmentCount").text(jArray["CountAssignment"]);
+          $("#assignmentPostIds").val(jArray["postIds"]);
+        } else {
+          $("#assignmentCount").text('-');
+        }
+        getPlacementDetail('');
+      },
+      error: function () {
+        jAlert("Something went wrong, Please try after some time", "Error");
+      }
+    });
+  }
+  fetchJobTrayForStudent() {
+    var hdnUserRole = $('#hdnUserRole').val();
+    var url = 'getStudentJobTrayAlerts.json';
+    if (hdnUserRole == "student" || hdnUserRole == "Student") {
+      url = 'stu_getStudentJobTrayAlerts.json';
+    }
+    $.ajax({
+      url: url,
+      dataType: 'json',
+      beforeSend: function () {
+        $('#jobTrayRefereshImage').html('Updating...');
+      },
+      complete: function () {
+        $('#jobTrayRefereshImage').html('Reload');
+      },
+      success: function (jArray) {
+        var notificationJArray = jArray[0];
+        if (notificationJArray.length > 0) {
+          $("#taskCount").text(notificationJArray.length);
+        } else {
+          $("#taskCount").text("0");
+        }
+        this.setState({
+          TaskArr: notificationJArray
+        });
+      }.bind(this)
+    });
+  }
+  viewAnnouncemnet() {
+    //alert(flag);
+    $("#divalumpost").hide();
+    let SearchWord = "";
+    let filterFlag = "unread";
+    $('#announcementDetails').html('');
+    getUnreadAnnouncement();
+    getUnreadStudentMessage();
+    $.ajax({
+      url: 'getStudentAnnouncement.json',
+      dataType: 'json',
+      data: {
+        SearchWord: searchKeyword,
+        filterFlag: filterFlag
+      },
+      async: false,
+      beforeSend: function () {
+        //$("#"+divId).html('<div id="divPostLoading" style="text-align: center;width: 100%;"><i class="fa fa-spinner fa-pulse fa-fw fa-4x" style="color:#0b4971"></i></div>');
+      },
+      complete: function () {},
+      success: function (jArray) {
+        if (document.getElementById('tabResult') != null) {
+          ReactDOM.unmountComponentAtNode(document.getElementById('tabResult'));
+        }
+        ReactDOM.render( /*#__PURE__*/React.createElement(StudentAnnouncement, {
+          announcementArr: jArray
+        }), document.getElementById('tabResult'));
+      },
+      error: function () {
+        return;
+      }
+    });
+  }
+  getJobTrayAlerts() {
+    if (document.getElementById('tabResult') != null) {
+      ReactDOM.unmountComponentAtNode(document.getElementById('tabResult'));
+    }
+    $('#tabResult').show('slow');
+    $('#divalumpost').hide();
+    /*ReactDOM.render(<React.Fragment>{faIcon("fa fa-spinner fa-pulse fa-fw",{fontSize: '15px',color:'#0b4971'})}</React.Fragment>,
+    		  document.getElementById('tabResult'));*/
+    ReactDOM.render( /*#__PURE__*/React.createElement(StudentTasks, {
+      jobTray: this.state.TaskArr
+    }), document.getElementById('tabResult'));
+  }
+  componentDidMount() {
+    this.isProfileUpdated();
+    this.fetchAnnouncement();
+    this.fetchAttedance();
+    this.fetchJobTrayForStudent();
+    showTodaysConflictTimetableForStudent();
+    getbooksIssuedCount();
+    studentSubjectCount();
+    showTodaysTimetableForStudent();
+  }
+  componentWillUnmount() {
+    console.log("Unmount");
+  }
+  render() {
+    const {
+      error,
+      isLoaded,
+      items,
+      customer,
+      CourseType,
+      studentId,
+      studentName,
+      isProfileUploadModal,
+      handleClose
+    } = this.state;
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(MiddleBox, {
+      CourseType: CourseType,
+      customer: customer,
+      state: this
+    }));
+  }
+}
+$(document).ready(function () {
+  ReactDOM.render( /*#__PURE__*/React.createElement(MiddleBoxStudentDashboard, null), document.getElementById('middleBoxStudentDashboard'));
+});
+function ProfileInfo(props) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "avatar-container homeSection profileDash"
+  }, /*#__PURE__*/React.createElement("img", {
+    className: "pull-left",
+    width: "64px",
+    height: "150px",
+    src: 'getStudentProfileImage.json',
+    alt: "Photo",
+    id: "studentProfilePhoto",
+    name: "Photo",
+    style: {
+      backgroundColor: '#FFFFFF',
+      maxHeight: '270px'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "studentDesc"
+  }, /*#__PURE__*/React.createElement("span", null, props.studentName), /*#__PURE__*/React.createElement("br", null), props.studentLockStatus == "true" || props.studentLockStatus == true ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'red'
+    }
+  }, "LOCKED") : null), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("small", {
+    style: {
+      color: 'gray'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    id: "rollNo"
+  })));
+}
+function MiddleBox(props) {
+  const styles = {
+    borderRadius: '5px',
+    backgroundColor: '#fff !important',
+    cursor: 'pointer',
+    textAlign: 'center',
+    marginLeft: '10px',
+    paddingTop: '10px'
+  };
+  let BoxClassName = "avatar-container homeSection EvtDashboard   span2  text-center";
+  let CustomizeMiddleBox;
+  let Placement;
+  let quickLink;
+  let SubjectList;
+  let boxId = 3;
+  let studDashboardLblStudSide = $('#studDashboardLblStudSide').val() == '' || $('#studDashboardLblStudSide').val() == undefined || $('#studDashboardLblStudSide').val() == "false" || $('#studDashboardLblStudSide').val() == null || $('#studDashboardLblStudSide').val() == false ? false : true;
+  if (props.CourseType == "COURSE_TYPE_SCHOOL") {
+    if (!(props.customer == "IMT_NAGPUR" || props.customer == "IMT_GAZIABAD" || props.customer == "IMT_HYDERABAD")) {
+      if (props.CourseType == "COURSE_TYPE_SCHOOL") {
+        $(".home_work").show();
+        CustomizeMiddleBox = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+          className: BoxClassName,
+          style: styles,
+          id: 'stud' + boxId++,
+          onClick: e => {
+            showAssignmentPage();
+            changeBulletinBar(e);
+          }
+        }, /*#__PURE__*/React.createElement("h3", {
+          className: "NewuniformFontStylesBold",
+          style: {
+            display: 'inline',
+            margin: '2px'
+          }
+        }), /*#__PURE__*/React.createElement("h2", {
+          className: "EvtDashboardTxt panelDash uniformFontStyles"
+        }, "Home Work"), /*#__PURE__*/React.createElement("input", {
+          id: "assignmentPostIds",
+          type: "hidden",
+          value: "0"
+        })));
+      } else {
+        $(".assignments").show();
+        CustomizeMiddleBox = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+          className: BoxClassName,
+          id: 'stud' + boxId++,
+          style: styles,
+          onClick: e => {
+            showAssignmentPage();
+            changeBulletinBar(e);
+          }
+        }, /*#__PURE__*/React.createElement("h3", {
+          className: "NewuniformFontStylesBold",
+          style: {
+            display: 'inline',
+            margin: '2px'
+          },
+          id: "assignmentCount"
+        }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+          fontSize: '15px',
+          color: '#0b4971'
+        })), /*#__PURE__*/React.createElement("h2", {
+          className: "EvtDashboardTxt panelDash uniformFontStyles"
+        }, " Assignments"), /*#__PURE__*/React.createElement("input", {
+          id: "assignmentPostIds",
+          type: "hidden",
+          value: "0"
+        })));
+      }
+    } else {
+      $(".assessments").show();
+      CustomizeMiddleBox = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        className: BoxClassName,
+        style: styles,
+        id: 'stud' + boxId++,
+        onClick: e => {
+          showAssignmentPage();
+          changeBulletinBar(e);
+        }
+      }, "if(!(props.CourseType == \"COURSE_TYPE_SCHOOL\"))", /*#__PURE__*/React.createElement("h3", {
+        className: "NewuniformFontStylesBold",
+        style: {
+          display: 'inline',
+          margin: '2px'
+        },
+        id: "assignmentCount"
+      }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+        fontSize: '15px',
+        color: '#0b4971'
+      })), "else", /*#__PURE__*/React.createElement("h3", {
+        className: "NewuniformFontStylesBold",
+        style: {
+          display: 'inline',
+          margin: '2px'
+        }
+      }), /*#__PURE__*/React.createElement("h2", {
+        className: "EvtDashboardTxt panelDash uniformFontStyles"
+      }, "Assessment"), /*#__PURE__*/React.createElement("input", {
+        id: "assignmentPostIds",
+        type: "hidden",
+        value: "0"
+      })));
+    }
+  } else {
+    $(".assessments").show();
+    CustomizeMiddleBox = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: BoxClassName,
+      id: 'stud' + boxId++,
+      style: styles,
+      onClick: e => {
+        showAssignmentPage();
+        changeBulletinBar(e);
+      }
+    }, /*#__PURE__*/React.createElement("h3", {
+      className: "NewuniformFontStylesBold",
+      style: {
+        display: 'inline',
+        margin: '2px'
+      },
+      id: "assignmentCount"
+    }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+      fontSize: '15px',
+      color: '#0b4971'
+    })), /*#__PURE__*/React.createElement("h2", {
+      className: "EvtDashboardTxt panelDash uniformFontStyles"
+    }, "Assessment"), /*#__PURE__*/React.createElement("input", {
+      id: "assignmentPostIds",
+      type: "hidden",
+      value: "0"
+    })));
+  }
+  let Task;
+  if (!(props.customer == "IMT_NAGPUR" || props.customer == "IMT_GAZIABAD" || props.customer == "IMT_HYDERABAD")) {
+    $(".task").show();
+    Task = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: BoxClassName,
+      id: 'stud' + boxId++,
+      style: styles,
+      onClick: e => {
+        props.state.getJobTrayAlerts();
+        changeBulletinBar(e);
+      }
+    }, /*#__PURE__*/React.createElement("h3", {
+      className: "NewuniformFontStylesBold",
+      style: {
+        display: 'inline',
+        margin: '2px'
+      },
+      id: "taskCount"
+    }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+      fontSize: '15px',
+      color: '#0b4971'
+    })), /*#__PURE__*/React.createElement("h2", {
+      className: "EvtDashboardTxt panelDash uniformFontStyles"
+    }, studDashboardLblStudSide == true || studDashboardLblStudSide == "true" ? 'Feedback' : 'Task')));
+  }
+  if (props.customer == "IMT_NAGPUR" || props.customer == "IMT_GAZIABAD" || props.customer == "IMT_HYDERABAD" || props.customer == "INDIRA_PUNE" || props.customer == "MATSUNIVERSITY" || props.customer == "HPTELIBRARY" || props.customer == "HPTU" || props.customer == "JDGROUP" || props.customer == "MIT" || props.customer == "XISS" || props.customer == "WESCHOOL" || props.customer == "ABS" || props.customer == "RAMAIAH" || props.customer == "RAMAIAH_UNIVERSITY" || props.customer == "SPIT" || props.customer == "MGMU" || props.customer == "REVA_UNIVERSITY" || props.customer == "SIES") {
+    if (props.CourseType != "COURSE_TYPE_SCHOOL") {
+      Placement = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        className: BoxClassName,
+        id: 'stud' + boxId++,
+        style: styles,
+        onClick: e => {
+          window.location.replace('registerforPlacements.htm');
+          changeBulletinBar(e);
+        }
+      }, /*#__PURE__*/React.createElement("h3", {
+        className: "NewuniformFontStylesBold",
+        style: {
+          display: 'inline',
+          margin: '2px'
+        },
+        id: "companyCountPlc"
+      }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+        fontSize: '15px',
+        color: '#0b4971'
+      })), /*#__PURE__*/React.createElement("h2", {
+        className: "EvtDashboardTxt panelDash uniformFontStyles"
+      }, "Placement")));
+    }
+  }
+  let AddmisionLink;
+  let Transport;
+  if (props.customer == "DYPATIL") {
+    AddmisionLink = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("table", {
+      style: {
+        width: '100%'
+      }
+    }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+      style: {
+        display: 'none',
+        backgroundColor: '#e0e0e0',
+        borderTop: '2px solid rgb(127,127,127)',
+        borderBottom: '2px solid rgb(127,127,127)',
+        borderLeft: '2px solid rgb(127,127,127)',
+        borderRight: '2px solid rgb(127,127,127)',
+        cursor: 'pointer',
+        verticalAlign: 'middle'
+      },
+      id: "transDiv",
+      className: "span12 text-center"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "icon icon-hand-right "
+    }), "\xA0\xA0", /*#__PURE__*/React.createElement("a", {
+      id: "redirectAdmissionLink"
+    }, /*#__PURE__*/React.createElement("b", {
+      style: {
+        fontSize: '13px',
+        textDecoration: 'underline',
+        verticalAlign: 'middle'
+      },
+      className: "fg-black"
+    }, "Click here for Next Year Admissions "), " ", /*#__PURE__*/React.createElement("i", {
+      style: {
+        fontSize: '13px',
+        textDecoration: 'underline',
+        verticalAlign: 'middle'
+      }
+    })))))));
+  }
+  if (props.customer == "DES" || props.customer == "SIES") {
+    $(".subject_list").show();
+    SubjectList = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: BoxClassName,
+      id: 'stud' + boxId++,
+      style: styles,
+      onClick: e => {
+        getStudentSubjectList();
+        changeBulletinBar(e);
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: "img/study-process.png"
+    }), " ", /*#__PURE__*/React.createElement("h3", {
+      className: "NewuniformFontStylesBold",
+      style: {
+        display: 'inline',
+        margin: '2px'
+      },
+      id: "subjectListCountNew"
+    }), /*#__PURE__*/React.createElement("h2", {
+      className: "EvtDashboardTxt panelDash uniformFontStyles"
+    }, "Course List")), /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("table", {
+      style: {
+        width: '100%'
+      }
+    }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+      style: {
+        display: 'none',
+        backgroundColor: '#e0e0e0',
+        borderTop: '2px solid rgb(127,127,127)',
+        borderBottom: '2px solid rgb(127,127,127)',
+        borderLeft: '2px solid rgb(127,127,127)',
+        borderRight: '2px solid rgb(127,127,127)',
+        cursor: 'pointer',
+        verticalAlign: 'middle'
+      },
+      id: "transDiv",
+      className: "span12 text-center"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "icon icon-hand-right "
+    }), "\xA0\xA0", /*#__PURE__*/React.createElement("a", {
+      id: "redirectAdmissionLink"
+    }, /*#__PURE__*/React.createElement("b", {
+      style: {
+        fontSize: '13px',
+        textDecoration: 'underline',
+        verticalAlign: 'middle'
+      },
+      className: "fg-black"
+    }, "Click here for Next Year Admissions "), " ", /*#__PURE__*/React.createElement("i", {
+      style: {
+        fontSize: '13px',
+        textDecoration: 'underline',
+        verticalAlign: 'middle'
+      }
+    })))))));
+  } else {
+    if (props.CourseType != "COURSE_TYPE_SCHOOL") {
+      if (!(props.customer == "INDIRA_PUNE" || props.customer == "MATSUNIVERSITY" || props.customer == "HPTELIBRARY" || props.customer == "HPTU" || props.customer == "JDGROUP" || props.customer == "MIT" || props.customer == "XISS" || props.customer == "WESCHOOL" || props.customer == "ABS" || props.customer == "RAMAIAH" || props.customer == "RAMAIAH_UNIVERSITY" || props.customer == "SPIT" || props.customer == "MGMU" || props.customer == "REVA_UNIVERSITY" || props.customer == "SIES")) {
+        if (props.customer == "IMT_NAGPUR" || props.customer == "IMT_GAZIABAD" || props.customer == "IMT_HYDERABAD") {
+          $(".subject").show();
+          SubjectList = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+            className: BoxClassName,
+            id: 'stud' + boxId++,
+            style: styles,
+            onClick: e => {
+              showSubjectDetails();
+              changeBulletinBar(e);
+            }
+          }, /*#__PURE__*/React.createElement("h3", {
+            style: {
+              display: 'inline',
+              margin: '2px'
+            },
+            className: "NewuniformFontStylesBold",
+            id: "subjectListCountNew"
+          }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+            fontSize: '15px',
+            color: '#0b4971'
+          })), /*#__PURE__*/React.createElement("h2", {
+            className: "EvtDashboardTxt panelDash uniformFontStyles"
+          }, " Subjects")), " ");
+        } else {
+          if (props.customer == "STJOHNS" || props.customer == "WESCHOOL" || props.customer == "VCET") {
+            Placement = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+              className: BoxClassName,
+              id: 'stud' + boxId++,
+              style: styles,
+              onClick: e => {
+                window.location = "manageDocument.json";
+              }
+            }, /*#__PURE__*/React.createElement("i", {
+              className: "fa fa-folder-open-o fa-2x"
+            }), /*#__PURE__*/React.createElement("h2", {
+              className: "EvtDashboardTxt panelDash uniformFontStyles"
+            }, "DMS")));
+          } else if (props.customer != "XLRI") {
+            $(".placement").show();
+            Placement = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+              className: BoxClassName,
+              id: 'stud' + boxId++,
+              style: styles,
+              onClick: e => {
+                getPlacementDetail(1);
+                changeBulletinBar(e);
+              }
+            }, /*#__PURE__*/React.createElement("h3", {
+              className: "NewuniformFontStylesBold",
+              style: {
+                display: 'inline',
+                margin: '2px'
+              },
+              id: "companyCount"
+            }, faIcon("fa fa-spinner fa-pulse fa-fw", {
+              fontSize: '15px',
+              color: '#0b4971'
+            })), /*#__PURE__*/React.createElement("h2", {
+              className: "EvtDashboardTxt panelDash uniformFontStyles"
+            }, "Placement")));
+          }
+          if (props.customer == "SRM_SIKKIM") {
+            quickLink = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+              className: BoxClassName,
+              id: 'stud' + boxId++,
+              style: styles,
+              onClick: e => {
+                quickLinksPopup(props);
+              }
+            }, /*#__PURE__*/React.createElement("i", {
+              className: "fa fa-external-link fa-x"
+            }), /*#__PURE__*/React.createElement("h2", {
+              className: "EvtDashboardTxt panelDash uniformFontStyles"
+            }, "Quick Links")));
+          }
+        }
+      }
+    } else {
+      if (props.customer != "INDIRA_PUNE") {
+        $(".transport").show();
+        Transport = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+          className: BoxClassName,
+          id: 'stud' + boxId++,
+          style: styles,
+          onClick: e => {
+            getTransportDetail(1);
+            changeBulletinBar(e);
+          }
+        }, /*#__PURE__*/React.createElement("h3", {
+          className: "NewuniformFontStylesBold",
+          style: {
+            display: 'inline',
+            margin: '2px'
+          },
+          id: "TransportCount"
+        }, "-"), /*#__PURE__*/React.createElement("h2", {
+          className: "EvtDashboardTxt panelDash uniformFontStyles"
+        }, "Transport")), " ");
+      }
+    }
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: '5px',
+      backgroundColor: '#fff !important',
+      cursor: 'pointer',
+      textAlign: 'center',
+      marginLeft: '0px',
+      paddingTop: '10px'
+    },
+    id: "stud1",
+    className: BoxClassName,
+    onClick: e => {
+      props.state.viewAnnouncemnet();
+      changeBulletinBar(e);
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "NewuniformFontStylesBold",
+    style: {
+      display: 'inline',
+      margin: '2px'
+    },
+    id: "announcementCount"
+  }), /*#__PURE__*/React.createElement("h2", {
+    className: "EvtDashboardTxt ann panelDash uniformFontStyles"
+  }, "Announcements")), /*#__PURE__*/React.createElement("div", {
+    style: styles,
+    className: BoxClassName,
+    id: "stud2",
+    onClick: e => {
+      showAttendencePage();
+      changeBulletinBar(e);
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "NewuniformFontStylesBold",
+    style: {
+      display: 'inline',
+      margin: '2px'
+    },
+    id: "attendencePer"
+  }), /*#__PURE__*/React.createElement("h2", {
+    className: "EvtDashboardTxt panelDash uniformFontStyles"
+  }, studDashboardLblStudSide == true || studDashboardLblStudSide == "true" ? 'LS attendance' : 'Attendance', " ")), CustomizeMiddleBox, Task, Placement, SubjectList, Transport, AddmisionLink, quickLink);
+}
+function StudentTasks(props) {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "accordion",
+    id: "accordionExample",
+    style: {
+      width: '100%'
+    }
+  }, props.jobTray.map((posts, i) => {
+    let action;
+    let posted;
+    if (posts.isRead == "false") {
+      if (posts.actionurl != "") {
+        if (posts.actionurl.split(':')[0] == "call") {
+          action = /*#__PURE__*/React.createElement("a", {
+            className: "btn btn-success btn-mini",
+            style: {
+              margin: '5px',
+              paddingLeft: '10px'
+            },
+            onclick: posts.actionurl.split(':')[1]
+          }, "check");
+        } else {
+          action = /*#__PURE__*/React.createElement("a", {
+            className: "btn btn-success btn-mini",
+            style: {
+              margin: '5px',
+              paddingLeft: '10px'
+            },
+            href: posts.actionurl
+          }, "check");
+        }
+      }
+    }
+    let assignTime = "";
+    let assignDate = "";
+    if (posts.JobAssignedTime != "" && posts.JobAssignedTime != undefined && posts.JobAssignedTime != null) {
+      assignTime = 'on ' + posts.JobAssignedTime;
+    }
+    if (posts.JobAssignedDate != "" && posts.JobAssignedDate != undefined && posts.JobAssignedDate != null) {
+      assignDate = $.datepicker.formatDate('M dd, yy', new Date(posts.JobAssignedDate));
+    }
+    if (posts.byUsername != "" && posts.byUsername != undefined && posts.byUsername != null) {
+      posted = /*#__PURE__*/React.createElement("span", null, assignTime + " ", " ", assignDate + "  ", /*#__PURE__*/React.createElement("b", null, " By " + posts.byUsername));
+    } else {
+      posted = /*#__PURE__*/React.createElement("span", null, assignTime + " ", " ", assignDate);
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      className: "accordion-group",
+      key: i
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "accordion-heading"
+    }, /*#__PURE__*/React.createElement("a", {
+      className: "accordion-toggle",
+      "data-toggle": "collapse",
+      "data-parent": "#accordionExample",
+      href: '#accordion_' + i,
+      "aria-expanded": "false"
+    }, /*#__PURE__*/React.createElement("strong", null, posts.JobHeading), /*#__PURE__*/React.createElement("span", {
+      style: {
+        float: 'right'
+      }
+    }, posted))), /*#__PURE__*/React.createElement("div", {
+      id: 'accordion_' + i,
+      className: "accordion-body collapse"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "accordion-inner"
+    }, posts.JobDescription, /*#__PURE__*/React.createElement("span", {
+      style: {
+        float: 'right'
+      }
+    }, action))));
+  })));
+}
+function StudentAnnouncement(props) {
+  if (props.announcementArr.length == 0) {
+    return /*#__PURE__*/React.createElement("h4", {
+      style: {
+        textAlign: 'center',
+        fontSize: '14px',
+        padding: '5px'
+      }
+    }, "No  Announcements");
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "accordion",
+    id: "accordionExample1",
+    style: {
+      width: '98%'
+    }
+  }, props.announcementArr.map((obj, i) => {
+    let posted = /*#__PURE__*/React.createElement("span", null, "On  ", obj.createdDate, " by ", /*#__PURE__*/React.createElement("b", null, obj.employeeName));
+    let annoucemnetHdr;
+    try {
+      annoucemnetHdr = /*#__PURE__*/React.createElement("strong", null, decodeURIComponent(obj.heading));
+    } catch (e) {
+      annoucemnetHdr = /*#__PURE__*/React.createElement("strong", null, obj.heading);
+    }
+    let div = "div";
+    return /*#__PURE__*/React.createElement("div", {
+      className: "accordion-group",
+      key: i
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "accordion-heading"
+    }, /*#__PURE__*/React.createElement("a", {
+      className: "accordion-toggle",
+      "data-toggle": "collapse",
+      "data-parent": "#accordionExample1",
+      onClick: e => {
+        viewAnnouncementDetailNew(obj.announcementId);
+      },
+      href: '#accordion_' + obj.announcementId,
+      "aria-expanded": "false"
+    }, /*#__PURE__*/React.createElement("strong", null, annoucemnetHdr), /*#__PURE__*/React.createElement("span", {
+      style: {
+        float: 'right'
+      }
+    }, posted))), /*#__PURE__*/React.createElement("div", {
+      id: 'accordion_' + obj.announcementId,
+      className: "accordion-body collapse"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "accordion-inner"
+    }, /*#__PURE__*/React.createElement("div", {
+      id: 'announcementBody-' + obj.announcementId
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "footer",
+      style: {
+        float: 'right',
+        marginBottom: '10px'
+      }
+    }, /*#__PURE__*/React.createElement("a", {
+      title: "Move to Trash",
+      onClick: e => {
+        removeStudentAnnouncement(obj.announcementId, div, obj.isPermanent);
+        setReadAnnouncement(obj.announcementId);
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: "img/trash.png"
+    }))))));
+  })));
+}
+function changeBulletinBar(ele) {
+  var EvtDashboardTxt = $(ele.target).find('.EvtDashboardTxt').text();
+  var boiler = "";
+  if (EvtDashboardTxt == "Announcements") {
+    boiler += '<i  class="fa fa-bullhorn fa-lg" ></i>&nbsp;&nbsp' + EvtDashboardTxt;
+  } else if (EvtDashboardTxt == "Task") {
+    boiler += '<i class="fa fa-list-alt fa-lg"></i>&nbsp;&nbsp' + EvtDashboardTxt;
+  } else if (EvtDashboardTxt == "Placement") {
+    boiler += '<i class="fa fa-handshake-o fa-lg"></i>&nbsp;&nbsp' + EvtDashboardTxt;
+  } else {
+    boiler += '<i class="fa fa-inbox fa-lg"></i>&nbsp;&nbsp;BULLETIN BOARD</span>';
+  }
+  $('#currentSelection').html(boiler);
+}
+class BulletinBoard extends React.Component {
+  constructor() {
+    super();
+    this.state = {
+      customer: $('#customerHelper').val()
+    };
+  }
+  render() {
+    let ComposeAndShare;
+    const {
+      customer
+    } = this.state;
+    if (!(customer == "IMT_NAGPUR" || customer == "IMT_GAZIABAD" || customer == "IMT_HYDERABAD")) {
+      ComposeAndShare = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", null, " | "), /*#__PURE__*/React.createElement("a", {
+        id: "bulletinStatus",
+        className: "compose",
+        onClick: e => {
+          bulletinStatus(e);
+        }
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fa fa-envelope fa-lg"
+      }), "\xA0Compose\xA0"), /*#__PURE__*/React.createElement("a", {
+        id: "bulletinStatus",
+        style: {
+          display: 'none'
+        },
+        className: "compose",
+        onClick: e => {
+          bulletinStatus(e);
+        }
+      }, /*#__PURE__*/React.createElement("i", {
+        className: "fa fa-times-circle fa-lg"
+      })));
+    }
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("legend", {
+      className: "buletinCls",
+      style: {
+        width: '97%'
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: '11px'
+      },
+      id: "currentSelection"
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-inbox fa-lg"
+    }), "\xA0\xA0BULLETIN BOARD"), /*#__PURE__*/React.createElement("span", {
+      className: "pull-right",
+      style: {
+        fontSize: '11px',
+        textTransform: 'none'
+      }
+    }, /*#__PURE__*/React.createElement("a", {
+      bulletintype: "Posts",
+      onClick: e => {
+        getAlumniPost(10);
+      }
+    }, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-bullhorn fa-lg"
+    }), "\xA0View All Posts\xA0"), ComposeAndShare))), /*#__PURE__*/React.createElement("br", null));
+  }
+}
+$(document).ready(function () {
+  ReactDOM.render( /*#__PURE__*/React.createElement(BulletinBoard, null), document.getElementById('BulletinBoard'));
+  ReactDOM.render( /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AlumniPost, null)), document.getElementById('divalumpost'));
+});
+function StudentDashboardList1(props) {
+  let CustomiseList;
+  let profileLink;
+  let syllabusLink;
+  let acadFeesLink;
+  const Linkstyle = {
+    height: '100%',
+    width: '100%'
+  };
+  var customerHelpStr = $('#customerHelper').val();
+  if (customerHelpStr == "IMT_NAGPUR" || customerHelpStr == "IMT_GAZIABAD" || customerHelpStr == "IMT_HYDERABAD") {
+    profileLink = "stu_studentProfileIMT.htm";
+    syllabusLink = "studentCourseFileNew.htm";
+  } else if (props.CourseType == "COURSE_TYPE_SCHOOL" && props.SubCourseType == "COURSE_TYPE_SCHOOL") {
+    profileLink = "schoolForm.htm";
+    syllabusLink = "studentCourseFileNew.htm";
+  } else {
+    profileLink = "stu_studentProfile.htm";
+    syllabusLink = "studentCourseFileNew.htm";
+  }
+  var newFeesAcdemicUiFlag = $('#newFeesAcdemicUiFlag').val() == '' || $('#newFeesAcdemicUiFlag').val() == undefined ? false : true;
+  var studDashboardLblStudSide = $('#studDashboardLblStudSide').val() == '' || $('#studDashboardLblStudSide').val() == undefined || $('#studDashboardLblStudSide').val() == "false" || $('#studDashboardLblStudSide').val() == null || $('#studDashboardLblStudSide').val() == false ? false : true;
+  if (customerHelpStr == "GOKHALE_INSTITUTE" || customerHelpStr == "MEGHE" || newFeesAcdemicUiFlag) {
+    acadFeesLink = 'studentAcademicFeesPayment.htm';
+  } else {
+    acadFeesLink = 'studentFinanceDetails.htm';
+  }
+  let HostelTr;
+  if (customerHelpStr != "SIES" && customerHelpStr != "XLRI" && customerHelpStr != "SRM_SIKKIM") {
+    HostelTr = /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-building fa-lg"
+    })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+      id: "a_hostel",
+      href: "studentHostelHomeDetails.htm"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: Linkstyle
+    }, "HOSTEL"))));
+  }
+  let CustomerSpecific;
+  if (customerHelpStr != "INDIRA_PUNE" && customerHelpStr != "IMT_NAGPUR" && customerHelpStr != "IMT_GAZIABAD" && customerHelpStr != "IMT_HYDERABAD") {
+    CustomerSpecific = /*#__PURE__*/React.createElement(React.Fragment, null, customerHelpStr != "XLRI" && customerHelpStr != "SRM_SIKKIM" && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-file-text fa-lg"
+    })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+      id: "a_leave",
+      href: "studentLeaveApplication.htm"
+    }, " ", /*#__PURE__*/React.createElement("div", {
+      style: Linkstyle
+    }, "LEAVE DETAILS")))), HostelTr, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-male fa-lg"
+    })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+      id: "a_mentor",
+      href: "stu_mentorCommunicationSmsEmail.htm"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: Linkstyle
+    }, "CONTACT MENTOR")))), customerHelpStr != "BITS_MESRA" && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+      className: "fa fa-comments-o fa-lg"
+    })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+      id: "a_blogs",
+      href: "viewCommentBlog.htm"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: Linkstyle
+    }, "BLOGS")))));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "avatar-container homeSection stuSideBar "
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "table table-considered borderless"
+  }, /*#__PURE__*/React.createElement("tbody", {
+    className: "nav nav-list studDashli "
+  }, /*#__PURE__*/React.createElement("tr", {
+    className: "active"
+  }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-dashboard fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    href: "home.htm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, "DASHBOARD")))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-user fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_profile",
+    href: profileLink
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, "PROFILE")))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-book fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_syllabus",
+    href: syllabusLink
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, " SYLLABUS")))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-calendar fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_academicCalender",
+    href: "studentScheduleAcademicCalender.htm"
+  }, " ", /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, studDashboardLblStudSide === true ? "ACADEMIC CALENDAR" : "CALENDAR")))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-clock-o fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_timeTable",
+    href: "stu_StudentTimeTable.htm",
+    onClick: e => {
+      getTimeTableDetails();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, "TIME TABLE")))), customerHelpStr != "XLRI" && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-bar-chart fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_library",
+    href: "stu_studentLibraryDetails.htm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, studDashboardLblStudSide === true ? "DIGITAL LIBRARY" : /*#__PURE__*/React.createElement(React.Fragment, null, "LIBRARY(", /*#__PURE__*/React.createElement("span", {
+    id: "bookIssueCount"
+  }, "-"), ")"))))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("i", {
+    className: "fa fa-rupee fa-lg"
+  })), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("a", {
+    id: "a_fees",
+    href: acadFeesLink
+  }, /*#__PURE__*/React.createElement("div", {
+    style: Linkstyle
+  }, "FEES DETAILS")))), CustomerSpecific)));
+}
+function stdProfilePic() {
+  var Maxsize = 5242880;
+  $image_crop = $('#image_demo').croppie({
+    enableExif: true,
+    enableOrientation: true,
+    viewport: {
+      width: 200,
+      height: 200,
+      type: 'square' //circle
+    },
+    boundary: {
+      width: 300,
+      height: 300
+    }
+  });
+  $('#profilePictureUpload').on('change', function () {
+    var reader = new FileReader();
+    reader.onload = function (event) {
+      $image_crop.croppie('bind', {
+        url: event.target.result
+      }).then(function () {
+        console.log('jQuery bind complete');
+      });
+    };
+    reader.readAsDataURL(this.files[0]);
+    $('#uploadimageModal').modal('show');
+  });
+  $(function () {
+    $('.vanilla-rotate').on('click', function (ev) {
+      $image_crop.croppie('rotate', parseInt($(this).data('deg')));
+    });
+  });
+  $('.crop_image').click(function (event) {
+    $image_crop.croppie('result', {
+      type: 'canvas',
+      size: 'viewport'
+    }).then(function (response) {
+      console.log(response);
+      var base64ImageContent = response.replace(/^data:image\/(png|jpg);base64,/, "");
+      var blob = base64ToBlob(base64ImageContent, 'image/png');
+      var formData = new FormData();
+      formData.append('fileData', blob);
+      $.ajax({
+        url: "uploadStudentProfileImage.json",
+        type: "POST",
+        contentType: false,
+        processData: false,
+        data: formData,
+        name: 'fileData',
+        size: Maxsize,
+        onSubmit: function (data) {
+          //if(extension.toString().toLowerCase() == 'png' || extension.toString().toLowerCase() == 'jpg',extension.toString().toLowerCase() == 'jpeg'){
+          startLoading();
+          this.setData({
+            'fileSize': Maxsize
+          });
+        },
+        success: function (data) {
+          $('#uploadimageModal').modal('hide');
+          if (isNaN(data)) {
+            //showErrorMessage('File size is larger than specified',10000);
+            jAlert("File size is larger than specified !!");
+          } else {
+            var imageBoiler = '<img src="getStudentProfileImage.json?type=profile&someparam=' + data + '" alt="Photo" name="Photo" width="120px" height="120px" border="1" align="right" style="background-color: #FFFFFF" />';
+            $('#stdProfileImage2342').html(imageBoiler);
+            jAlert("Image uploaded successfully !!!");
+            imageStatus = true;
+            showSuccessMessage('Image uploaded. ', 10000);
+            $('#profileImgModal').modal('hide');
+          }
+          //$('#uploaded_image').html(data);
+          $image_crop.croppie('destroy');
+        }
+      });
+    });
+  });
+}
+function base64ToBlob(base64, mime) {
+  mime = mime || '';
+  var sliceSize = 1024;
+  var byteChars = window.atob(base64);
+  var byteArrays = [];
+  for (var offset = 0, len = byteChars.length; offset < len; offset += sliceSize) {
+    var slice = byteChars.slice(offset, offset + sliceSize);
+    var byteNumbers = new Array(slice.length);
+    for (var i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    var byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+  return new Blob(byteArrays, {
+    type: mime
+  });
+}
+let gpropVar = null;
+function quickLinksPopup(props) {
+  gpropVar = null;
+  $("#divalumpost").hide();
+  $('#tabResult').show();
+  gpropVar = props;
+  var bodyB = `	
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="https://online-degree.swayam2.ac.in/" target="_blank"><strong>LMS</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>Coursera</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="applyLinkForLiveSession();"><strong>Live Session</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>Participation Status</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>My Assignment Status</strong></a>
+	</div></div>
+	
+	`;
+  $('#tabResult').html(bodyB);
+}
+function applyLinkForLiveSession() {
+  try {
+    var studentCourse = $('#courseNameTemp').val();
+    if (gpropVar.customer == "SRM_SIKKIM" && studentCourse == "MBA") {
+      window.open("https://meet.google.com/ddu-rduf-nfg", "_blank");
+    } else if (gpropVar.customer == "SRM_SIKKIM" && studentCourse == "MCA") {
+      window.open("https://meet.google.com/ebv-evju-cko", "_blank");
+    } else {
+      jAlert("Link Not Mapped!");
+    }
+  } catch (e) {}
+}
+function underDevlopment() {
+  jAlert("Rolling Out Soon.");
+}”ò¿Ÿ?  (         Ê3ÃŒ      _defineProperty    ﬂN#9      obj    B¸ø;      key    |ÀL√      _toPropertyKey     âœ#¸      _toPrimitive   IŸX´,      @@toPrimitive must return a primitive value.   €ç∏}      SideBarStudentDashboard    ,ï
+x      React      ≤xi	      Component	      e      customer
+   ‘⁄$»      #customerHelper    &⁄õ      val    ˛tuW      error      rj—›
+      CourseType     wü      #courseType    æK˛2	      studentId      §˙ò
+      #studentId     É:Fˇ      studentName    	w±      #studentName   ≈},      SubCourseType      «pQ      #SubCourseType     ºf_á      studentLockStatus      ﬂ´¢Å      #studentLockStatus     dJ∆      componentDidMount      Ä„q      getAcademicInformation     "Gõ      getAdmissionLink   ‘ÍÕ˜      render     DC      createElement      Mkc      Fragment   ÊÿËq      ProfileInfo    \zZ      StudentDashboardList1      ∏OÄ      document    ¢Ñ
+      ready!      ·       ReactDOM"   t«£      getElementById#     Î∆±      sideBarStudentDashboard$    øÂ!      faIcon%     ^¶LŒ      cls&    6CY>	      className'      >¬◊      spinner(    éÜ+:      fa fa-spinner fa-pulse fa-fw)   CâÎ4      aria-hidden*     Ø„0      MiddleBoxStudentDashboard+      ‹F©’      isProfileUpdated,   Àuˆi      hdnUserRole-    _lh∫      #hdnUserRole.   âP      checkProfileImage.json/     ˇÿö˘      student0    „%>(      Student1    Å£Øu      stu_checkProfileImage.json2     æd»ê      ajax3   DoÄw      dataType4   O€      junoSpinner5    …©\9      success6    ‡Ô€µ      isImage7    1Ôf       boiler8     kø .     <div class="thumbnail" id="stdProfileImage2342" style="height:120px;width:120px;margin-left:20px"><img src="getStudentProfileImage.json?id=-1249993431" alt="Photo" name="Photo" style="background-color: #FFFFFF" width="120px" height="120px" border="1" align="right"><br></div>9    l+˛‰     &nbsp&nbsp&nbsp&nbsp&nbsp<div class="btn btn-info" style="width:110px;height:20px">Upload Image<input style="margin-top:-40px;margin-left:-35px;opacity:0;" type="file" name="fileData" id="profilePictureUpload" onclick="stdProfilePic();" accept="image/*"></div>:   C*C|      #profileImgModalBodyDiv;    ‘„X      html<   ¬ˆB      #profileImgModal=    ∫˚      modal>      HáíK      show?   >ü      css@    Ú(:…      margin-leftA    ÎƒJ˚      widthB      ‡Õ      bindC   {\an      handleCloseprofileD     *∆Î      setStateE   uÀ›Á      handleCloseF    ß1÷P      isLoadedG   ˆ=      announcementArrH    ∞wÔ      assestmentArrI      MoIâ      TaskArrJ    ≈§5û      placementArrK   l£æ      jobTrayL    u1G      isProfileUploadModalM   ª ≤      fetchAnnouncementN      Bõô      fetchAttedanceO     J“       fetchAssignmentsP   oº^      fetchJobTrayForStudentQ     ¯8ë!      getUnreadStudentAnnouncement.jsonR      -/0á%      stu_getUnreadStudentAnnouncement.jsonS      Ñ–ˇ
+      beforeSendT     Dï»á      completeU   ı≤z      jArrayV     ∂iÑ'      #announcementCountW     à3¿µ      textX   Àsq5      #countAnnouncementY     ∑&+Ú      #NoticeCounterZ     üvÙ}      hide[   ◊d1%      getStudentAttendancePercentageSP.json\      @≤åe)      stu_getStudentAttendancePercentageSP.json]      Ω!t      per^    n ù˚      NIET_   ÉKn_      #attendencePer`     2,.      Problema    Òp^      jAlertb     gàı◊0      Something went wrong, Please try after some timec   ”ô‡m      getStudentAssignments.jsond     –ºÈ      stu_getStudentAssignments.jsone     ã◊˘ˆ      #assignmentCountf   ΩKl™      CountAssignmentg    6˜¯'      #assignmentPostIdsh     ì◊i{      postIdsi    §xM      getPlacementDetailj     çæ)C      getStudentJobTrayAlerts.jsonk   ı¨_       stu_getStudentJobTrayAlerts.jsonl   7
+ÖÊ      #jobTrayRefereshImagem      Âπö÷      Updating...n    ÿL      Reloado     6BÒ      notificationJArrayp      $ŸN
+      #taskCountq     >Ì4      viewAnnouncemnetr   (¸-ï      #divalumposts   4ø¨é
+      SearchWordt     Õ∂•o
+      filterFlagu     [C-/      unreadv     9´ó      #announcementDetailsw   ∏àÀ¶      getUnreadAnnouncementx      ˘‹QA      getUnreadStudentMessagey    µCÀb      getStudentAnnouncement.jsonz    6ó(Å      data{   rE›      searchKeyword|      ˘◊Ú	      tabResult}      ÎijT      unmountComponentAtNode~     ≠Æ˘      StudentAnnouncement    ï¢¶3      getJobTrayAlertsÄ   ØŸäa
+      #tabResultÅ     b{su      slowÇ   ‰xEò      StudentTasksÉ   K1∂J%      showTodaysConflictTimetableForStudentÑ      9≈ #      getbooksIssuedCountÖ    ç˜K)      studentSubjectCountÜ    FZr      showTodaysTimetableForStudentá      4„#      componentWillUnmountà   ˛Q1      consoleâ    =X˚      logä    {ı∫      Unmountã    §#`      itemså      æ-ã(	      MiddleBoxç      {ßÏn      middleBoxStudentDashboardé       ¶      propsè      ú≥ÊŸ      divê    ˛*˙*(      avatar-container homeSection profileDashë   e ú      imgí    •∑I∂	      pull-leftì      _‘ª      64pxî   ∑…≈      heightï     5g      150pxñ      ú∑»õ      srcó    ⁄~œ      getStudentProfileImage.jsonò    Kl¸      altô    Û˝Y      Photoö      ÎÊ[l      studentProfilePhotoõ    ∂Cõ      backgroundColorú    |<Ëô      #FFFFFFù    Ç⁄Œá	      maxHeightû      ÿ      270pxü      xÏñ=      studentDesc†    ±4PB      span°   Ï
+ó      color¢      ‰◊Í      red£    Ë´–ˆ      LOCKED§     √úΩ      small•      Ëc5ò      gray¶   35∑s      rollNoß     V
+§n      styles®     ∏=ÌL      borderRadius©   qÒ∆      5px™    £~`      #fff !important´    ˇ∆N      cursor¨     ˘Èÿ9      pointer≠    ì˙@	      textAlignÆ      rLtö      centerØ     GÁ$W
+      marginLeft∞     –£¥      10px±   lâçµ
+      paddingTop≤     ñè-o      BoxClassName≥   [Ú”¸>      avatar-container homeSection EvtDashboard   span2  text-center¥     UhT      CustomizeMiddleBoxµ      m‰2	      Placement∂      ü›lÆ	      quickLink∑      â~l
+      SubjectList∏    ≠ÛM      boxIdπ      òsƒ      studDashboardLblStudSide∫   ËÕ„¸      #studDashboardLblStudSideª      Q◊ÁW      COURSE_TYPE_SCHOOLº     ªûÃü
+      IMT_NAGPURΩ     ,€ı∂      IMT_GAZIABADæ   ò¥!Ô      IMT_HYDERABADø      F} 7
+      .home_work¿     Ê„ø      stud¡   ;ã¢Ô      onClick¬    ›N˛      showAssignmentPage√     ¥ºvè      changeBulletinBarƒ      ƒX∆`      NewuniformFontStylesBold≈   e}ü      display∆    Tünì      inline«     d¸9      margin»     ˛Åñ      2px…    ≈t"T+      EvtDashboardTxt panelDash uniformFontStyles     »
+‹ò	      Home WorkÀ      Ÿoh{      assignmentPostIdsÃ      Ñ€ËW      hiddenÕ     B;h      .assignmentsŒ    ‡πÕ      assignmentCountœ    ˜ûe      fontSize–   ≥ﬁ«k      15px—   òÚ>      #0b4971“    Ùf⁄¿       Assignments”   ªWU      .assessments‘   ﬁ‡Áé/      if(!(props.CourseType == "COURSE_TYPE_SCHOOL"))’    »Ö!˙
+      Assessment÷     ı$À*      Task◊   §8+Œ      .taskÿ      ≤u≠¡	      taskCountŸ      µ…nµ      Feedback⁄   B-#      INDIRA_PUNE€    ¬(}œ      MATSUNIVERSITY‹     0¶g      HPTELIBRARY›    é6Ñ      HPTUﬁ   \Ådê      JDGROUPﬂ    Ÿ‹¯Ä      MIT‡    cœi      XISS·   .kë      WESCHOOL‚   #O™      ABS„    Z¬∂Ç      RAMAIAH‰    boƒ      RAMAIAH_UNIVERSITYÂ     @t‰      SPITÊ   €Z      MGMUÁ   j1ÌÄ      REVA_UNIVERSITYË    ãä«π      SIESÈ   ¯2áâ      windowÍ     0+QA      locationÎ   £í&!      registerforPlacements.htmÏ      R¿Ê      companyCountPlcÌ    Ö,+      AddmisionLinkÓ      íûºk	      TransportÔ      üÛ_E      DYPATIL    ∂dî      tableÒ      ª?y      100%Ú   ßèâv      tbodyÛ      ,Ω      noneÙ   ¶À˝      #e0e0e0ı    %3ÎV	      borderTopˆ      Q˝Ωf      2px solid rgb(127,127,127)˜     ◊Áˇ˝      borderBottom¯   ô`≠ò
+      borderLeft˘     n*é      borderRight˙    vò
+      verticalAlign˚      rÀ˚J      middle¸     <Ó_c      transDiv˝   ◊oa´      span12 text-center˛     óp˙§      icon icon-hand-right ˇ      ‹7◊ê      ††     ›Î'“      redirectAdmissionLink     ﬁBÃÏ      13px  j&_      textDecoration    Ó„e	      underline     ∆!ô      fg-black  Ñ±ì $      Click here for Next Year Admissions   c+^      DES   =My>      .subject_list     \MCî      getStudentSubjectList	     ›¢Üú      img/study-process.png
+     8‡§8      subjectListCountNew   7œ›d      Course List   ‚YY      .subject  ı™GG      showSubjectDetails    %94ô	       Subjects     ˝ì/œ      STJOHNS   Ûø˜      VCET  íès»      manageDocument.json   I"}      fa fa-folder-open-o fa-2x     TàA      DMS   «©5û      XLRI  !™%Ω
+      .placement    »ÊQg      companyCount  äáMÑ
+      SRM_SIKKIM    7ó;Æ      quickLinksPopup   ã„æ3      fa fa-external-link fa-x  dÄ$      Quick Links   òoÅß
+      .transport    `q ¿      getTransportDetail    ¨≈N¢      TransportCount    l∆T´      0px   6X“ì      stud1      ûâå      announcementCount!     'Hó/      EvtDashboardTxt ann panelDash uniformFontStyles"   ‘„eZ      Announcements#     }ﬁöı      stud2$     â“é'      showAttendencePage%    t4"`      attendencePer&     œ{Zµ      LS attendance'     Ì∑Ú
+      Attendance(    ∏˝Y	      accordion)     Xsg7      accordionExample*  9Ã      map+   Ü€®≈      posts,     	‡Ï      action-    3«A      posted.    ¿]      isRead/    næΩ	      actionurl0     ∑÷G˜      btn btn-success btn-mini1  wö9      paddingLeft2   EﬁS      onclick3   è¢ü1      check4     ª©`X      href5  ä^áS
+      assignTime6    4VÉÓ
+      assignDate7    9“j      JobAssignedTime8   ∫;∞      on 9   ◊sP      JobAssignedDate:   Jñ˛L
+      datepicker;    à‘m}
+      formatDate<    rÛÔÈ      M dd, yy=  2ƒ›‡
+      byUsername>    xd¡        ?    7<±       By @  °.ŒY      accordion-groupA   ﬂÒı'      accordion-headingB     ô∆®      accordion-toggleC  O°)¯      data-toggleD   #ùÁ¢      collapseE  ”-˙»      data-parentF   J„Q1      #accordionExampleG     RÊÖ’      #accordion_H   tId      aria-expandedI     oÉ	      strongJ    ÏÍ	
+      JobHeadingK    [œ      floatL      ë∏.      rightM     ¥œ\Ã
+      accordion_N    ˙Hª      accordion-body collapseO   ì’Ã      accordion-innerP   ßÉç      JobDescriptionQ    F$¬c      14pxR  /·´B      paddingS   Îÿe      No  AnnouncementsT     øy…„      accordionExample1U     AûÇ¨      98%V   I&E      On  W  F"£J      createdDateX   Á∏Œz       by Y  æ\-a      employeeNameZ  ˘¶˘O      annoucemnetHdr[    c˝)/      heading\   ˇu.      #accordionExample1]    ≤÷¡ã      viewAnnouncementDetailNew^     g¬¬™      announcementId_    yhk±      announcementBody-`     â>Ç˚      footera    FŸEÈ      marginBottomb  “E      titlec     A∑Wê      Move to Trashd     #xª      removeStudentAnnouncemente     {CŸ{      isPermanentf   ˘ﬁËö      setReadAnnouncementg   ™ã©‘      img/trash.pngh     òJô      elei   ≥D∫-      EvtDashboardTxtj   §Ác      .EvtDashboardTxtk  ±gãˇ1      <i  class="fa fa-bullhorn fa-lg" ></i>&nbsp;&nbspl     å|P/      <i class="fa fa-list-alt fa-lg"></i>&nbsp;&nbspm   \°Œ2      <i class="fa fa-handshake-o fa-lg"></i>&nbsp;&nbspn    °«ÚÊB      <i class="fa fa-inbox fa-lg"></i>&nbsp;&nbsp;BULLETIN BOARD</span>o    «LŒˇ      #currentSelectionp     l6™"      BulletinBoardq     «Aª      ComposeAndSharer   h©Ø        | s   Õ=Æı      bulletinStatust    JÈ¶ˇ      composeu   ˘¥      fa fa-envelope fa-lgv  œ≠ãö	      †Compose†w     âÂ&ˇ      fa fa-times-circle fa-lgx  &`«!      legendy    3ŒdÈ
+      buletinClsz    v3∏      97%{   h◊ü      11px|  ‹ø÷      currentSelection}  ¥/F      fa fa-inbox fa-lg~     ˜Õ      ††BULLETIN BOARD  òÔ°Z
+      pull-rightÄ    [(fL      textTransformÅ     
+±]      bulletintypeÇ  Ÿ‰      PostsÉ     ìπ⁄(      getAlumniPostÑ     ˚·O}      fa fa-bullhorn fa-lgÖ  Yac      †View All Posts†Ü  m¢F¨
+      AlumniPostá    Œw.Ÿ      divalumpostà   Ó∑Xu      CustomiseListâ     åæ§º      profileLinkä   »ÍçÚ      syllabusLinkã  Jô‚      acadFeesLinkå  V0_	      Linkstyleç     u†,      customerHelpStré   l∑@      stu_studentProfileIMT.htmè     ee‰o      studentCourseFileNew.htmê   ö      schoolForm.htmë    [›Ô©      stu_studentProfile.htmí    òiy≤      newFeesAcdemicUiFlagì  óÍï>      #newFeesAcdemicUiFlagî     Yxâò      GOKHALE_INSTITUTEï     VfWF      MEGHEñ     iPÜ¸      studentAcademicFeesPayment.htmó    ±      studentFinanceDetails.htmò     ‹ÕU∂      HostelTrô  ê'∏Ú      fa fa-building fa-lgö  äÀéƒ      a_hostelõ  †&ã‰      studentHostelHomeDetails.htmú  4Œ≥      HOSTELù    ´öÔì      CustomerSpecificû  ≤'Zk      fa fa-file-text fa-lgü     –)=á      a_leave†   ønÉ      studentLeaveApplication.htm°   «67      LEAVE DETAILS¢     Ô_«4      fa fa-male fa-lg£  °;$J      a_mentor§  —}{D#      stu_mentorCommunicationSmsEmail.htm•   5l7%      CONTACT MENTOR¶    ,`ÿM
+      BITS_MESRAß    vy      fa fa-comments-o fa-lg®    £q      a_blogs©   ÄÒ≥Õ      viewCommentBlog.htm™    çÖ      BLOGS´     ‘Y6X(      avatar-container homeSection stuSideBar ¨  ≈É˜!      table table-considered borderless≠     7ˆ      nav nav-list studDashli Æ  å®Px      activeØ    Bîf      fa fa-dashboard fa-lg∞     8" ∑      home.htm±  R˘–Ø	      DASHBOARD≤     ;»◊‰      fa fa-user fa-lg≥  ÛáÅF	      a_profile¥     «∫j¥      PROFILEµ   Ä‡bç      fa fa-book fa-lg∂  3Ï
+      a_syllabus∑    Gìã	       SYLLABUS∏     ömΩ      fa fa-calendar fa-lgπ  Ãñ      a_academicCalender∫    Û(yE#      studentScheduleAcademicCalender.htmª   *ñPJ      ACADEMIC CALENDARº     ¡d8{      CALENDARΩ  ÆïÄ      fa fa-clock-o fa-lgæ   p—˝H      a_timeTableø   ßÒ      stu_StudentTimeTable.htm¿  *À‡D      getTimeTableDetails¡   ÓñÉ?
+      TIME TABLE¬    ˚s.∞      fa fa-bar-chart fa-lg√     =Ë@	      a_libraryƒ     „A«y      stu_studentLibraryDetails.htm≈     7ÀV      DIGITAL LIBRARY∆   wOõ∏      LIBRARY(«  £€Ωn      bookIssueCount»    |ùñ„      fa fa-rupee fa-lg…     eâZÓ      a_fees     è°@ò      FEES DETAILSÀ  ÜÄ	      stdProfilePicÃ     è+Ω      MaxsizeÕ   ñÚC      $image_cropŒ   \"Z"      #image_demoœ   $ÀÜ*      croppie–   tp˘˝
+      enableExif—    z"§∞      enableOrientation“     ﬁ#ìc      viewport”  z ªÌ      square‘    QeÔ      boundary’  ıﬂü      #profilePictureUpload÷     Á˛¡      change◊    †R
+d      readerÿ    DvA
+      FileReaderŸ    áƒ{p      onload⁄    II∑P      event€     ˚ÏÉ      jQuery bind complete‹  I_∆      readAsDataURL›     ¥·Pπ      filesﬁ     í‘Cq      #uploadimageModalﬂ     ™µ      .vanilla-rotate‡   ü™‚X      click·     ±ñÕÖ      rotate‚    pàË|      deg„   ÷xit      .crop_image‰   V_      canvasÂ    âOÁù      responseÊ  XPW'      base64ImageContentÁ    ÑË:f      ^data:image\/(png|jpg);base64,Ë    &ËF      blobÈ  S…Ò      base64ToBlobÍ  mNC	      image/pngÎ     Ê¥Ò      formDataÏ  PR<       FormDataÌ  ‹B-      appendÓ    C«l      fileDataÔ  ÿô.      uploadStudentProfileImage.json    ﬂ:      POSTÒ  Yì      contentTypeÚ   b∂,¶      processDataÛ   Èp~      onSubmitÙ   xn      startLoadingı  ún◊´      setDataˆ   ﬁ¶≠      fileSize˜  m%      File size is larger than specified !!¯     $¶\      imageBoiler˘   0ìS=      <img src="getStudentProfileImage.json?type=profile&someparam=˙     ∞Øau      " alt="Photo" name="Photo" width="120px" height="120px" border="1" align="right" style="background-color: #FFFFFF" />˚     ©·ﬁº      #stdProfileImage2342¸  d,ˇç      Image uploaded successfully !!!˝   ÷ß·o      imageStatus˛   y8g      showSuccessMessageˇ    UCø      Image uploaded.    ŒÛ˝      destroy   T¡™       base64    œÿ{      mime  ¬IÔ≤	      sliceSize     ˜»øn	      byteChars     wµ`Ç      atob  @^¬
+      byteArrays    €õÕX      len   ÿÖ Ã      slice	     ≠i‹›      byteNumbers
+   (=S:
+      charCodeAt    1zìö	      byteArray     Ñu2      push  ‘Aˆi      Blob  $#ü      gpropVar  ›i©      bodyB     ≠≠Âß™     	
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="https://online-degree.swayam2.ac.in/" target="_blank"><strong>LMS</strong></a>
+	</div></div>
+	
+	<div class="accordion-group">Ò—.<div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>Coursera</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="applyLinkForLiveSession();"><strong>Live Session</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>Participation Status</strong></a>
+	</div></div>
+	
+	<div class="accordion-group"><div class="accordion-heading">
+		<a class="accordion-toggle" href="#" onclick="underDevlopment();"><strong>My Assignment Status</strong></a>
+	</div></div>
+	
+	    —ˆ      applyLinkForLiveSession   ç¥ïæ      studentCourse     ≥¨Í±      #courseNameTemp   
+	Rn      MBA   óx5      open  ØEÌ$      https://meet.google.com/ddu-rduf-nfg  9“◊^      _blank    ~JÖo      MCA   Ù$2$      https://meet.google.com/ebv-evju-cko  %É‚%      Link Not Mapped!  ’o˙ƒ      underDevlopment   Ö$IŒ      Rolling Out Soon.     ÛnBù      MiddleBoxStudentDashboard/<   ,¢Ÿü&      MiddleBoxStudentDashboard/</<.success<"    ‹X¬D      fetchAnnouncement/<.success<&  ø;X      fetchAttedance/<.success<.     _,ÛW!      fetchJobTrayForStudent/<.success<4     #ML      StudentTasks/<5    K∂H      StudentAnnouncement/<9     åΩw      stdProfilePic/<:   Q@      stdProfilePic/</reader.onload;     ï X‚      stdProfilePic/</reader.onload/<<   ∫˝…/      stdProfilePic/</<     X   É  e   X          ‘   Ô%,â                                                                                      +                 ,                                  -                 .                 /                 0                 1                 2                 3                 4                 5                 6                 7                 8                 9                 :                  ;                 <                                   =                >                                                 ?                 @                  A                  H                                  I                 J      "           K      #           L      $           M      "           N      &           O      "           P      (           Q      )           R      )           S                  T                  U                  V      .                            W                        1                 1                 1                 4                                                                      8          	      9           
+      :                 ;                 9                 8                 >                 >                 >                 >                 8                 C                 C                 C                 C                 8                 H                 H                 H                 H                 8                 M                 M                 M                  8           !      Q                 R           "      R           #      R           $      R           %      8           &      8           '      8           (      8           )      Z                            *                        ]           B      ]           C      _                `           D      `           E      `           F                  G      ≥Oåc            ê  ê  ê  êå  êÇ  ê~  ê√  ê  êÀ êÈ ê ê ê ê  *  p  $                   P              t  i              t  r  e  i               é               é  P      
+   ≤  ¥  µ  ∂  ∑  ∏  π  ÷  Ì  Ó  ß               e               e               e               e               e               e               e               e               e               e               e               e               e               e               é               + i           , - 5 6              é                 Pi           - Z è  P         e               e               e              h i 7              é  ç í π     
+      à â ä ã ò ù å              e                 Ã P              ◊ ã                ⁄                                             ü ã                ⁄             Â Ê Ë Î             z  ã               z  ¯    	              •    	 i               é                           e                                            ã   á                 ã                 ã               	                                         %  
+            *                ã  `á                 ,  J              B  7                ã                                 ,  J  ã                                               U  ã                                 ,  J  ã                                               ]  ã                                 ,  J                                               U                                ,  J  ã                                               U  o  ã                            s  t                                               U                                ã                 ã                                 ã   	   
+         F  ã  	        L  E                            p               ã   á                 ã            q 	               e               e               e                  Ø¬0∞Á     IÙ$KEÆ˙ö         P  ô   M   i           &     (     &  A  î  ñ  ò  ç {  
+     
+      õ  ù         &          
+          °          
+          °          ç         ®  õ  ´  ≠  Ø  ±         &  
+  ç ¡     
+      &  
+     
+    ≈  «         &          ç 0  P        &  ç 
+  ¡           &  
+  ç    
+   ≈  «     
+    œ  °         &          ç 0  P        &  
+  ç ¡           &  
+  ç    
+   ≈  «     
+    œ  °     
+    &  
+     
+    ≈  «         &          ç 0  P        &  ç 
+  ¡           &  
+  ç    
+   ≈  «     
+    œ  °         &          ç 0  P        &  ç 
+  ¡           &  
+  ç    
+   ≈  «     
+    œ  °         &          &  ç 
+  ¡           &  
+  ç    
+   ≈  «     
+    œ  °         &          
+          A          
+  ç &     (   ≈  õ  ı  ˜  ¯  ˘  ´  ˙           &          ç    
+     
+  &         œ   ˙        
+          œ   ˙        &  ç 
+  ¡           ñ          &  
+  ç    
+   ≈  «         &          
+          A          
+  ç &     (   ≈  õ  ı  ˜  ¯  ˘  ´  ˙           &          ç    
+     
+  &         œ   ˙        
+          œ   ˙        &  ç 
+  ¡           
+  &  ç    
+   ≈  «     
+    œ  °         &          &  ç 
+  ¡           &          &          &  ç 
+  ¡           &  
+  ç    
+   ≈  «     
+    œ  °         &          &  ç 
+  ¡           &          &          &  ç 
+  ¡           &  
+  ç    
+   ≈  «         &          
+  ç &  ¡           ®  õ  ´  ≠  Ø  ±         &  
+  ç    
+   ≈  «         &          
+  &  ç ¡           &  
+  ç    
+   ≈  «         &          &  ç 
+        A          &  
+  2    
+   «  1        &  
+  4    
+   «  1    
+    &           &          &  C E 4 H         
+          K    
+     ç &         &          
+          K         
+          ≠  œ  R       &  ç 
+        A     
+     &           &          &  C E ¡  4 H        
+          K    
+     ç &         &          ç    
+     &  
+     
+    K a    
+    b ¡         ñ     
+     î  A         &     
+     ç 4        
+          &     
+     ç 4        
+          &     
+     ç 4        
+          &     
+     ç 4        
+          &          &          &          &          &          4         
+          &     
+     ç 4        
+          &     
+     ç 4        
+          &     
+     ç 4        
+          &          ç 4 ¡        
+          &     
+     ç 4        
+          ç         &     
+     ç 4        
+          – — “ ‘          A  î  0     
+   A  î         J     
+     0  ¯  	   -    J  0  Ò Ú z  {  ¯  Û 5          ˆ         0     #     	                                	            &  )  
+        J  3  4  5           @          E     F     F  G  H  I  J  K  	            L  E     #    J  3     S  T  5          G     #     J  3     S  T  5       #   J  3     S  T  5          J  3  S  T  5          I     (     J  3  z     S  T  5       
+      s  t         G          K            	          	          ç &  ¡        &          ç 
+  &  ¡           ≈          &     
+     &  
+         A     
+     
+  ç        œ          &     
+     &  
+     
+    œ  Ä    
+    Å ¡         &  á&’™ç!´!X   ‰     ÑB¥  Ï               H       ⁄   ∞±   ﬂª   J   p·ö   ó   ·J   ô   ó   ﬂr
+ó   ;‰q   ‰‚>   =   m   =   m   =   ﬂ±   “≤   ﬂª    ª   s ·J   ‰m   w ﬂm   ≤   ﬂ∞±   ﬂª   J   p·ö   ó   ·J   ô   ó   ﬂr
+ó   ;‰q!   ‰‚>   =   m"   =#   m$   =%   m&   ='   m(   =)   m*   =+   m,   =-   m.   =   m/   =0   m1   =   ﬂ±   “≤2   ﬂª    ª   s ·J   ‰m3   w ﬂ∞±   ﬂª   J   p·ö   ó:   ·J   ô   ó;   ﬂr
+ó<   ;‰q5   ‰‚>   =   m6   =   ﬂ±   “≤7   ﬂª    ª   s ·J   ‰m8   w ﬂ≤9   ﬂ•5fƒ@Jñ0)`ˇˇˇˇP
+ˇˇˇ˙PD,`;3fƒ@hJÄ  ÑJÄ  †JÄ  ∫JÄ  ÷JÄ  ˜JÄ JÄ  ñ0Ä #`ˇˇˇˇP
+ˇˇˇ˙P4Ä Ñfƒ@Ä ãñ0Ä ¬`ˇˇˇˇP
+ˇˇˇ˙PDÄ £`GÄ –PÄÄÄ‰        d   ˇˇˇˇ    ò   ™   ˇˇˇˇ4   f  Z   ˇˇˇˇ»   ªPéñ»   u                         ª    º s Ã ﬂº º  "öD   ó   ª   ·J   ‰º  º 9   º <   <   <   <   w ﬂô   ó   º  º º Nﬂó   º  ¢• `ˇˇˇÒP``ˇˇˇ±Pk`ê `QÄà   ç÷˘à   H                        ª    º     s Õ   ﬂæ   ö   ó   æ   ô   ó   ª    æ   s ó   ¢• `ˇˇˇˇP` § ˇˇˇ˘PQÄÄÄX  0†´òX  Â                        º  Åù   ó   ﬂº  ó   ö   ó   º  ¢ó   º  ª   J   KÕ   ﬂæ   öe   ó	   æ   ·J   ‰º  º ù   ó   ﬂ   ó   s Õ  ﬂæ  Åö   ó   æ  ¢ó   ª   Ä   „  Å ßó      º ö   ó   ª   ô   ó   ª	   ó    º  s ¢• ` ê ì `Ä  ˘ˇˇˇ`ì ``ò ˇˇˇ¯P` ê 
+`ˇˇˇã`P	A`® ˇˇˇˇPQÄÄP  ~ÑFâP  Ï                "       ﬁÕ   ﬂ5Õ  ﬂ∆ÜÄæ  É  æ   áﬂ±   ﬂæ   ∂9   ª       s ·J   ‰s  <   <   ª       s ·J   ‰s  <   ª    	   s ·J   ‰s  <
+   ª       s ·J   ‰s  <   ª       s ·J   ‰s  <   ª       s ·J   ‰s  <   M   ﬂæ   ¶§•,`ˇˇˇ˙P.`*
+P
+P(&P
+P(P
+P(P
+P(P
+P(P
+PNVÄt   MÍ`æt   7                        ﬁÕ   ﬂª    æ   J   J   w ﬂª    æ   J   J   w ﬂ•&`ˇˇˇˇP$`ˇˇˇˇP$PÄÄÄÄ  |íÖE`                        ﬁÕ   ﬂ∞±  ±  ±  ±  ±  ±  ±  ﬂæ   J   e·J   ±  ﬂ·J   ±  ﬂ·J   ±  ﬂ·J   ±  ﬂ·J   ±  ﬂ·J   ±  ﬂ·J	   ±  ﬂﬂª
+   ·J   ‰ª
+   J   ª
+   ·J   ‰ª   9   æ  <   æ  <   æ  <	   s ª
+   ·J   ‰ª   9   æ  <   æ  <   æ  <   s s §“•“•û@		`ÿ `(#%))I
+VPC%))IPC
+PCTÄÄ        ¸   ˇˇˇˇ              x   œ∂x   :                  
+        ª   ·J   ‰ª   ·J   ‰ª   s ª   ·J   ‰   s w ﬂ• `ˇˇˇÚP.ë 	PˇˇˇÆPPÄÄî   €ØIbî   \                  	       ª   ·J   ‰   9   º     ö   ó      ô   ó   º  ó   <      <	   º <
+   s ¢• `ë -%Ø *HP3QÄÄÄ†  é‡%ÿ†  Ë               @       ﬁŒ   ﬂ5Õ   ﬂ∆ÜÄæ   É  ¡   áﬂ≥   ﬂª    ¡   ∂   m   w ﬂª    ¡   ∂   m   w ﬂ¡   ∂9   <   h    <   h    <	   h    <
+   h    <   h    <   ª       s ·J   ‰s  <   <   ª       s ·J   ‰s  <   ª       s ·J   ‰s  <   ª       s ·J   ‰s  <   ª       s ·J   ‰s  <   <   <   M   ﬂ¡   ∂¡   ∂J   ·J   ‰¡   ∂s M   ﬂ¡   ∂¡   ∂J   ·J   ‰¡   ∂s M   ﬂ¡   ∂¡   ∂J    ·J   ‰¡   ∂s M    ﬂ¡   ∂¡   ∂J!   ·J   ‰¡   ∂s M!   ﬂ¡   ¶§•-`ˇˇˇ˙Pê `ˇˇˇÂPD`ˇˇˇ„PD`+&*****
+P
+P(&P
+P(P
+P(P
+P(P
+P(&L/`ò 5ˇˇˇ˚P)`ò /ˇˇˇ˚P)`ò 3ˇˇˇ˚P)`ò ?ˇˇˇ˚P)W   QÕI⁄   ≠                         ª       s ·J   ‰s  Õ   ﬂ   Õ  ﬂæ      ù   ó   ﬂæ      ó   ö   ó      Õ  ﬂó   ª   ·J   ‰9	   æ  <
+      <   <   m   ·J   ‰¡   ∂s <   w ﬂ• `P
+P(`*`Æ 	`O`%	)	*	&	Lˇˇˇ˚PH	PDPÿ   ”Î≈ÿ   Ü                        º  J   õx   ó      Õ   ﬂæ      &.Õ   ﬂª       s ·J   ‰æ   w ﬂª       s ·J   ‰	   s ·J
+   ‰9   m   <   w ﬂó   • `í `*`ê `P
+!ˇˇˇ˚P$`PP
+%J1PI	PÄÄÄX   ˚•˛X   #                        ﬁÕ   ﬂª    æ   s ·J   ‰s  +¢•&` ˇˇˇ˛P
+P'QÄP   úÀÀP                             ¡   ∂·J   ‰9   <   w ﬂ• `%	FPDPÄÄÄ(  ÕAj(  œ         	               ﬁÕ  ﬂª       s ·J   ‰s  Õ   ﬂ   Õ  ﬂæ      ù   ó   ﬂæ      ó   ö   ó      Õ  ﬂó   ª   ·J   ‰9	   æ  <
+      <   <   m   <   m   <   m   ·J   ‰æ  s <   m   <   w ﬂ•&`P
+P(`*	`Æ `O`%)*&**Lˇˇˇ˚P(JPDP$   5õ9$                               • $   5õ9$                               • ú  Äú                 ,       ﬁÕ   ﬂº  J   ö  ó   æ   ·J   ‰9   º  K<   w ﬂª       s ·J   ‰º  KJ   w ﬂª    	   s ·J   ‰º  KJ   w ﬂº  KJ   ö(   ó   ª    
+   s ·J   ‰w  ﬂô7   ó   ª    
+   s ·J   ‰º  KJ   s ·J   ‰w  ﬂó$   ª    	   s ·J   ‰º  KJ   s ·J   ‰w  ﬂó,   •&`î `%JPD`P
+
+ˇˇˇ˚P$`P
+
+ˇˇˇ˚P$`ñ `P
+P`P
+
+ˇˇˇ˚P
+P)`P
+
+ˇˇˇ˚P
+PI
+P,   ˘Ëü≥,                               ¢• 	`!QÄÄ,  uÆì*,  œ         	               ﬁÕ  ﬂª       s ·J   ‰s  Õ   ﬂ   Õ  ﬂæ      ù   ó   ﬂæ      ó   ö   ó      Õ  ﬂó   ª   ·J   ‰9	   æ  <
+      <   <   m   <   m   <   m   ·J   ‰æ  s <   m   <   w ﬂ•&`P
+P(`*	`Æ `O`E)*&**Lˇˇˇ˚P(JPDPÄÄÄ$   5õ9$                               • $   5õ9$                               • Ñ  —y◊^Ñ                 #       ﬁÕ   ﬂª       s ·J   ‰s     úN   ó   ﬂª       s ·J   ‰s     ù%   ó   ﬂª       s ·J   ‰s  ó   ö-   ó   ª       s ·J   ‰	   w ﬂôg   ó   º  
+   ö1   ó   ª       s ·J   ‰º     &w ﬂô(   ó   ª       s ·J   ‰	   w ﬂó!   æ   ·J   ‰w  ﬂ•&`P
+Pü P
+Pü P
+Pî `PP.`ì `P
+	ˇˇˇ˚P `PPI	`P$PÄ@   ∏ñ@                             ª          w ﬂ• 	`ê P$P  ®w	   ª                         ª       s ·J   ‰s  Õ   ﬂ   Õ  ﬂæ      ù   ó   ﬂæ      ó   ö   ó      Õ  ﬂó   ª   ·J   ‰9	   æ  <
+      <   <   m   <   m   <   m   <   m   <   w ﬂ• `P
+P(`*	`Æ `O`%)*&**JJPDP$   5õ9$                               • $   5õ9$                               • ‰   ﬁü∫‰   é                         º  öQ   ó   ª       s ·J   ‰º  J   w ﬂª       s ·J   ‰º  J   w ﬂô(   ó   ª       s ·J   ‰   w ﬂó   ª	    
+   w ﬂ• `/`P
+ˇˇˇ˚P$`P
+ˇˇˇ¸P `PPI	`P$PÄÄ@   ∏ñ@                             ª          w ﬂ• 	`ê P$P  ë{ø  ø         	               ﬁÕ  ﬂª       s ·J   ‰s  Õ   ﬂ   Õ  ﬂæ      ù   ó   ﬂæ      ó   ö   ó      Õ  ﬂó   ª   ·J   ‰9	   æ  <
+      <   m   <   m   <   m   ·J   ‰æ  s <   w ﬂ•&`P
+P(`*	`Æ `O`%)*JJLˇˇˇ˚PHPDPÄÄL   5iwL                             ª       s ·J   ‰   w ﬂ• 	`PP$PL   5iwL                             ª       s ·J   ‰   w ﬂ• 	`PP$P‰   ê™ñ]‰   í                       ﬁÕ  ﬂº  KÕ   ﬂæ   J   ö1   ó   ª       s ·J   ‰æ   J   w ﬂô(   ó	   ª       s ·J   ‰   w ﬂó   æ  ·J   ‰9   æ   <   w ﬂ•&"`*`ï `P
+	ˇˇˇ˚P `PPI	`%IPD
+PÄÄ\  	1dKL  ﬂ                         ∞±   ±  ﬂª       s ·J   ‰w  ﬂ   ±   ﬂ   ±  ﬂª       s ·J   ‰   w ﬂª	    w  ﬂª
+    w  ﬂª   ·J   ‰9      <      <   9   ª   <   æ  <   <   <   m   <   m   <   m   <   m   <   w ﬂ“• J`P
+P$`*`*`PP$`*`*`%**%	*	N&J*JJPE PÄÄÄ\         ﬁ   ˇˇˇˇ(   #B°(                               •@ÄÄÄ$   5õ9$                               • Ë   æ#nÆË   è                         ª   ·J   ‰   s ö.   ó   ª   ·J   ‰ª   ·J   ‰   s w ﬂó   ª   ·J   ‰ª   ·J   ‰ª	   9
+   º  <   s ª   ·J   ‰   s w ﬂ• `ë 	P/` ë 	Pˇˇˇ‡PI	`%H-PCë 	PCPDPÄÄÄ,   ˘Ëü≥,                               ¢• 	`!QÄÄD  §\PÅD  ◊                !        ﬁÕ   ﬂª   ·J   ‰   s ö.   ó   ª   ·J   ‰ª   ·J   ‰   s w ﬂó   ª       s ·J   ‰	   w ﬂª    
+   s ·J   ‰w  ﬂª   ·J   ‰ª   ·J   ‰ª   9   æ   J   J   <   s ª   ·J   ‰   s w ﬂ•&	`ë 	P/` ë 	Pˇˇˇ‡PI`PP$`P
+PD`%ì@)PC
+	ë 	PCPDPÄÄÄ¥   ØT*|¥   k                        ﬁÕ   ﬂæ   ·J   ‰w  ﬂæ   ·J   ‰w  ﬂæ   ·J   ‰w  ﬂæ   ·J   ‰w  ﬂª    w  ﬂª    w  ﬂª    w  ﬂª    w  ﬂ•&`P$`P$`P$`P$`*`*`*`*PÄD   F?¶«D                             ª   ·J   ‰   w ﬂ• `ë P$PÄÄÄ\  Ò	H:<  Ì      
+                 ﬁÕ   ﬂ∞±  ±  ±  ±  ±  ±  ±  ±  ±	  ﬂæ   J   e·J   ±  ﬂ·J   ±  ﬂ·J   ±  ﬂ·J   ±  ﬂ·J   ±  ﬂ·J   ±  ﬂ·J	   ±  ﬂ·J
+   ±  ﬂ·J   ±	  ﬂﬂª   ·J   ‰ª   J   ª   ·J   ‰ª   9   æ  <   æ  <   æ   <   s s §“•“•¶@	`Ó `(#%))IVPˇˇˇ…PCTÄÄ\        Ê   ˇˇˇˇ    Í          x    Mô$x   :                  
+        ª   ·J   ‰ª   ·J   ‰ª   s ª   ·J   ‰   s w ﬂ• `ˇˇˇÚP0ë 	Pˇˇˇ¨PPÄÄp  ‹À≈˘p  –                 <       ª   ·J   ‰   9      <   ª   ·J   ‰   9   	   <   
+   <      <      <      <      <      <   9      <      <   <   s ª   ·J   ‰   9      <   ª   ·J   ‰   º  J   s ª   ·J   ‰   s º  J    !   ù   ó!   ﬂº  J    ó#   öA   ó$   ª   ·J   ‰   9"   9#   $   <%   <   &   s ô   ó+   ó+   s ª   ·J   ‰   s ª   ·J   ‰'   9(   9)   *   <%   <   ª   ·J   ‰   9+   ,   <   s s s ¢• `ë /%*ë %*******%*OPCë %*í "ˇˇˇ‰P=í P√ p%%?EÄ  —P=FPC&í P(ë %%Oë %JPCZPCP3QÄÄ"  Û÷	–"  i  	      /       s     Ω  Œ   ﬂ∞±   ±  ±  ±  ±  ±  ±  ±  ±  ±	  ±
+  ﬂ9      <      <      <   	   <
+      <      <   ±
+  ﬂ   ±   ﬂ ±  ﬂ ±  ﬂ ±  ﬂ ±  ﬂ±  ﬂª       s ·J   ‰s     ùò   ó   ﬂª       s ·J   ‰s   ùs   ó   ﬂª       s ·J   ‰s     ùJ   ó   ﬂª       s ·J   ‰s  ù%   ó   ﬂª       s ·J   ‰s  ó$   ö   ó%   ô   ó%   ó%   ±  ﬂ¡   J      öµ  ó(   ¡   J      ù6   ó+   ﬂ¡   J      ù   ó.   ﬂ¡   J      ó0   õ±  ó1   ¡   J      ö3  ó4   ª       s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9    æ   <!   æ
+  <"   #   æ  0·(Õ  ﬂ&<$   m%   <&   ª   ·J   ‰'   9(   )   <!   9*   +   <,   -   <.   <"   s ª   ·J   ‰/   90   1   <!   2   s ª   ·J   ‰3   94   5   <$   6   <7   8   <9   s s s Õ  ﬂô_  ó^   ª    :   s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9;   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   m<   <&   ª   ·J   ‰'   9=   )   <!   9>   +   <,   -   <.   <"   ?   <$   ª@    A   9B   C   <D   E   <F   s s ª   ·J   ‰/   9G   1   <!   H   s ª   ·J   ‰3   9I   5   <$   6   <7   8   <9   s s s Õ  ﬂóé   ô™  óé   ª    J   s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9K   æ   <!   æ
+  <"   #   æ  0·(Õ  ﬂ&<$   mL   <&   M   ª   ·J   ‰'   9N   )   <!   9O   +   <,   -   <.   <"   ?   <$   ª@    A   9P   C   <D   E   <F   s s Q   ª   ·J   ‰'   9R   )   <!   9S   +   <,   -   <.   <"   s ª   ·J   ‰/   9T   1   <!   U   s ª   ·J   ‰3   9V   5   <$   6   <7   8   <9   s s s Õ  ﬂó«   ô_  ó«   ª    J   s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9W   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   mX   <&   ª   ·J   ‰'   9Y   )   <!   9Z   +   <,   -   <.   <"   ?   <$   ª@    A   9[   C   <D   E   <F   s s ª   ·J   ‰/   9\   1   <!   U   s ª   ·J   ‰3   9]   5   <$   6   <7   8   <9   s s s Õ  ﬂó˜    ±  ﬂ¡   J      ù6   ó˙   ﬂ¡   J      ù   ó˝   ﬂ¡   J      óˇ   õf  ó   ª    ^   s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9_   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   m`   <&   ª   ·J   ‰'   9a   )   <!   9b   +   <,   -   <.   <"   c   <$   ª@    A   9d   C   <D   E   <F   s s ª   ·J   ‰/   9e   1   <!   æ  ù   ó(  ﬂæ  f   ó)  ö   ó*  g   ô   ó*  h   ó*  s s s Õ  ﬂó-  ¡   J      ùÀ  ó0  ﬂ¡   J      ù∞  ó3  ﬂ¡   J      ùï  ó6  ﬂ¡   J   i   ùz  ó9  ﬂ¡   J   j   ù_  ó<  ﬂ¡   J   k   ùD  ó?  ﬂ¡   J   l   ù)  óB  ﬂ¡   J   m   ù  óE  ﬂ¡   J   n   ùÛ   óH  ﬂ¡   J   o   ùÿ   óK  ﬂ¡   J   p   ùΩ   óN  ﬂ¡   J   q   ù¢   óQ  ﬂ¡   J   r   ùá   óT  ﬂ¡   J   s   ùl   óW  ﬂ¡   J   t   ùQ   óZ  ﬂ¡   J   u   ù6   ó]  ﬂ¡   J   v   ù   ó`  ﬂ¡   J   w   ób  ö)  óc  ¡   J      ö  óf  ª   ·J   ‰ª   J   ª   ·J   ‰   9x   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   my   <&   ª   ·J   ‰'   9z   )   <!   9{   +   <,   -   <.   <"   |   <$   ª@    A   9}   C   <D   E   <F   s s ª   ·J   ‰/   9~   1   <!      s s s Õ  ﬂóã   ±  ﬂ ±	  ﬂ¡   J   Ä   ö˝  óé  ª   ·J   ‰ª   J   ª   ·J   ‰Å   s ª   ·J   ‰Ç   9É   9Ñ   Ö   <Ü   <"   ª   ·J   ‰á   ª   ·J   ‰à   ª   ·J   ‰â   9ä   9ã   å   <,   ç   <   é   <è   é   <ê   é   <ë   é   <í      <   ì   <î   <"   ï   <$   ñ   <!   ª   ·J   ‰ó   9ò   ô   <!   s ö   ª   ·J   ‰õ   9ú   ù   <$   ª   ·J   ‰û   9ü   9†   °   <D   ¢   <£   ì   <î   <"   §   <!   •   s ¶   ª   ·J   ‰ó   9ß   9®   °   <D   ¢   <£   ì   <î   <"   s s s s s s s Õ  ﬂó–  ¡   J   ©   ù   ó”  ﬂ¡   J   w   ó’  ö  ó÷  ª    ™   s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9´   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   m¨   <&   ª   ·J   ‰≠   9Æ   Ø   <∞   s ¶   ª   ·J   ‰'   9±   )   <!   9≤   +   <,   -   <.   <"   ≥   <$   s ª   ·J   ‰/   9¥   1   <!   µ   s s ª   ·J   ‰Å   s ª   ·J   ‰Ç   9∂   9∑   Ö   <Ü   <"   ª   ·J   ‰á   ª   ·J   ‰à   ª   ·J   ‰â   9∏   9π   å   <,   ç   <   é   <è   é   <ê   é   <ë   é   <í      <   ì   <î   <"   ï   <$   ñ   <!   ª   ·J   ‰ó   9∫   ô   <!   s ö   ª   ·J   ‰õ   9ª   ù   <$   ª   ·J   ‰û   9º   9Ω   °   <D   ¢   <£   ì   <î   <"   §   <!   •   s ¶   ª   ·J   ‰ó   9æ   9ø   °   <D   ¢   <£   ì   <î   <"   s s s s s s s Õ  ﬂôã  ó<  ¡   J      öQ  ó?  ¡   J   i   ùz  óB  ﬂ¡   J   j   ù_  óE  ﬂ¡   J   k   ùD  óH  ﬂ¡   J   l   ù)  óK  ﬂ¡   J   m   ù  óN  ﬂ¡   J   n   ùÛ   óQ  ﬂ¡   J   o   ùÿ   óT  ﬂ¡   J   p   ùΩ   óW  ﬂ¡   J   q   ù¢   óZ  ﬂ¡   J   r   ùá   ó]  ﬂ¡   J   s   ùl   ó`  ﬂ¡   J   t   ùQ   óc  ﬂ¡   J   u   ù6   óf  ﬂ¡   J   v   ù   ói  ﬂ¡   J   w   ók  õÆ  ól  ¡   J      ù6   óo  ﬂ¡   J      ù   ór  ﬂ¡   J      ót  ö2  óu  ª    ¿   s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9¡   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   m¬   <&   ª   ·J   ‰'   9√   9ƒ   +   <,   -   <.   <"   )   <!   ≥   <$   ª@    A   9≈   C   <D   E   <F   s s ª   ·J   ‰/   9∆   1   <!   «   s s ¶   s Õ  ﬂô,  óû  ¡   J   »   ù6   ó°  ﬂ¡   J   p   ù   ó§  ﬂ¡   J   …   ó¶  ö≈   óß  ª   ·J   ‰ª   J   ª   ·J   ‰   9    æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   mÀ   <&   ª   ·J   ‰ó   9Ã   Õ   <!   s ª   ·J   ‰/   9Œ   1   <!   œ   s s s Õ  ﬂôB  ó¬  ¡   J   –   ö(  ó≈  ª    —   s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9“   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   m”   <&   ª   ·J   ‰'   9‘   )   <!   9’   +   <,   -   <.   <"   ÷   <$   ª@    A   9◊   C   <D   E   <F   s s ª   ·J   ‰/   9ÿ   1   <!      s s s Õ  ﬂóÓ  ¡   J   Ÿ   ö¿   óÒ  ª   ·J   ‰ª   J   ª   ·J   ‰   9⁄   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   m€   <&   ª   ·J   ‰ó   9‹   ›   <!   s ª   ·J   ‰/   9ﬁ   1   <!   ﬂ   s s s Õ  ﬂó  ô%  ó  ¡   J   i   ö  ó  ª    ‡   s ·J   ‰w  ﬂª   ·J   ‰ª   J   ª   ·J   ‰   9·   æ   <!   #   æ  0·(Õ  ﬂ&<$   æ
+  <"   m‚   <&   ª   ·J   ‰'   9„   )   <!   9‰   +   <,   -   <.   <"   Â   <$   Ê   s ª   ·J   ‰/   9Á   1   <!   Ë   s s ¶   s Õ	  ﬂó3  ª   ·J   ‰ª   J   ª   ·J   ‰   9È   9Í      <      <      <   	   <
+   Î   <      <   <"   Ï   <$   æ   <!   mÌ   <&   ª   ·J   ‰'   9Ó   )   <!   9Ô   +   <,   -   <.   <"      <$   s ª   ·J   ‰/   9Ò   Ú   <!   Û   s s ª   ·J   ‰   9Ù   æ
+  <"   æ   <!   ı   <$   mˆ   <&   ª   ·J   ‰'   9˜   )   <!   9¯   +   <,   -   <.   <"   ˘   <$   s ª   ·J   ‰/   9˙   1   <!   æ  ù   ón  ﬂæ  f   óo  ö   óp  ˚   ô   óp  ¸   óp  ¶   s s æ  æ  æ  æ  æ	  æ  æ  s §“•“•	Æ `%*****O	`&`'"`P
+Pü P
+P	ò P
+Pü P
+Põ P
+P™ `ö 	`’ `ö 	`P
+P$	`6#ë %))í Jë %*%*OPC"ë %E" PC$'ë %**J$-PChPˇˇˇ…Pí0) 	`P
+P$	`6#ë %)í )J3ë %*%*O9*'%*J:PC3PC=ë %E=!PC?*ë %**J?0PC+hPˇˇˇ…Pó0E `P
+P$`6#ë %	)	)	í 	JOLñ %	*	%*OU	*
+'%	*	JV
+PCORPCY!ñ %	*	%*OY'PC_ë %	E_PCa&ë %	*	*	Ja,PCGfPˇˇˇ…Pó0g `P
+P$`6#ë %)í )Jqë %*%	*	Ow*'%*JxPCqPC{ë %E{PC}$ë %**J}*PCidPˇˇˇ…P=Ä  É&`’ `P
+
+P$`(#ë %)í ) ë %*%	*	 *'%*JÄ  ïPCÄ  éPCÄ  òë %*√@Ä  òPCÄ  ÜVPˇˇˇ…PMÄ  ú`ˇˇˇÌ 	`ö `-#ë %	)	í 	)	 ë %	*	%* 	*
+'%	*	JÄ  ≠
+PCÄ  ¶PCÄ  ∞ë %	EÄ  ∞PCÄ  û]Pˇˇˇ…P=Ä  µ&`ö `1#í P(ë %%	 í 0í -ë %%	*	*	*	*	*	*	*	 **ë %JÄ  …P "ñ %*ë %%	*	*	 EÄ  ÕPCÄ  ‘Cñ %%	*	*	OÄ  ‘IPCÄ  À(PCÄ  ºxPˇˇˇ”Pˇˇˇ–PCÄ  ∏Ä  çPˇˇˇõPMÄ  ‹`∫ `P
+P$`/#ë %)í ) ë %JÄ  ÊP ñ %*%	*	 JÄ  Ë!PCÄ  Ôë %EÄ  ÔPCÄ  ﬁ]PCÄ  Ò&í P(ë %%	 í 0í -ë %%	*	*	*	*	*	*	*	 **ë %JÄ P "ñ %*ë %%	*	*	 EÄ PCÄ Cñ %%	*	*	OÄ IPCÄ (PCÄ  ıxPˇˇˇ”Pˇˇˇ–PCÄ  ÒZPCÄ  ﬁ&Pí0Ä  	`ö `ˇˇˇú `’ `P
+P$`/#ë %)í ) ë %%* **'%*JÄ (PCÄ !!PCÄ +ë %EÄ +#PCÄ cP3Ä -EÄ ,Pí0Ä . `’ `-#ë %)í ) ë %JÄ 7#P ë %EÄ 9$PCÄ 0cPˇˇˇ…Pí@Ä <`ö `P
+P$`-#ë %)í ) ë %*%* *'%*JÄ MPCÄ F#PCÄ Pë %EÄ P%PCÄ >cPˇˇˇ…PMÄ T`ö `-#ë %)í ) ë %JÄ \#P ë %EÄ ^$PCÄ UcPˇˇˇ…Pó0Ä d `ö 	`P
+P$	`-#ë %)í ) ë %*%* EÄ oPCÄ vë %EÄ v%PCÄ g_P3Ä xEÄ g(PMÄ |`(#ë %%***** *) ë %*%* JÄ ãPCÄ íë %EÄ íPCÄ |TPCÄ î&ë %))* ë %*%* JÄ úPCÄ £ë %*»@Ä £PCÄ î,PCÄ •vDÄ |P3Ä ¶TÄÄ"     	   _  ˇˇˇˇ    f         L   3≠G‰L                            ª    w  ﬂª    º  w ﬂ• `*`ˇˇˇˇP$PÄÄL   3≠G‰L                            ª    w  ﬂª    º  w ﬂ• `*`ˇˇˇˇP$PÄÄL   5ÒXL                            ª    w  ﬂª    º  w ﬂ• `*`ˇˇˇˇP$	PÄÄL   Ÿƒ»L                            ª    w  ﬂª    º  w ﬂ• 	`*	`ˇˇˇˇP$PÄÄ\   7ÅìŸ\   #                         ¡   J   ·J   ‰w  ﬂª    º  w ﬂ• 	`ë P$	`ˇˇˇˇP$PÄÄÄ`   ¨(Ò`   (                         ª   J   ·J   ‰   w ﬂª    º  w ﬂ• `ñ P$`ˇˇˇˇP$	PÄÄL   Ÿƒ»L                            ª    w  ﬂª    º  w ﬂ• 	`*	`ˇˇˇˇP$PÄÄL   ìN¶L                            ª    w  ﬂª    º  w ﬂ• `*`ˇˇˇˇP$PÄÄ<   "| è<                            ª      L   ﬂ• `ê PÄÄÄP   èsA€P                            ª    w ﬂª    º  w ﬂ• `P$`ˇˇˇˇP$PÄÄ@   '¨«@                            ª    ¡   w ﬂ• `ˇˇˇˇP$PÄP   ?ô”±P                            ª    w ﬂª    º  w ﬂ• `P$`ˇˇˇˇP$PÄÄ\   ïX<]\   #                         ¡   J   ·J   ‰w  ﬂª    º  w ﬂ• `ë P$`ˇˇˇˇP$PÄÄÄL   ÒkÛL                            ª    w  ﬂª    º  w ﬂ• `*`ˇˇˇˇP$PÄÄ¿   Ô®Ä°¿   t                         ª   ·J   ‰ª   J   ª   ·J   ‰   9      <      <	   9
+      <   <   º  J   ·J   ‰m   s s s ¢• `(#ë %**%Oˇˇˇ¸PCTPˇˇˇ…P3HQÄ¸  ≈:W‹  è                ã      ∞±   ±  ±  ±  ﬂ ±   ﬂ ±  ﬂº  J      ö  ó   º  J      ö˛   ó   º  J   ·J   ‰   s K   öx   ó   ª	   ·J
+   ‰   9      <   9      <      <   <   º  J   ·J   ‰   s K<      s Õ   ﬂôb   ó   ª	   ·J
+   ‰   9      <   9      <      <   <   º  J   <      s Õ   ﬂó%      ±  ﬂ   ±  ﬂº  J      ú*   ó(   ﬂº  J    ú   ó+   ﬂº  J   ó-   ö   ó.      º  J   &Õ  ﬂó0   º  J      ú*   ó3   ﬂº  J    ú   ó6   ﬂº  J   ó8   ö=   ó9   ª   J   ·J   ‰    ª!   Äº  J   „  Å s Õ  ﬂó@   º  J"      ú*   óC   ﬂº  J"    ú   óF   ﬂº  J"   óH   öe   óI   ª	   ·J
+   ‰#   æ  $   &$   æ  %   &ª	   ·J
+   ‰&   '   º  J"   &s s Õ  ﬂô7   óS   ª	   ·J
+   ‰#   æ  $   &$   æ  s Õ  ﬂóW   ª	   ·J
+   ‰(   9)   *   <   º <+   ª	   ·J
+   ‰(   9,   -   <   ª	   ·J
+   ‰   9.   /   <   0   <1   2   <3   4   º &<      <5   ª	   ·J
+   ‰6   º  J7   s ª	   ·J
+   ‰#   98   99   :   <;   <   æ  s s s ª	   ·J
+   ‰(   9<   =   º &<>   ?   <   ª	   ·J
+   ‰(   9@   A   <   º  JB   ª	   ·J
+   ‰#   9C   9D   :   <;   <   æ   s s s s §“•“• í&	`ò `ò `î Pï `ë /%*%*Oî PE'Pí0 `ë /%*%*OE'PM`*`*	`° 8¶ `ì@	`° 8¶ `ñ 1	ˇˇˇ˜PˇˇˇÈPM"	`° .¶ `í 8
+ í 		ˇˇˇﬁPˇˇˇßPí `í 8ˇˇˇÕPM'`ë /%*(ë %*ë %***)*í $ˇˇˇ‚P>ë %%	O6D2_PC,PC*PC6 ë %)*ë %*#ë %%	O?D;1PC9PC6&PC'PC@TÄÄ¸         é  ˇˇˇˇ    å         @  Úzr@  Ÿ                         º  J   J   öQ   ó   ª   ·J   ‰   9   9      <	   
+   <      <   <      s ¢ó   ª   ·J   ‰ª   J   ª   ·J   ‰   9      <      <   9      <   <   º  J   ·J   ‰m   s s s ¢• `ô `ë .%%	*	*	?EP3BF
+`(#ë %**%Oˇˇˇ¸PC
+TPˇˇˇ…P3BQÄP  r
+\h  ˝  	             ]      $Ω  Œ   ﬂ–   ∞±   ±  ﬂª   ·J   ‰      ¡  J      ª   ·J   ‰   ¡  J	   s s ±   ﬂ ±  ﬂ´ª   ·J   ‰
+   ª    ¡  J   s s Õ  ﬂô=   ó    §≠∞±  ﬂ±  ﬂª   ·J   ‰
+   ¡  J   s Õ  ﬂ“ó      ≥   ﬂª   ·J   ‰   9      <   º <   ª   ·J   ‰   9      <   ª   ·J   ‰   9      <      <      <   m   <      ¡  J   &<    !   <"   ª   ·J   ‰
+   æ  s ª   ·J   ‰   9#   9$   %   <&   <'   æ   s s s ª   ·J   ‰   9(   )   ¡  J   &<*   +   <   ª   ·J   ‰   9,   -   <   ª   ·J   ‰   9.   /   ¡  J   &<*   s ª   ·J   ‰   90   1   <   92   %   <&   3   <4   <'   ª   ·J   ‰   95   6   <7   m8   <   ª   ·J   ‰9   9:   ;   <<   s s s s s s §—•—•	/`ó *&í 
+ˇˇˇÁPˇˇˇ∞P!`í B
+ˇˇˇÌPˇˇˇ‚Pï +`í B
+ˇˇˇ‚PN`+`ë /%*(ë %*ë %***Jê *í $ˇˇˇ‚P<ë %%	OD]PCPCPC ë %ê *ë %*ë %ê@ PC"ë %*%	*	O(ë %*J.ë %J.PC(PC"PCPC&PC	PC1TÄP  @        Ó  ˇˇˇˇ   ¶   0           ˙                 l   2   D   «t+D                            ª    ¡  J   w ﬂ• 	`
+ˇˇˇˇP$P|   ±K}—|   =                         ª    ¡  J   ¡   µ   ¡  J   w ﬂª    ¡  J   w ﬂ• 	`
+
+
+ˇˇˇÊP$	`
+ˇˇˇˇP$PÄp  [M83p                         ª    º  J   s ·J   ‰   s ·J   ‰s  Õ   ﬂ   Õ  ﬂæ      ö$   ó	   æ     æ   &&.Õ  ﬂôÄ   ó   æ   	   ö$   ó   æ  
+   æ   &&.Õ  ﬂôM   ó   æ      ö$   ó   æ     æ   &&.Õ  ﬂô   ó   æ     &.Õ  ﬂó   ª       s ·J   ‰æ  w ﬂ• `ˇˇˇˇPP
+P(`*`î `	@ñ `î `	>ñ `î `	Añ `ï@`P
+ˇˇˇ˚PPÄÄê   :èYóê   U                       ﬁÕ   ﬂ5Õ  ﬂ∆ÜÄæ  É  æ   áﬂ±   ﬂæ   ∂9   ª       s ·J   ‰s  <   M   ﬂæ   ¶§•,`ˇˇˇ˙P.`*
+P
+PNVÄÄ  ˝~q  Û               b       ﬁÕ   ﬂ∞±  ±  ﬂ ±  ﬂæ   J   e·J   ±  ﬂﬂæ     ù*   ó   ﬂæ     ù   ó   ﬂæ     ó   õ  ó   ª   ·J   ‰ª   J	   ª   ·J   ‰
+      s ª   ·J   ‰   9      <      <   m   <   ª   ·J   ‰   9      <   s    s ª   ·J   ‰   9      <   9      <   <      <   m   <   ª   ·J   ‰   9      <   s s s Õ  ﬂó-   ª   ·J   ‰ª   J	   ª   ·J   ‰    9!   "   <   9#   $   <%   <   ª   ·J   ‰&   ª   ·J   ‰
+   9'   9(   )   <*   <   +   <   ª   ·J   ‰   9,   -   <   s .   s ª   ·J   ‰
+   9/   0   <   91   )   <*      <2   <   ª   ·J   ‰   93   4   <5   m6   <   ª   ·J   ‰   97   8   <   s 9   s æ  s s s ª   ·J   ‰:   s s §“•“•@	`ñ 	`√ `3#ó P1ë %	*	*	Jë %	JP3EÄ  öPC,ë %	*	%O	*	Jë %	JPC2PC,PM`(#ë %*%	O í .ë %%	O$*ë %J%P3'E IPC'1ë %*%	*	O-ë %*J2ë %J2P34E-PC4$D'7PC PCVPC4Eí PCPC5TÄ        Ï  ˇˇˇˇ             @   qÜY@                            ª    º  w ﬂ• `ˇˇˇˇP$	PÄÄÄ@   qÜY@                            ª    º  w ﬂ• `ˇˇˇˇP$	PÄÄÄ8   ºê©8                            ª    
+w ﬂ• 	`P$PÄÏ   £ÓQÏ   ç           
+               ª   ·J   ‰ª   ·J   ‰ª   s ª   ·J   ‰   s w ﬂª   ·J   ‰ª   ·J   ‰ª   J   ª   ·J   ‰ª	   s s ª   ·J   ‰
+   s w ﬂ• `ˇˇˇÚP$ë 	Pˇˇˇ∏P$`#ˇˇˇÚPˇˇˇ…PYë 	PˇˇˇÉPP¸  U?ñ‹        
+   6       ê     ∞±  ±  ±  ±  ±  ±  ±	  ﬂ ±  ﬂ ±  ﬂ ±  ﬂ ±  ﬂ9      <      <   ±	  ﬂª       s ·J   ‰s  Õ   ﬂæ   	   ù*   ó	   ﬂæ   
+   ù   ó   ﬂæ      ó   ö#   ó      Õ  ﬂ   Õ  ﬂôr   ó   º  J      ú   ó   ﬂº  J      ó   ö#   ó      Õ  ﬂ   Õ  ﬂô   ó      Õ  ﬂ   Õ  ﬂó   ª       s ·J   ‰s     ù%   ó   ﬂª       s ·J   ‰s   ó   ö   ó   ô   ó   ó   Õ  ﬂª       s ·J   ‰s     ùò   ó%   ﬂª       s ·J   ‰s   ùs   ó+   ﬂª       s ·J   ‰s     ùJ   ó1   ﬂª       s ·J   ‰s  ù%   ó7   ﬂª       s ·J   ‰s  ó<   ö   ó=   ô   ó=   ó=   Õ  ﬂæ      ù$   ó?   ﬂæ      ù   óA   ﬂæ  óA   ö   óB      Õ  ﬂô   óB      Õ  ﬂóB    ±  ﬂæ      ú*   óD   ﬂæ      ú   óF   ﬂæ      óG   ö≈   óH   ª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9#   $   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9'   (   <)   *   <+   ª   ·J   ‰,   9-   æ	  <.   /   s s s s Õ  ﬂóa    ±  ﬂæ   0   ú?   óc   ﬂæ   	   ú*   óe   ﬂæ   
+   ú   óg   ﬂæ      óh   öù  ói   ª   ·J   ‰ª   J1   æ      ú€   óo   ﬂæ      ú∆   óq   ﬂª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   92   3   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   94   5   <)   6   <+   7   ª   ·J   ‰,   98   æ	  <.   9   s s s s óä   æ  ª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9:   ;   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9<   =   <)   >   <+   ª   ·J   ‰,   9?   æ	  <.   @   s s s s æ   A   ú¡   ó•   ﬂª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9B   C   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9D   E   <)   F   <+   ª   ·J   ‰,   9G   æ	  <.   H   s s s s óæ   s Õ  ﬂóø   ª   ·J   ‰,   9I   J   <%   ª   ·J   ‰K   9L   M   <%   ª   ·J   ‰N   9O   P   <%   ª   ·J   ‰    9Q   R   <%   ª   ·J   ‰!   ª   ·J   ‰"   9S   T   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9U   V   <+   ª   ·J   ‰,   9W   æ	  <.   X   s s s s ª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9Y   Z   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9[   \   <)   æ  <+   ª   ·J   ‰,   9]   æ	  <.   ^   s s s s ª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9_   `   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9a   b   <)   æ  <+   ª   ·J   ‰,   9c   æ	  <.   d   s s s s ª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9e   f   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9g   h   <)   i   <+   7   ª   ·J   ‰,   9j   æ	  <.   æ  ö   ó.  k   ô   ó.  l   ó.  s s s s ª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9m   n   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9o   p   <)   q   <+   mr   <s   ª   ·J   ‰,   9t   æ	  <.   u   s s s s æ      ú,  óO  ﬂª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9v   w   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9x   y   <)   z   <+   ª   ·J   ‰,   9{   æ	  <.   æ  ö   óf  |   ôV   óf  ª   ·J   ‰ª   J1   }   ª   ·J   ‰~   9   Ä   <)   Å   s Ç   s óp  s s s s ót  ª   ·J   ‰    ª   ·J   ‰!   ª   ·J   ‰"   9É   Ñ   <%   s s ª   ·J   ‰!   ª   ·J   ‰&   9Ö   Ü   <)   æ  <+   ª   ·J   ‰,   9á   æ	  <.   à   s s s s æ  s
+ s s §“•“• û&`%*O	`P
+P(`√ `*`î `∂ `*`î `*`O`P
+Pü P
+P	ß "`P
+Pü P
+P	ò P
+Pü P
+Põ P
+P™ `Ω `î `?&`√ `í Eí -ë %J}Pˇˇˇ”PCí -ë %**ë %E"PCJPˇˇˇ”PC#P=&&`ÿ `4º zí -ë %J(Ä  ¸Pˇˇˇ”PC*í -ë %**ñ %E- PC*JPˇˇˇ”PC(Ä  ¢PH/í -í -ë %J/Ä  îPˇˇˇ”PC1í -ë %**ë %E4PC1JPˇˇˇ”PC/:PC6ß ]í -ë %J6Ä  ÆPˇˇˇ”PC8í -ë %**ë %E;PC8JPˇˇˇ”PC6TPH(+PM?`ë /%*ë %*ë %*ë %*í -ë %JGFPˇˇˇ”PCIí -ë %*ë %EKPCIHPˇˇˇ”PCEPCM$í -í -ë %JMÄ  ÑPˇˇˇ”PCOí -ë %*)ë %ERPCOHPˇˇˇ”PCM*PCT"í -í -ë %JTÄ  ÇPˇˇˇ”PCVí -ë %*)ë %EYPCVHPˇˇˇ”PCT(PC[$í -í -ë %J[Ä  ÑPˇˇˇ”PC]í -ë %**ñ %)©@`PC]HPˇˇˇ”PC[*PCb]í -í -ë %JbÄ  ΩPˇˇˇ”PCdí -ë %**Jjë %EjPCdHPˇˇˇ”PCbcPClß Wí -ë %JlÄ  ¢Pˇˇˇ”PCní -ë %**ë %)´ Yê /ë %EsÄ  îP3uEsQPHqPCnHPˇˇˇ”PClHPHu#í -í -ë %JuÄ  ÉPˇˇˇ”PCwí -ë %*)ë %EzPCwHPˇˇˇ”PCu)PC|DCPCAPC?P3}TÄÄ¸           ˇˇˇˇ             4    ùü‚4                            ª    w  ﬂ• `*PÄÄ@  4ìE@  Õ                          	  PŒ   ﬂ∑   ª       s ·J   ‰9   <   <   9   » <	   » <
+      <   <   9   ,<	   ,<
+   <   s     ﬂª       s ·J   ‰   m   w ﬂª    m   w ﬂª       s ·J   ‰m   w ﬂ• `*`ê P
+%&&%((O
+%(M"PI`P'ˇˇˇÛPD`ˇˇˇˇPD `P
+ˇˇˇ˙P4LPÄÄ†   àπ4Ì†   `                        ﬁÕ  ﬂª   Ä„  Å  Õ   ﬂæ   m   L   ﬂæ   ·J   ‰æ  J   Kw ﬂª       s ·J   ‰	   w ﬂ•&`í `O	`ˇˇˇÚP$`PP$Px   Ï•D«x   <                  
+       ª   ·J   ‰   9   º  J   J   <   s ·J   ‰m	   w ﬂ• `ë %	í@PJˇˇˇ˚PDPÄD   ¢~˙D                             ª   ·J   ‰   w ﬂ• 	`ë P$PÄÄÄX   ÇQÏÛX   $                          ª       s ·J   ‰   m   w ﬂ• `P ˇˇˇÙPDPÄÑ   ÈU>≥Ñ   A         	       	       ﬁÕ   ﬂª   ·J   ‰   ª    ª    æ   s ·J   ‰   s s w ﬂ•&`ë 	ˇˇˇ˛PPˇˇˇÔPˇˇˇÓP$P|   ®‡ˇÿ|   >                  	       ª   ·J   ‰   9      <      <   s ·J	   ‰m
+   w ﬂ• `ë %*JPJˇˇˇ˚PD+PÄÄL  \ *FL  ◊                        ª   ·J   ‰º  w ﬂº  ·J   ‰l      s Õ   ﬂª    æ      s Õ  ﬂª   Ä„  Å  Õ  ﬂæ  ·J	   ‰
+   æ  w ﬂª   ·J   ‰9      <      <   <   <   æ  <   
+   <   ¡   <   m   <   m   <   w ﬂ• `ˇˇˇ¸P$ `
+
+ˇˇˇ¯P(`	ˇˇˇˇP(`í `ê ˇˇˇÌP$`%	*	*	&	&	)	*	*	J	J	PD&PÄÄÄd   qEd   /                       ﬁÕ   ﬂª    w  ﬂæ   ·J   ‰9   ¡   <   w ﬂ•F`*`%JPD	PÄX  3f≤*X  ‰                        ª       s ·J   ‰   w ﬂª    º  s ö   ó   ª       w ﬂôÜ   ó	      º  &	   &Õ   ﬂª    
+   s ·J   ‰æ   w ﬂª       w ﬂ∑       ﬂª       'w ﬂª       s ·J   ‰   w ﬂó   ª   ·J   ‰   w ﬂ• `PP$`ˇˇˇˇPM`P `B/`P
+ˇˇˇ˚P$`P$`,`P$`PPI`ë P$	PÄ,  ŒÍØü  d      	                º ù   ó   ﬂ   ó   Ã ﬂ Õ   ﬂª   ·J   ‰º  s Õ  ﬂh    Õ  ﬂÕ  ﬂæ  J   Õ  ﬂò   æ  æ  ö◊   ó   æ  ·J   ‰æ  æ  æ   &s Õ  ﬂª   Äæ  J   „  Å Õ  ﬂÕ  ﬂò   æ  æ  J   ö6   ó   æ  æ  æ  ·J   ‰æ  s Nﬂæ  0(Õ  ﬂôªˇˇˇó   ª   Äæ  „  Å Õ  ﬂæ  ·J	   ‰æ  w ﬂæ  æ   &.Õ  ﬂôˇˇˇó   ª
+   Äæ  9   º <   „  Å ¢• `ú `(`ˇˇˇ˚P(`* `	`f	/`	ˇˇˇÈP(`
+ˇˇˇˆ(
+ `fî `ì "ˇˇˇıPE'`ï@`ˇˇˇÒ(`ˇˇˇ˚PD>`ô@`%L
+P3Q,         ≥   J          Y   Ê   ƒ   ˚Lùƒ   t                        ∑       ﬂª       s ·J   ‰w  ﬂª       s ·J   ‰w  ﬂ∑   º      ﬂ   Õ   ﬂª       s ·J   ‰æ   w ﬂ• `,`P
+P$`P
+P$`.`J`P
+ˇˇˇ˚PPÄÄÄx  6c¶LX                         $´ª       s ·J   ‰s  Õ   ﬂª   J      ú   ó   ﬂæ      ó	   ö)   ó
+   ª   ·J	   ‰
+      w ﬂôq   ó   ª   J      ú   ó   ﬂæ      ó   ö)   ó   ª   ·J	   ‰      w ﬂô   ó   ª       w ﬂó   ô   ó    §≠∞±  ﬂ±  ﬂ“ó   •!`P
+P(	`¥ `ñ P.`¥ `ñ P `Pñ@
+ëPx  h     Ô      ˇˇˇˇ           Ê   <   7ÉßP<                             ª       w ﬂ• `PPÄÄÄ3ıÿ  `  }  q      @P  ô   M   i    `  w  Ü    `®  ﬂ  6   m   è    w  Ü  Ö    `    è    @ê  &  ë    @í  ì  A  ï  î  ó  ñ  ô  ò  ö  ç {    @ú  õ  û  ù  
+    @ü  †    €   -    @  @¢  °  £  §    @  @•  	  @¶    `¬  √    `¬  √  	  `¬  √  
+  `¬  √    `    √    `È  Í  ⁄  Î  √    ` √    ` √    `È   Í    `i  √    `   ` √    `  q  √    `$ √    `  `
+  @©  ®  ™  õ  ¨  ´  Æ  ≠  ∞  Ø  ±  ≥  $  ∫    ê   ®     ª  	  º  Ω  æ  ø  >        è    @&  
+  ¿  ç -  p¡  C   @ƒ    @∆  ≈  »  «  B   @…         @À  Ã  0  0  P  Õ    @.  p  @  @Œ  $  (    @–  œ  —  °    @“    @”    @/  p‘    @  @  @è     @  @  @’    @  @0  p  @   @!  @"  @#  @◊  $  @1  p%  @&  @ÿ  '  @(  @-  Ÿ  ÷  ⁄  €  ‹  ›  ﬁ  ﬂ  ‡  ·  ‚  „  ‰  Â  Ê  Á  Ë  )  @2  p*  @+  @Ï  ,  @-  @µ  Ô  €   .  @/  @Ò  A  Ú  [ M 0  @1  @Û  Ù  ˆ  ı  ˜  ¯  ˘  ˚  ˙  ¸  ˝  i  2  @˛  ˇ  a  3  @  b  4  @5  @        6  @7  @  8  @3  pë  9  @	 ñ  :  @;  @
+ <  @ =  @>  @?  @@  @A  @B  @C  @D  @E  @F  @ G  @4  pH  @I  @J  @K  @   L  @5  pM  @ N  @   O  @6  pP  @Q  @ R  @S  @ T  @7  pU  @ V  @  W  @8  pX  @Y  @ -  Z  @Ó  [  @\  @  9  p]  @^  @  _  @! " `  @# :  pa  @b  @% c  @& '   `  `. ®   / ê   ﬁ  :  6       a  f  @0 &  g  @©  «  ∞  1 
+  2 3 h  @i  @4 7 8 9 $  : ; < É  = †     > b  ? è  j  @@   k  @A l  @B D C F E G H I J m  @n  @L K o  @M ç N p  @O P q  @r  @  `      è  d  @( &  ) ç e  @Ò  A  
+  K  * <  p  `] ^   `d ^ e f   `  `    †  V W X b  Y I l   [   `è  w  @@ &    x  @A a  y  @B D C \ E ?  p¡  G ^ 4 ®   H z  @{  @L K 
+  |  @M ç N }  @O ~  @_   @` Ä  @∞  a Å  @c b @  pë  Ç  @g ñ    `G  I      D s  @t  @Æ  ≠  Q œ  ©  R 
+  S   è  u  @( &  T ç v  @U A  * >  p  `$    ∞   j W  ê   " k ÷  l µ  m n o ;  !  `¿   `   `É  @Ò  î  A  $  
+    º  Ω  æ  é è   ª    ê ë ì ê   ∫  ®   î ï ñ ó Ë        [ M i  Ñ  @ô &  a  Ö  @ö ç õ 4 è  Ü  @
+  ú ⁄    á  @û à  @ü †    â  @° ä  @¢ ã  @£ § å  @• ¶ ç  @ß é  @® © è  @™ ê  @´   ë  @¨ Ú  í  @≠ ì  @Æ î  @Ø ï  @∞ ñ  @± ó  @≤ ò  @≥ ô  @¥ ö  @µ õ  @∂ ú  @∑ ù  @∏ û  @π ∫ ü  @ª º †  @Ω °  @æ ø I  p¡  ¢  @¡ £  @¬ §  @√ ƒ •  @≈ ∆ †  ¶  @« -  )  ß  @» ®  @… ©  @  %  `à  â  € $  `Õ œ B  ≠  @  €  J    M  p#  `ÿ L  pŸ ‹ › $  ﬁ =  >  '  `Õ œ · ±  $  z  ‚ &  `$  ﬂ  ‡ O  p*  `Ù ı ∞  @ˆ +  `$  ﬁ =  Z  (  a  ˜ ˘ ˙ ˚ ;  ¸ ˝ ˛ ˇ <  Õ œ   )  `à  â  ⁄     Pê   È Í Ï Ì Ó $  2  Ø  @Ô J   0  Ò Ú z  {  ¯  R  pÛ S  p5  (  `Õ œ €  Æ  @‰ 0  “ ¯    Q  p"  `Õ $  Œ œ ™  @– — ´  @A  î  ” 0  “ ¨  @‘ ’  ÷ K  pN  p„ ‡ P  p,  `ê   È   I   Ä  
+ ó    ±  @0  -  ` $  r  Z  Ä  >   ;  .  `$      	    È       a   /  `0  `a   2  `≤  @$  
+    	                          3  `        4  `5  `    	                    ≥  @  ¥  @6  `!            "  #  7  `    i  µ  @'  (  &  -  )  
+  <  `$  A  ;  `6  8  9  $  :  ;  <  =  >  ?  ∑  @  p@  :  `$  -    .  /  0  1  2  ∂  @J  B  3  4    pB  5  =  `D  ∏  @E  9  `   +  
+  pC    pπ  @F  G  H  I  J  K  $  
+    	                    L  E    M  B  N  O  P  ?  `@  `A  `I  D  ª  @G  $  V  W  W   X  Y  Z  ;  >  B  `>  `$  -    Q  /  0  R  2  ∫  @J  B  3       pS    pT    pB  5    p  D  `E  `F  `$  
+    ^    -  _  W  -  `  %  O  G  `a  b  à  C  `$  -    [  /  0  \  2  º  @J  W  3       pS    pT    pB  5    p  I  `J  `K  `$  e  W  f  g    h  -  i  ê   L  `a  b  à  H  `$  -    c  /  0  d  2  Ω  @J  B  3       pS    pT    p5    p  N  `$  l  ;  m  O  `$  l  ;  n  P  `I  $  p  W  0  D  ø  @I  M  `$  -    j  /  0  k  2  æ  @J  B  3    pS    pT     pB  5  S  `T  `U  `  "  |  !  }        ~  ¬  @G  V  `Q  `R  `$  r  Z  ê   u  v  ;  w  x  2  ¿  @y  J  B  3  ¡  @{  s  t  z     "  pS  #  pT  $  p5  %  p  W  `  "  |  !  }  $  Ä  >  Å  r  Z        Ç  √  @  I  K  X  `+  M  N  P  É  Ñ  Ö  Ü  Y  `à  â  ä  Z  `[  `    F  ã  	        L  E        å  ƒ  @\  `!        *    "  ç  ^  `≈  @$  
+    	    a  `s b  `s c  `É _  ``  `  	  º  Ω  æ        †  r a  ∆  @s ç t &  D  p¡  i  «  @u v »  @…  @Û  ≈  
+  E  p   @w x À  @y Ã  @z A  è  Õ  @Œ  @{ œ  | œ  @} ~ –  @ —  @Ä “  @Ç Å F  p”  @Ñ Ö € d  `!        p   "    Ü á    `  p  p  p+  p,  p;  p=  pA  pH  pJ  pT  pU  pV  pW  p1  `    √    pR     p    p    $         p$    p8  `	  p  pM    pN    pO    pP  !  pq  &  p  '  p(  pá  )  p*  *  p]  `B  pC  pp G  p ˇXÑI  :                  	            	                 
+           i           # {           "  Ä           "  ë  	             ö     $      !
+ À  "   *      # ∂          ! ®            •     @        «          ! ˛     M      "  Ì     S        Ó     T        Ô     "       ˝             (     N      "       S             T             &       $             P     O      "  ?     S        @     T        A     5        L             y     P      "  f     S        k     T        p  	   .       ú     q      "  ç     S        é     T        è     5        õ             ª           "  œ  	         "  ÿ     á      "  ‹           "  Ì  	                -           s   ˝   å        D      ¡      !
+ G      ¡      !
+ J      ¡      !
+ M      ¡      !
+ P      ¡      !
+ T      ¡      !
+ Z      ¡      !
+ ]      ¡      !
+ `      ¡      !
+ d      ¡      !
+ g      ¡      !
+ i      ¡      !
+ l      ¡      !
+ p      ¡      !
+ µ     Ç        p  E   4     !      ~        Œ  =   5     ! ∆     ¡      !
+ …     ¡      !
+ '     √        ˆ     p     #   ;         "  ˝     ¡      !
+ ˇ     ¡      !
+      ¡      !
+ >               9  â           7     ¡      !
+ '     À       –  
+   9       ∆  
+   :       ¬     ;       ‚     9       ⁄     <            9            <       Ë     Û       Ì     5        ?     È       L  	          U            f            ùH©¿      WΩ      WΩ                     Ï       Ï                    [  Ì   [                 q  î  \  î               
+ ⁄  .  ï  ⁄                 B  ®  1  ®                 ±  ÿ  ´  ÿ     	             ˆ  Ö  Ì  Ö  *                ó  U  ó  U  -             ä û    W  7(  5                ﬁ  ¥  ﬁ  ¥  7   /             '
+  ô  
+  ô  A              0  s  '  s  G   '             Á  /  Á  /  O   1              ©    ©  i                \  a  S  a  s                |  Å  s  Å  t               õ  ^  í  ^  u               Å  ù  x  ù  Ä               ∫  Ä  ¨  Ä  Ö                <  A  3  A  ê                \  a  S  a  ë               {  ¯  r  ¯  í                 t    t  ú                ì  ò  É  ò  °                À  –  ¬  –  ´                Î    ‚    ¨                
+        ≠               3  å  *  å  ∂               ±  ÿ  õ  ÿ  ª                Ÿ    –    ƒ                8  w  /  w  «               ë  ¡  à  ¡                  Î  #  €  #  ◊                î   P!  ã   P!  Á                k!  p!  b!  p!  Í                ä!  Ÿ"  Å!  Ÿ"  Î               Ò"  #  Ë"  #  Û               ,#  K%  #  K%  ¯               _%  h&  N%  h&                 &  £&  k&  £&                ¨&  5(  ¶&  5(    	             S(  Ê(  J(  Ê(  $               ˝(  ﬂ,  È(  ﬂ,  '            ÄÚ,  ùn  ‡,  ùn  D              {1  —1  {1  —1  \               4   5   4   5  s              £8  Û8  £8  Û8  è              1=  {=  1=  {=  ±              A  ZA  A  ZA  Œ              ØF  G  ØF  G  Ê              ∏O  P  ∏O  P  &              aZ  ΩZ  aZ  ΩZ  a              0^  ^  0^  ^  x              “`  5a  “`  5a  Ü              xd  ∂d  xd  ∂d  ù              g  vg  g  vg  Ø              gj  µj  gj  µj  À              ll  ∞l  ll  ∞l  ‹             ≥n  hy  ûn  hy  Î              ùo  by  ùo  by  Ú             Öy  ÌÇ  iy  ÌÇ  4            Ä\{  ÁÇ  \{  ÁÇ  D               Ö~   ~  Ö~   ~  V              ˛Å  äÇ  ˛Å  äÇ  n              É  xÖ  ÓÇ  xÖ  w            
+ ¥Ö  Ü  yÖ  sç  Ü              Ü  qç  Ü  qç  å  	             √á  á  √á  á  ï              â  Bâ  â  Bâ  †              áå  ∞å  áå  ∞å  ª              èç  ≤é  Üç  ≤é  √              ”é  W™  µé  W™  «              ∑•  ‡•  ∑•  ‡•  .            Än™  §¥  X™  §¥  E             ∑´  ˚¨  Æ´  ˚¨  T  4            ¸´  £¨  Û´  £¨  V              b¨  õ¨  Y¨  õ¨  Y              ≠  î≠  ≠  î≠  `              >≠  é≠  5≠  é≠  a  /           π≠  †¥  ∞≠  †¥  e  #           )Æ  ö¥   Æ  ö¥  i             (∞  4±  ∞  4±  w              P±  ä¥  G±  ä¥  ~              ∫¥  ‡∂  •¥  ‡∂  í              ∑  Qª  ˆ∂  Qª  •              rª  Ω  Rª  Ω  √  !             2Ω  WΩ  Ω  WΩ  œ             5°›bÒ(ƒ!¬˘X∑Ì      g¯ﬁÛg¯ﬁÛHøﬁg¯Âo   q    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/scriptReactCompiled/student/studentHomeReact.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:55 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|d0a9714e-8fc1-d5ad-001f-25c503806ee7|
+Accept-Ranges: bytes
+ETag: W/"48471-1744298508000"
+Last-Modified: Thu, 10 Apr 2025 15:21:48 GMT
+Content-Type: application/javascript
+Content-Length: 48471
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:55 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|d0a9714e-8fc1-d5ad-001f-25c503806ee7|
+Accept-Ranges: bytes
+ETag: W/"48471-1744298508000"
+Last-Modified: Thu, 10 Apr 2025 15:21:48 GMT
+Content-Type: application/javascript
+Content-Length: 48471
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=86
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 594 net-response-time-onstop 624 alt-data 1;48471,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  èc

@@ -1,0 +1,1866 @@
+/*
+ * jQuery Autocomplete plugin 1.1
+ *
+ * Copyright (c) 2009 J√∂rn Zaefferer
+ *
+ * Dual licensed under the MIT and GPL licenses:
+ *   http://www.opensource.org/licenses/mit-license.php
+ *   http://www.gnu.org/licenses/gpl.html
+ *
+ * Revision: $Id: jquery.autocomplete.js 15 2009-08-22 10:30:27Z joern.zaefferer $
+ */
+
+;(function($) {
+	
+$.fn.extend({
+	autocomplete: function(urlOrData, options) {
+		var isUrl = typeof urlOrData == "string";
+		options = $.extend({}, $.Autocompleter.defaults, {
+			url: isUrl ? urlOrData : null,
+			data: isUrl ? null : urlOrData,
+			delay: isUrl ? $.Autocompleter.defaults.delay : 10,
+			max: options && !options.scroll ? 10 : 150
+		}, options);
+		
+		// if highlight is set to false, replace it with a do-nothing function
+		options.highlight = options.highlight || function(value) { return value; };
+		
+		// if the formatMatch option is not specified, then use formatItem for backwards compatibility
+		options.formatMatch = options.formatMatch || options.formatItem;
+		
+		return this.each(function() {
+			new $.Autocompleter(this, options);
+		});
+	},
+	result: function(handler) {
+		return this.bind("result", handler);
+	},
+	search: function(handler) {
+		return this.trigger("search", [handler]);
+	},
+	flushCache: function() {
+		return this.trigger("flushCache");
+	},
+	setOptions: function(options){
+		return this.trigger("setOptions", [options]);
+	},
+	unautocomplete: function() {
+		return this.trigger("unautocomplete");
+	}
+});
+
+$.Autocompleter = function(input, options) {
+
+	var KEY = {
+		UP: 38,
+		DOWN: 40,
+		DEL: 46,
+		TAB: 9,
+		RETURN: 13,
+		ESC: 27,
+		COMMA: 188,
+		PAGEUP: 33,
+		PAGEDOWN: 34,
+		BACKSPACE: 8
+	};
+
+	// Create $ object for input element
+	var $input = $(input).attr("autocomplete", "off").addClass(options.inputClass);
+
+	var timeout;
+	var previousValue = "";
+	var cache = $.Autocompleter.Cache(options);
+	var hasFocus = 0;
+	var lastKeyPressCode;
+	var config = {
+		mouseDownOnSelect: false
+	};
+	var select = $.Autocompleter.Select(options, input, selectCurrent, config);
+	
+	var blockSubmit;
+	
+	// prevent form submit in opera when selecting with return key
+	$.browser.opera && $(input.form).bind("submit.autocomplete", function() {
+		if (blockSubmit) {
+			blockSubmit = false;
+			return false;
+		}
+	});
+	
+	// only opera doesn't trigger keydown multiple times while pressed, others don't work with keypress at all
+	$input.bind(($.browser.opera ? "keypress" : "keydown") + ".autocomplete", function(event) {
+		// a keypress means the input has focus
+		// avoids issue where input had focus before the autocomplete was applied
+		hasFocus = 1;
+		// track last key pressed
+		lastKeyPressCode = event.keyCode;
+		switch(event.keyCode) {
+		
+			case KEY.UP:
+				event.preventDefault();
+				if ( select.visible() ) {
+					select.prev();
+				} else {
+					onChange(0, true);
+				}
+				break;
+				
+			case KEY.DOWN:
+				event.preventDefault();
+				if ( select.visible() ) {
+					select.next();
+				} else {
+					onChange(0, true);
+				}
+				break;
+				
+			case KEY.PAGEUP:
+				event.preventDefault();
+				if ( select.visible() ) {
+					select.pageUp();
+				} else {
+					onChange(0, true);
+				}
+				break;
+				
+			case KEY.PAGEDOWN:
+				event.preventDefault();
+				if ( select.visible() ) {
+					select.pageDown();
+				} else {
+					onChange(0, true);
+				}
+				break;
+			
+			// matches also semicolon
+			case options.multiple && $.trim(options.multipleSeparator) == "," && KEY.COMMA:
+			case KEY.TAB:
+			case KEY.RETURN:
+				if( selectCurrent() ) {
+					// stop default to prevent a form submit, Opera needs special handling
+					event.preventDefault();
+					blockSubmit = true;
+					return false;
+				}
+				break;
+				
+			case KEY.ESC:
+				select.hide();
+				break;
+				
+			default:
+				clearTimeout(timeout);
+				timeout = setTimeout(onChange, options.delay);
+				break;
+		}
+	}).focus(function(){
+		// track whether the field has focus, we shouldn't process any
+		// results if the field no longer has focus
+		hasFocus++;
+	}).blur(function() {
+		hasFocus = 0;
+		if (!config.mouseDownOnSelect) {
+			hideResults();
+		}
+	}).click(function() {
+		// show select when clicking in a focused field
+		if ( hasFocus++ > 1 && !select.visible() ) {
+			onChange(0, true);
+		}
+	}).bind("search", function() {
+		// TODO why not just specifying both arguments?
+		var fn = (arguments.length > 1) ? arguments[1] : null;
+		function findValueCallback(q, data) {
+			var result;
+			if( data && data.length ) {
+				for (var i=0; i < data.length; i++) {
+					if( data[i].result.toLowerCase() == q.toLowerCase() ) {
+						result = data[i];
+						break;
+					}
+				}
+			}
+			if( typeof fn == "function" ) fn(result);
+			else $input.trigger("result", result && [result.data, result.value]);
+		}
+		$.each(trimWords($input.val()), function(i, value) {
+			request(value, findValueCallback, findValueCallback);
+		});
+	}).bind("flushCache", function() {
+		cache.flush();
+	}).bind("setOptions", function() {
+		$.extend(options, arguments[1]);
+		// if we've updated the data, repopulate
+		if ( "data" in arguments[1] )
+			cache.populate();
+	}).bind("unautocomplete", function() {
+		select.unbind();
+		$input.unbind();
+		$(input.form).unbind(".autocomplete");
+	});
+	
+	
+	function selectCurrent() {
+		var selected = select.selected();
+		if( !selected )
+			return false;
+		
+		var v = selected.result;
+		previousValue = v;
+		
+		if ( options.multiple ) {
+			var words = trimWords($input.val());
+			if ( words.length > 1 ) {
+				var seperator = options.multipleSeparator.length;
+				var cursorAt = $(input).selection().start;
+				var wordAt, progress = 0;
+				$.each(words, function(i, word) {
+					progress += word.length;
+					if (cursorAt <= progress) {
+						wordAt = i;
+						return false;
+					}
+					progress += seperator;
+				});
+				words[wordAt] = v;
+				// TODO this should set the cursor to the right position, but it gets overriden somewhere
+				//$.Autocompleter.Selection(input, progress + seperator, progress + seperator);
+				v = words.join( options.multipleSeparator );
+			}
+			v += options.multipleSeparator;
+		}
+		
+		$input.val(v);
+		hideResultsNow();
+		$input.trigger("result", [selected.data, selected.value]);
+		return true;
+	}
+	
+	function onChange(crap, skipPrevCheck) {
+		if( lastKeyPressCode == KEY.DEL ) {
+			select.hide();
+			return;
+		}
+		
+		var currentValue = $input.val();
+		
+		if ( !skipPrevCheck && currentValue == previousValue )
+			return;
+		
+		previousValue = currentValue;
+		
+		currentValue = lastWord(currentValue);
+		if ( currentValue.length >= options.minChars) {
+			$input.addClass(options.loadingClass);
+			if (!options.matchCase)
+				currentValue = currentValue.toLowerCase();
+			request(currentValue, receiveData, hideResultsNow);
+		} else {
+			stopLoading();
+			select.hide();
+		}
+	};
+	
+	function trimWords(value) {
+		if (!value)
+			return [""];
+		if (!options.multiple)
+			return [$.trim(value)];
+		return $.map(value.split(options.multipleSeparator), function(word) {
+			return $.trim(value).length ? $.trim(word) : null;
+		});
+	}
+	
+	function lastWord(value) {
+		if ( !options.multiple )
+			return value;
+		var words = trimWords(value);
+		if (words.length == 1) 
+			return words[0];
+		var cursorAt = $(input).selection().start;
+		if (cursorAt == value.length) {
+			words = trimWords(value)
+		} else {
+			words = trimWords(value.replace(value.substring(cursorAt), ""));
+		}
+		return words[words.length - 1];
+	}
+	
+	// fills in the input box w/the first match (assumed to be the best match)
+	// q: the term entered
+	// sValue: the first matching result
+	function autoFill(q, sValue){
+		// autofill in the complete box w/the first match as long as the user hasn't entered in more data
+		// if the last user key pressed was backspace, don't autofill
+		if( options.autoFill && (lastWord($input.val()).toLowerCase() == q.toLowerCase()) && lastKeyPressCode != KEY.BACKSPACE ) {
+			// fill in the value (keep the case the user has typed)
+			$input.val($input.val() + sValue.substring(lastWord(previousValue).length));
+			// select the portion of the value not typed by the user (so the next character will erase)
+			$(input).selection(previousValue.length, previousValue.length + sValue.length);
+		}
+	};
+
+	function hideResults() {
+		clearTimeout(timeout);
+		timeout = setTimeout(hideResultsNow, 200);
+	};
+
+	function hideResultsNow() {
+		var wasVisible = select.visible();
+		select.hide();
+		clearTimeout(timeout);
+		stopLoading();
+		if (options.mustMatch) {
+			// call search and run callback
+			$input.search(
+				function (result){
+					// if no value found, clear the input box
+					if( !result ) {
+						if (options.multiple) {
+							var words = trimWords($input.val()).slice(0, -1);
+							$input.val( words.join(options.multipleSeparator) + (words.length ? options.multipleSeparator : "") );
+						}
+						else {
+							$input.val( "" );
+							$input.trigger("result", null);
+						}
+					}
+				}
+			);
+		}
+	};
+
+	function receiveData(q, data) {
+		if ( data && data.length && hasFocus ) {
+			stopLoading();
+			select.display(data, q);
+			autoFill(q, data[0].value);
+			select.show();
+		} else {
+			hideResultsNow();
+		}
+	};
+
+	function request(term, success, failure) {
+		if (!options.matchCase)
+			term = term.toLowerCase();
+		var data = cache.load(term);
+		// recieve the cached data
+		if (data && data.length) {
+			success(term, data);
+		// if an AJAX url has been supplied, try loading the data now
+		} else if( (typeof options.url == "string") && (options.url.length > 0) ){
+			
+			var extraParams = {
+				timestamp: +new Date()
+			};
+			$.each(options.extraParams, function(key, param) {
+				extraParams[key] = typeof param == "function" ? param() : param;
+			});
+			
+			$.ajax({
+				// try to leverage ajaxQueue plugin to abort previous requests
+				mode: "abort",
+				// limit abortion to this input
+				port: "autocomplete" + input.name,
+				dataType: options.dataType,
+				url: options.url,
+				data: $.extend({
+					q: lastWord(term),
+					limit: options.max
+				}, extraParams),
+				success: function(data) {
+					var parsed = options.parse && options.parse(data) || parse(data);
+					cache.add(term, parsed);
+					success(term, parsed);
+				}
+			});
+		} else {
+			// if we have a failure, we need to empty the list -- this prevents the the [TAB] key from selecting the last successful match
+			select.emptyList();
+			failure(term);
+		}
+	};
+	
+	function parse(data) {
+		var parsed = [];
+		var rows = data.split("\n");
+		for (var i=0; i < rows.length; i++) {
+			var row = $.trim(rows[i]);
+			if (row) {
+				row = row.split("|");
+				parsed[parsed.length] = {
+					data: row,
+					value: row[0],
+					result: options.formatResult && options.formatResult(row, row[0]) || row[0]
+				};
+			}
+		}
+		return parsed;
+	};
+
+	function stopLoading() {
+		$input.removeClass(options.loadingClass);
+	};
+
+};
+
+$.Autocompleter.defaults = {
+	inputClass: "ac_input",
+	resultsClass: "ac_results",
+	loadingClass: "ac_loading",
+	minChars: 1,
+	delay: 400,
+	matchCase: false,
+	matchSubset: true,
+	matchContains: false,
+	cacheLength: 10,
+	max: 100,
+	mustMatch: false,
+	extraParams: {},
+	selectFirst: true,
+	formatItem: function(row) { return row[0]; },
+	formatMatch: null,
+	autoFill: false,
+	width: 0,
+	multiple: false,
+	multipleSeparator: ", ",
+	highlight: function(value, term) {
+		return value.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + term.replace(/([\^\$\(\)\[\]\{\}\*\.\+\?\|\\])/gi, "\\$1") + ")(?![^<>]*>)(?![^&;]+;)", "gi"), "<strong>$1</strong>");
+	},
+    scroll: true,
+    scrollHeight: 180
+};
+
+$.Autocompleter.Cache = function(options) {
+
+	var data = {};
+	var length = 0;
+	
+	function matchSubset(s, sub) {
+		if (!options.matchCase) 
+			s = s.toLowerCase();
+		var i = s.indexOf(sub);
+		if (options.matchContains == "word"){
+			i = s.toLowerCase().search("\\b" + sub.toLowerCase());
+		}
+		if (i == -1) return false;
+		return i == 0 || options.matchContains;
+	};
+	
+	function add(q, value) {
+		if (length > options.cacheLength){
+			flush();
+		}
+		if (!data[q]){ 
+			length++;
+		}
+		data[q] = value;
+	}
+	
+	function populate(){
+		if( !options.data ) return false;
+		// track the matches
+		var stMatchSets = {},
+			nullData = 0;
+
+		// no url was specified, we need to adjust the cache length to make sure it fits the local data store
+		if( !options.url ) options.cacheLength = 1;
+		
+		// track all options for minChars = 0
+		stMatchSets[""] = [];
+		
+		// loop through the array and create a lookup structure
+		for ( var i = 0, ol = options.data.length; i < ol; i++ ) {
+			var rawValue = options.data[i];
+			// if rawValue is a string, make an array otherwise just reference the array
+			rawValue = (typeof rawValue == "string") ? [rawValue] : rawValue;
+			
+			var value = options.formatMatch(rawValue, i+1, options.data.length);
+			if ( value === false )
+				continue;
+				
+			var firstChar = value.charAt(0).toLowerCase();
+			// if no lookup array for this character exists, look it up now
+			if( !stMatchSets[firstChar] ) 
+				stMatchSets[firstChar] = [];
+
+			// if the match is a string
+			var row = {
+				value: value,
+				data: rawValue,
+				result: options.formatResult && options.formatResult(rawValue) || value
+			};
+			
+			// push the current match into the set list
+			stMatchSets[firstChar].push(row);
+
+			// keep track of minChars zero items
+			if ( nullData++ < options.max ) {
+				stMatchSets[""].push(row);
+			}
+		};
+
+		// add the data items to the cache
+		$.each(stMatchSets, function(i, value) {
+			// increase the cache size
+			options.cacheLength++;
+			// add to the cache
+			add(i, value);
+		});
+	}
+	
+	// populate any existing data
+	setTimeout(populate, 25);
+	
+	function flush(){
+		data = {};
+		length = 0;
+	}
+	
+	return {
+		flush: flush,
+		add: add,
+		populate: populate,
+		load: function(q) {
+			if (!options.cacheLength || !length)
+				return null;
+			/* 
+			 * if dealing w/local data and matchContains than we must make sure
+			 * to loop through all the data collections looking for matches
+			 */
+			if( !options.url && options.matchContains ){
+				// track all matches
+				var csub = [];
+				// loop through all the data grids for matches
+				for( var k in data ){
+					// don't search through the stMatchSets[""] (minChars: 0) cache
+					// this prevents duplicates
+					if( k.length > 0 ){
+						var c = data[k];
+						$.each(c, function(i, x) {
+							// if we've got a match, add it to the array
+							if (matchSubset(x.value, q)) {
+								csub.push(x);
+							}
+						});
+					}
+				}				
+				return csub;
+			} else 
+			// if the exact item exists, use it
+			if (data[q]){
+				return data[q];
+			} else
+			if (options.matchSubset) {
+				for (var i = q.length - 1; i >= options.minChars; i--) {
+					var c = data[q.substr(0, i)];
+					if (c) {
+						var csub = [];
+						$.each(c, function(i, x) {
+							if (matchSubset(x.value, q)) {
+								csub[csub.length] = x;
+							}
+						});
+						return csub;
+					}
+				}
+			}
+			return null;
+		}
+	};
+};
+
+$.Autocompleter.Select = function (options, input, select, config) {
+	var CLASSES = {
+		ACTIVE: "ac_over"
+	};
+	
+	var listItems,
+		active = -1,
+		data,
+		term = "",
+		needsInit = true,
+		element,
+		list;
+	
+	// Create results
+	function init() {
+		if (!needsInit)
+			return;
+		element = $("<div/>")
+		.hide()
+		.addClass(options.resultsClass)
+		.css("position", "absolute")
+		.appendTo(document.body);
+	
+		list = $("<ul/>").appendTo(element).mouseover( function(event) {
+			if(target(event).nodeName && target(event).nodeName.toUpperCase() == 'LI') {
+	            active = $("li", list).removeClass(CLASSES.ACTIVE).index(target(event));
+			    $(target(event)).addClass(CLASSES.ACTIVE);            
+	        }
+		}).click(function(event) {
+			$(target(event)).addClass(CLASSES.ACTIVE);
+			select();
+			// TODO provide option to avoid setting focus again after selection? useful for cleanup-on-focus
+			input.focus();
+			return false;
+		}).mousedown(function() {
+			config.mouseDownOnSelect = true;
+		}).mouseup(function() {
+			config.mouseDownOnSelect = false;
+		});
+		
+		if( options.width > 0 )
+			element.css("width", options.width);
+			
+		needsInit = false;
+	} 
+	
+	function target(event) {
+		var element = event.target;
+		while(element && element.tagName != "LI")
+			element = element.parentNode;
+		// more fun with IE, sometimes event.target is empty, just ignore it then
+		if(!element)
+			return [];
+		return element;
+	}
+
+	function moveSelect(step) {
+		listItems.slice(active, active + 1).removeClass(CLASSES.ACTIVE);
+		movePosition(step);
+        var activeItem = listItems.slice(active, active + 1).addClass(CLASSES.ACTIVE);
+        if(options.scroll) {
+            var offset = 0;
+            listItems.slice(0, active).each(function() {
+				offset += this.offsetHeight;
+			});
+            if((offset + activeItem[0].offsetHeight - list.scrollTop()) > list[0].clientHeight) {
+                list.scrollTop(offset + activeItem[0].offsetHeight - list.innerHeight());
+            } else if(offset < list.scrollTop()) {
+                list.scrollTop(offset);
+            }
+        }
+	};
+	
+	function movePosition(step) {
+		active += step;
+		if (active < 0) {
+			active = listItems.size() - 1;
+		} else if (active >= listItems.size()) {
+			active = 0;
+		}
+	}
+	
+	function limitNumberOfItems(available) {
+		return options.max && options.max < available
+			? options.max
+			: available;
+	}
+	
+	function fillList() {
+		list.empty();
+		var max = limitNumberOfItems(data.length);
+		for (var i=0; i < max; i++) {
+			if (!data[i])
+				continue;
+			var formatted = options.formatItem(data[i].data, i+1, max, data[i].value, term);
+			if ( formatted === false )
+				continue;
+			var li = $("<li/>").html( options.highlight(formatted, term) ).addClass(i%2 == 0 ? "ac_even" : "ac_odd").appendTo(list)[0];
+			$.data(li, "ac_data", data[i]);
+		}
+		listItems = list.find("li");
+		if ( options.selectFirst ) {
+			listItems.slice(0, 1).addClass(CLASSES.ACTIVE);
+			active = 0;
+		}
+		// apply bgiframe if available
+		if ( $.fn.bgiframe )
+			list.bgiframe();
+	}
+	
+	return {
+		display: function(d, q) {
+			init();
+			data = d;
+			term = q;
+			fillList();
+		},
+		next: function() {
+			moveSelect(1);
+		},
+		prev: function() {
+			moveSelect(-1);
+		},
+		pageUp: function() {
+			if (active != 0 && active - 8 < 0) {
+				moveSelect( -active );
+			} else {
+				moveSelect(-8);
+			}
+		},
+		pageDown: function() {
+			if (active != listItems.size() - 1 && active + 8 > listItems.size()) {
+				moveSelect( listItems.size() - 1 - active );
+			} else {
+				moveSelect(8);
+			}
+		},
+		hide: function() {
+			element && element.hide();
+			listItems && listItems.removeClass(CLASSES.ACTIVE);
+			active = -1;
+		},
+		visible : function() {
+			return element && element.is(":visible");
+		},
+		current: function() {
+			return this.visible() && (listItems.filter("." + CLASSES.ACTIVE)[0] || options.selectFirst && listItems[0]);
+		},
+		show: function() {
+			var offset = $(input).offset();
+			element.css({
+				width: typeof options.width == "string" || options.width > 0 ? options.width : $(input).width(),
+				top: offset.top + input.offsetHeight,
+				left: offset.left
+			}).show();
+            if(options.scroll) {
+                list.scrollTop(0);
+                list.css({
+					maxHeight: options.scrollHeight,
+					overflow: 'auto'
+				});
+				
+                if($.browser.msie && typeof document.body.style.maxHeight === "undefined") {
+					var listHeight = 0;
+					listItems.each(function() {
+						listHeight += this.offsetHeight;
+					});
+					var scrollbarsVisible = listHeight > options.scrollHeight;
+                    list.css('height', scrollbarsVisible ? options.scrollHeight : listHeight );
+					if (!scrollbarsVisible) {
+						// IE doesn't recalculate width when scrollbar disappears
+						listItems.width( list.width() - parseInt(listItems.css("padding-left")) - parseInt(listItems.css("padding-right")) );
+					}
+                }
+                
+            }
+		},
+		selected: function() {
+			var selected = listItems && listItems.filter("." + CLASSES.ACTIVE).removeClass(CLASSES.ACTIVE);
+			return selected && selected.length && $.data(selected[0], "ac_data");
+		},
+		emptyList: function (){
+			list && list.empty();
+		},
+		unbind: function() {
+			element && element.remove();
+		}
+	};
+};
+
+$.fn.selection = function(start, end) {
+	if (start !== undefined) {
+		return this.each(function() {
+			if( this.createTextRange ){
+				var selRange = this.createTextRange();
+				if (end === undefined || start == end) {
+					selRange.move("character", start);
+					selRange.select();
+				} else {
+					selRange.collapse(true);
+					selRange.moveStart("character", start);
+					selRange.moveEnd("character", end);
+					selRange.select();
+				}
+			} else if( this.setSelectionRange ){
+				this.setSelectionRange(start, end);
+			} else if( this.selectionStart ){
+				this.selectionStart = start;
+				this.selectionEnd = end;
+			}
+		});
+	}
+	var field = this[0];
+	if ( field.createTextRange ) {
+		var range = document.selection.createRange(),
+			orig = field.value,
+			teststring = "<->",
+			textLength = range.text.length;
+		range.text = teststring;
+		var caretAt = field.value.indexOf(teststring);
+		field.value = orig;
+		this.selection(caretAt, caretAt + textLength);
+		return {
+			start: caretAt,
+			end: caretAt + textLength
+		}
+	} else if( field.selectionStart !== undefined ){
+		return {
+			start: field.selectionStart,
+			end: field.selectionEnd
+		}
+	}
+};
+
+})(jQuery);        |‚  x|‚É   20250331133932-8l_‚  ¥âV®1   https://erp.cmrit.ac.in/js/jquery.autocomplete.js      S  /*
+ * jQuery Autocomplete plugin 1.1
+ *
+ * Copyright (c) 2009 J√É¬∂rn Zaefferer
+ *
+ * Dual licensed under the MIT and GPL licenses:
+ *   http://www.opensource.org/licenses/mit-license.php
+ *   http://www.gnu.org/licenses/gpl.html
+ *
+ * Revision: $Id: jquery.autocomplete.js 15 2009-08-22 10:30:27Z joern.zaefferer $
+ */
+
+;(function($) {
+	
+$.fn.extend({
+	autocomplete: function(urlOrData, options) {
+		var isUrl = typeof urlOrData == "string";
+		options = $.extend({}, $.Autocompleter.defaults, {
+			url: isUrl ? urlOrData : null,
+			data: isUrl ? null : urlOrData,
+			delay: isUrl ? $.Autocompleter.defaults.delay : 10,
+			max: options && !options.scroll ? 10 : 150
+		}, options);
+		
+		// if highlight is set to false, replace it with a do-nothing function
+		options.highlight = options.highlight || function(value) { return value; };
+		
+		// if the formatMatch option is not specified, then use formatItem for backwards compatibility
+		options.formatMatch = options.formatMatch || options.formatItem;
+		
+		return this.each(function() {
+			new $.Autocompleter(this, options);
+		});
+	},
+	result: function(handler) {
+		return this.bind("result", handler);
+	},
+	search: function(handler) {
+		return this.trigger("search", [handler]);
+	},
+	flushCache: function() {
+		return this.trigger("flushCache");
+	},
+	setOptions: function(options){
+		return this.trigger("setOptions", [options]);
+	},
+	unautocomplete: function() {
+		return this.trigger("unautocomplete");
+	}
+});
+
+$.Autocompleter = function(input, options) {
+
+	var KEY = {
+		UP: 38,
+		DOWN: 40,
+		DEL: 46,
+		TAB: 9,
+		RETURN: 13,
+		ESC: 27,
+		COMMA: 188,
+		PAGEUP: 33,
+		PAGEDOWN: 34,
+		BACKSPACE: 8
+	};
+
+	// Create $ object for input element
+	var $input = $(input).attr("autocomplete", "off").addClass(options.inputClass);
+
+	var timeout;
+	var previousValue = "";
+	var cache = $.Autocompleter.Cache(options);
+	var hasFocus = 0;
+	var lastKeyPressCode;
+	var config = {
+		mouseDownOnSelect: false
+	};
+	var select = $.Autocompleter.Select(options, input, selectCurrent, config);
+	
+	var blockSubmit;
+	
+	// prevent form submit in opera when selecting with return key
+	$.browser.opera && $(input.form).bind("submit.autocomplete", function() {
+		if (blockSubmit) {
+			blockSubmit = false;
+			return false;
+		}
+	});
+	
+	// only opera doesn't trigger keydown multiple times while pressed, others don't work with keypress at all
+	$input.bind(($.browser.opera ? "keypress" : "keydown") + ".autocomplete", function(event) {
+		// a keypress means the input has focus
+		// avoids issue where input had focus before the autocomplete was applied
+		hasFocus = 1;
+		// track last key pressed
+		lastKeyPressCode = event.keyCode;
+		switch(event.keyCode) {
+		
+			case KEY.UP:
+				event.preventDefault();
+				if ( select.visible() ) {
+					select.prev();
+				} else {
+					onChange(0, true);
+				}
+				break;
+				
+			case KEY.DOWN:
+				event.preventDefault();
+				if ( select.visible() ) {
+					select.next();
+				} else {
+					onChange(0, true);
+				}
+				break;
+				
+			case KEY.PAGEUP:
+				event.preventDefault();
+				if ( select.visible() ) {
+					select.pageUp();
+				} else {
+					onChange(0, true);
+				}
+				break;
+				
+			case KEY.PAGEDOWN:
+				event.preventDefault();
+				if ( select.visible() ) {
+					select.pageDown();
+				} else {
+					onChange(0, true);
+				}
+				break;
+			
+			// matches also semicolon
+			case options.multiple && $.trim(options.multipleSeparator) == "," && KEY.COMMA:
+			case KEY.TAB:
+			case KEY.RETURN:
+				if( selectCurrent() ) {
+					// stop default to prevent a form submit, Opera needs special handling
+					event.preventDefault();
+					blockSubmit = true;
+					return false;
+				}
+				break;
+				
+			case KEY.ESC:
+				select.hide();
+				break;
+				
+			default:
+				clearTimeout(timeout);
+				timeout = setTimeout(onChange, options.delay);
+				break;
+		}
+	}).focus(function(){
+		// track whether the field has focus, we shouldn't process any
+		// results if the field no longer has focus
+		hasFocus++;
+	}).blur(function() {
+		hasFocus = 0;
+		if (!config.mouseDownOnSelect) {
+			hideResults();
+		}
+	}).click(function() {
+		// show select when clicking in a focused field
+		if ( hasFocus++ > 1 && !select.visible() ) {
+			onChange(0, true);
+		}
+	}).bind("search", function() {
+		// TODO why not just specifying both arguments?
+		var fn = (arguments.length > 1) ? arguments[1] : null;
+		function findValueCallback(q, data) {
+			var result;
+			if( data && data.length ) {
+				for (var i=0; i < data.length; i++) {
+					if( data[i].result.toLowerCase() == q.toLowerCase() ) {
+						result = data[i];
+						break;
+					}
+				}
+			}
+			if( typeof fn == "function" ) fn(result);
+			else $input.trigger("result", result && [result.data, result.value]);
+		}
+		$.each(trimWords($input.val()), function(i, value) {
+			request(value, findValueCallback, findValueCallback);
+		});
+	}).bind("flushCache", function() {
+		cache.flush();
+	}).bind("setOptions", function() {
+		$.extend(options, arguments[1]);
+		// if we've updated the data, repopulate
+		if ( "data" in arguments[1] )
+			cache.populate();
+	}).bind("unautocomplete", function() {
+		select.unbind();
+		$input.unbind();
+		$(input.form).unbind(".autocomplete");
+	});
+	
+	
+	function selectCurrent() {
+		var selected = select.selected();
+		if( !selected )
+			return false;
+		
+		var v = selected.result;
+		previousValue = v;
+		
+		if ( options.multiple ) {
+			var words = trimWords($input.val());
+			if ( words.length > 1 ) {
+				var seperator = options.multipleSeparator.length;
+				var cursorAt = $(input).selection().start;
+				var wordAt, progress = 0;
+				$.each(words, function(i, word) {
+					progress += word.length;
+					if (cursorAt <= progress) {
+						wordAt = i;
+						return false;
+					}
+					progress += seperator;
+				});
+				words[wordAt] = v;
+				// TODO this should set the cursor to the right position, but it gets overriden somewhere
+				//$.Autocompleter.Selection(input, progress + seperator, progress + seperator);
+				v = words.join( options.multipleSeparator );
+			}
+			v += options.multipleSeparator;
+		}
+		
+		$input.val(v);
+		hideResultsNow();
+		$input.trigger("result", [selected.data, selected.value]);
+		return true;
+	}
+	
+	function onChange(crap, skipPrevCheck) {
+		if( lastKeyPressCode == KEY.DEL ) {
+			select.hide();
+			return;
+		}
+		
+		var currentValue = $input.val();
+		
+		if ( !skipPrevCheck && currentValue == previousValue )
+			return;
+		
+		previousValue = currentValue;
+		
+		currentValue = lastWord(currentValue);
+		if ( currentValue.length >= options.minChars) {
+			$input.addClass(options.loadingClass);
+			if (!options.matchCase)
+				currentValue = currentValue.toLowerCase();
+			request(currentValue, receiveData, hideResultsNow);
+		} else {
+			stopLoading();
+			select.hide();
+		}
+	};
+	
+	function trimWords(value) {
+		if (!value)
+			return [""];
+		if (!options.multiple)
+			return [$.trim(value)];
+		return $.map(value.split(options.multipleSeparator), function(word) {
+			return $.trim(value).length ? $.trim(word) : null;
+		});
+	}
+	
+	function lastWord(value) {
+		if ( !options.multiple )
+			return value;
+		var words = trimWords(value);
+		if (words.length == 1) 
+			return words[0];
+		var cursorAt = $(input).selection().start;
+		if (cursorAt == value.length) {
+			words = trimWords(value)
+		} else {
+			words = trimWords(value.replace(value.substring(cursorAt), ""));
+		}
+		return words[words.length - 1];
+	}
+	
+	// fills in the input box w/the first match (assumed to be the best match)
+	// q: the term entered
+	// sValue: the first matching result
+	function autoFill(q, sValue){
+		// autofill in the complete box w/the first match as long as the user hasn't entered in more data
+		// if the last user key pressed was backspace, don't autofill
+		if( options.autoFill && (lastWord($input.val()).toLowerCase() == q.toLowerCase()) && lastKeyPressCode != KEY.BACKSPACE ) {
+			// fill in the value (keep the case the user has typed)
+			$input.val($input.val() + sValue.substring(lastWord(previousValue).length));
+			// select the portion of the value not typed by the user (so the next character will erase)
+			$(input).selection(previousValue.length, previousValue.length + sValue.length);
+		}
+	};
+
+	function hideResults() {
+		clearTimeout(timeout);
+		timeout = setTimeout(hideResultsNow, 200);
+	};
+
+	function hideResultsNow() {
+		var wasVisible = select.visible();
+		select.hide();
+		clearTimeout(timeout);
+		stopLoading();
+		if (options.mustMatch) {
+			// call search and run callback
+			$input.search(
+				function (result){
+					// if no value found, clear the input box
+					if( !result ) {
+						if (options.multiple) {
+							var words = trimWords($input.val()).slice(0, -1);
+							$input.val( words.join(options.multipleSeparator) + (words.length ? options.multipleSeparator : "") );
+						}
+						else {
+							$input.val( "" );
+							$input.trigger("result", null);
+						}
+					}
+				}
+			);
+		}
+	};
+
+	function receiveData(q, data) {
+		if ( data && data.length && hasFocus ) {
+			stopLoading();
+			select.display(data, q);
+			autoFill(q, data[0].value);
+			select.show();
+		} else {
+			hideResultsNow();
+		}
+	};
+
+	function request(term, success, failure) {
+		if (!options.matchCase)
+			term = term.toLowerCase();
+		var data = cache.load(term);
+		// recieve the cached data
+		if (data && data.length) {
+			success(term, data);
+		// if an AJAX url has been supplied, try loading the data now
+		} else if( (typeof options.url == "string") && (options.url.length > 0) ){
+			
+			var extraParams = {
+				timestamp: +new Date()
+			};
+			$.each(options.extraParams, function(key, param) {
+				extraParams[key] = typeof param == "function" ? param() : param;
+			});
+			
+			$.ajax({
+				// try to leverage ajaxQueue plugin to abort previous requests
+				mode: "abort",
+				// limit abortion to this input
+				port: "autocomplete" + input.name,
+				dataType: options.dataType,
+				url: options.url,
+				data: $.extend({
+					q: lastWord(term),
+					limit: options.max
+				}, extraParams),
+				success: function(data) {
+					var parsed = options.parse && options.parse(data) || parse(data);
+					cache.add(term, parsed);
+					success(term, parsed);
+				}
+			});
+		} else {
+			// if we have a failure, we need to empty the list -- this prevents the the [TAB] key from selecting the last successful match
+			select.emptyList();
+			failure(term);
+		}
+	};
+	
+	function parse(data) {
+		var parsed = [];
+		var rows = data.split("\n");
+		for (var i=0; i < rows.length; i++) {
+			var row = $.trim(rows[i]);
+			if (row) {
+				row = row.split("|");
+				parsed[parsed.length] = {
+					data: row,
+					value: row[0],
+					result: options.formatResult && options.formatResult(row, row[0]) || row[0]
+				};
+			}
+		}
+		return parsed;
+	};
+
+	function stopLoading() {
+		$input.removeClass(options.loadingClass);
+	};
+
+};
+
+$.Autocompleter.defaults = {
+	inputClass: "ac_input",
+	resultsClass: "ac_results",
+	loadingClass: "ac_loading",
+	minChars: 1,
+	delay: 400,
+	matchCase: false,
+	matchSubset: true,
+	matchContains: false,
+	cacheLength: 10,
+	max: 100,
+	mustMatch: false,
+	extraParams: {},
+	selectFirst: true,
+	formatItem: function(row) { return row[0]; },
+	formatMatch: null,
+	autoFill: false,
+	width: 0,
+	multiple: false,
+	multipleSeparator: ", ",
+	highlight: function(value, term) {
+		return value.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + term.replace(/([\^\$\(\)\[\]\{\}\*\.\+\?\|\\])/gi, "\\$1") + ")(?![^<>]*>)(?![^&;]+;)", "gi"), "<strong>$1</strong>");
+	},
+    scroll: true,
+    scrollHeight: 180
+};
+
+$.Autocompleter.Cache = function(options) {
+
+	var data = {};
+	var length = 0;
+	
+	function matchSubset(s, sub) {
+		if (!options.matchCase) 
+			s = s.toLowerCase();
+		var i = s.indexOf(sub);
+		if (options.matchContains == "word"){
+			i = s.toLowerCase().search("\\b" + sub.toLowerCase());
+		}
+		if (i == -1) return false;
+		return i == 0 || options.matchContains;
+	};
+	
+	function add(q, value) {
+		if (length > options.cacheLength){
+			flush();
+		}
+		if (!data[q]){ 
+			length++;
+		}
+		data[q] = value;
+	}
+	
+	function populate(){
+		if( !options.data ) return false;
+		// track the matches
+		var stMatchSets = {},
+			nullData = 0;
+
+		// no url was specified, we need to adjust the cache length to make sure it fits the local data store
+		if( !options.url ) options.cacheLength = 1;
+		
+		// track all options for minChars = 0
+		stMatchSets[""] = [];
+		
+		// loop through the array and create a lookup structure
+		for ( var i = 0, ol = options.data.length; i < ol; i++ ) {
+			var rawValue = options.data[i];
+			// if rawValue is a string, make an array otherwise just reference the array
+			rawValue = (typeof rawValue == "string") ? [rawValue] : rawValue;
+			
+			var value = options.formatMatch(rawValue, i+1, options.data.length);
+			if ( value === false )
+				continue;
+				
+			var firstChar = value.charAt(0).toLowerCase();
+			// if no lookup array for this character exists, look it up now
+			if( !stMatchSets[firstChar] ) 
+				stMatchSets[firstChar] = [];
+
+			// if the match is a string
+			var row = {
+				value: value,
+				data: rawValue,
+				result: options.formatResult && options.formatResult(rawValue) || value
+			};
+			
+			// push the current match into the set list
+			stMatchSets[firstChar].push(row);
+
+			// keep track of minChars zero items
+			if ( nullData++ < options.max ) {
+				stMatchSets[""].push(row);
+			}
+		};
+
+		// add the data items to the cache
+		$.each(stMatchSets, function(i, value) {
+			// increase the cache size
+			options.cacheLength++;
+			// add to the cache
+			add(i, value);
+		});
+	}
+	
+	// populate any existing data
+	setTimeout(populate, 25);
+	
+	function flush(){
+		data = {};
+		length = 0;
+	}
+	
+	return {
+		flush: flush,
+		add: add,
+		populate: populate,
+		load: function(q) {
+			if (!options.cacheLength || !length)
+				return null;
+			/* 
+			 * if dealing w/local data and matchContains than we must make sure
+			 * to loop through all the data collections looking for matches
+			 */
+			if( !options.url && options.matchContains ){
+				// track all matches
+				var csub = [];
+				// loop through all the data grids for matches
+				for( var k in data ){
+					// don't search through the stMatchSets[""] (minChars: 0) cache
+					// this prevents duplicates
+					if( k.length > 0 ){
+						var c = data[k];
+						$.each(c, function(i, x) {
+							// if we've got a match, add it to the array
+							if (matchSubset(x.value, q)) {
+								csub.push(x);
+							}
+						});
+					}
+				}				
+				return csub;
+			} else 
+			// if the exact item exists, use it
+			if (data[q]){
+				return data[q];
+			} else
+			if (options.matchSubset) {
+				for (var i = q.length - 1; i >= options.minChars; i--) {
+					var c = data[q.substr(0, i)];
+					if (c) {
+						var csub = [];
+						$.each(c, function(i, x) {
+							if (matchSubset(x.value, q)) {
+								csub[csub.length] = x;
+							}
+						});
+						return csub;
+					}
+				}
+			}
+			return null;
+		}
+	};
+};
+
+$.Autocompleter.Select = function (options, input, select, config) {
+	var CLASSES = {
+		ACTIVE: "ac_over"
+	};
+	
+	var listItems,
+		active = -1,
+		data,
+		term = "",
+		needsInit = true,
+		element,
+		list;
+	
+	// Create results
+	function init() {
+		if (!needsInit)
+			return;
+		element = $("<div/>")
+		.hide()
+		.addClass(options.resultsClass)
+		.css("position", "absolute")
+		.appendTo(document.body);
+	
+		list = $("<ul/>").appendTo(element).mouseover( function(event) {
+			if(target(event).nodeName && target(event).nodeName.toUpperCase() == 'LI') {
+	            active = $("li", list).removeClass(CLASSES.ACTIVE).index(target(event));
+			    $(target(event)).addClass(CLASSES.ACTIVE);            
+	        }
+		}).click(function(event) {
+			$(target(event)).addClass(CLASSES.ACTIVE);
+			select();
+			// TODO provide option to avoid setting focus again after selection? useful for cleanup-on-focus
+			input.focus();
+			return false;
+		}).mousedown(function() {
+			config.mouseDownOnSelect = true;
+		}).mouseup(function() {
+			config.mouseDownOnSelect = false;
+		});
+		
+		if( options.width > 0 )
+			element.css("width", options.width);
+			
+		needsInit = false;
+	} 
+	
+	function target(event) {
+		var element = event.target;
+		while(element && element.tagName != "LI")
+			element = element.parentNode;
+		// more fun with IE, sometimes event.target is empty, just ignore it then
+		if(!element)
+			return [];
+		return element;
+	}
+
+	function moveSelect(step) {
+		listItems.slice(active, active + 1).removeClass(CLASSES.ACTIVE);
+		movePosition(step);
+        var activeItem = listItems.slice(active, active + 1).addClass(CLASSES.ACTIVE);
+        if(options.scroll) {
+            var offset = 0;
+            listItems.slice(0, active).each(function() {
+				offset += this.offsetHeight;
+			});
+            if((offset + activeItem[0].offsetHeight - list.scrollTop()) > list[0].clientHeight) {
+                list.scrollTop(offset + activeItem[0].offsetHeight - list.innerHeight());
+            } else if(offset < list.scrollTop()) {
+                list.scrollTop(offset);
+            }
+        }
+	};
+	
+	function movePosition(step) {
+		active += step;
+		if (active < 0) {
+			active = listItems.size() - 1;
+		} else if (active >= listItems.size()) {
+			active = 0;
+		}
+	}
+	
+	function limitNumberOfItems(available) {
+		return options.max && options.max < available
+			? options.max
+			: available;
+	}
+	
+	function fillList() {
+		list.empty();
+		var max = limitNumberOfItems(data.length);
+		for (var i=0; i < max; i++) {
+			if (!data[i])
+				continue;
+			var formatted = options.formatItem(data[i].data, i+1, max, data[i].value, term);
+			if ( formatted === false )
+				continue;
+			var li = $("<li/>").html( options.highlight(formatted, term) ).addClass(i%2 == 0 ? "ac_even" : "ac_odd").appendTo(list)[0];
+			$.data(li, "ac_data", data[i]);
+		}
+		listItems = list.find("li");
+		if ( options.selectFirst ) {
+			listItems.slice(0, 1).addClass(CLASSES.ACTIVE);
+			active = 0;
+		}
+		// apply bgiframe if available
+		if ( $.fn.bgiframe )
+			list.bgiframe();
+	}
+	
+	return {
+		display: function(d, q) {
+			init();
+			data = d;
+			term = q;
+			fillList();
+		},
+		next: function() {
+			moveSelect(1);
+		},
+		prev: function() {
+			moveSelect(-1);
+		},
+		pageUp: function() {
+			if (active != 0 && active - 8 < 0) {
+				moveSelect( -active );
+			} else {
+				moveSelect(-8);
+			}
+		},
+		pageDown: function() {
+			if (active != listItems.size() - 1 && active + 8 > listItems.size()) {
+				moveSelect( listItems.size() - 1 - active );
+			} else {
+				moveSelect(8);
+			}
+		},
+		hide: function() {
+			element && element.hide();
+			listItems && listItems.removeClass(CLASSES.ACTIVE);
+			active = -1;
+		},
+		visible : function() {
+			return element && element.is(":visible");
+		},
+		current: function() {
+			return this.visible() && (listItems.filter("." + CLASSES.ACTIVE)[0] || options.selectFirst && listItems[0]);
+		},
+		show: function() {
+			var offset = $(input).offset();
+			element.css({
+				width: typeof options.width == "string" || options.width > 0 ? options.width : $(input).width(),
+				top: offset.top + input.offsetHeight,
+				left: offset.left
+			}).show();
+            if(options.scroll) {
+                list.scrollTop(0);
+                list.css({
+					maxHeight: options.scrollHeight,
+					overflow: 'auto'
+				});
+				
+                if($.browser.msie && typeof document.body.style.maxHeight === "undefined") {
+					var listHeight = 0;
+					listItems.each(function() {
+						listHeight += this.offsetHeight;
+					});
+					var scrollbarsVisible = listHeight > options.scrollHeight;
+                    list.css('height', scrollbarsVisible ? options.scrollHeight : listHeight );
+					if (!scrollbarsVisible) {
+						// IE doesn't recalculate width when scrollbar disappears
+						listItems.width( list.width() - parseInt(listItems.css("padding-left")) - parseInt(listItems.css("padding-right")) );
+					}
+                }
+                
+            }
+		},
+		selected: function() {
+			var selected = listItems && listItems.filter("." + CLASSES.ACTIVE).removeClass(CLASSES.ACTIVE);
+			return selected && selected.length && $.data(selected[0], "ac_data");
+		},
+		emptyList: function (){
+			list && list.empty();
+		},
+		unbind: function() {
+			element && element.remove();
+		}
+	};
+};
+
+$.fn.selection = function(start, end) {
+	if (start !== undefined) {
+		return this.each(function() {
+			if( this.createTextRange ){
+				var selRange = this.createTextRange();
+				if (end === undefined || start == end) {
+					selRange.move("character", start);
+					selRange.select();
+				} else {
+					selRange.collapse(true);
+					selRange.moveStart("character", start);
+					selRange.moveEnd("character", end);
+					selRange.select();
+				}
+			} else if( this.setSelectionRange ){
+				this.setSelectionRange(start, end);
+			} else if( this.selectionStart ){
+				this.selectionStart = start;
+				this.selectionEnd = end;
+			}
+		});
+	}
+	var field = this[0];
+	if ( field.createTextRange ) {
+		var range = document.selection.createRange(),
+			orig = field.value,
+			teststring = "<->",
+			textLength = range.text.length;
+		range.text = teststring;
+		var caretAt = field.value.indexOf(teststring);
+		field.value = orig;
+		this.selection(caretAt, caretAt + textLength);
+		return {
+			start: caretAt,
+			end: caretAt + textLength
+		}
+	} else if( field.selectionStart !== undefined ){
+		return {
+			start: field.selectionStart,
+			end: field.selectionEnd
+		}
+	}
+};
+
+})(jQuery);”ò¿Ÿ  Ù          ªl‡Ù      extend     k˜–      autocomplete   ã|ûU	      urlOrData       :yã      options    dÁd©      isUrl      ¥ËÉç      Autocompleter      6ó(Å      data   ãC±¿      delay      Kk.      max	    \z˚      scroll
+     Âß1	      highlight      jms      formatMatch    %≠¨
+      formatItem     ÜáZ`      handler    ‡Õ      bind   ˘!p¬      trigger    6»c
+      flushCache     .ûäm
+      setOptions     Le˙‘      unautocomplete     ,@∏ÿ      KEY    î(      DOWN   ƒ;b÷      DEL    ]˛…      TAB    wG≠™      RETURN     NLAÆ      ESC    óÁ(>      COMMA      cf      PAGEUP     ™˚l»      PAGEDOWN   ¶TÚ≤	      BACKSPACE      x÷Ö      $input     A¢Ωê      attr   ˙¯Öﬂ      off     Bå|      addClass!   Û*v
+      inputClass"     ∑\o      timeout#    ô¬0ˇ      previousValue$      
+É€,      cache%      VùvÀ      Cache&      ´¡ı      hasFocus'   ôﬂŒ®      lastKeyPressCode(   ~û4      config)     crXò      mouseDownOnSelect*      1<Î      select+     “Ã3∞      Select,     O-Í      selectCurrent-      ˜_ˇ      blockSubmit.    “ßf∞      browser/    t9,¨      opera0      *g“€      form1   \åÒd      submit.autocomplete2    ®±V      keypress3   ù∫”      keydown4    å
+±¡      .autocomplete5      II∑P      event6      ≠5      keyCode7    B9∫¿      preventDefault8     ?Iqõ      visible9    >∆ß"      prev:   t®$ä      onChange;   »œé¿      pageUp<     3Èå<      pageDown=   ZÑA)      multiple>   óñôb      trim?   9
+ƒ      multipleSeparator@      üvÙ}      hideA   QÔ8u      clearTimeoutB   3AtŸ
+      setTimeoutC     KÃÌ      focusD      ƒ∫·%      blurE   ¯6+˛      hideResultsF    ü™‚X      clickG      ı Å      findValueCallbackH      RâDo      toLowerCaseI    ó \	      trimWordsJ      &⁄õ      valK    l(      requestL    Â¿ò      flushM      Ì„∏∏      populateN   ı˛«Æ      unbindO     ≈.»œ      selectedP   À&”â      wordsQ      HÙUÂ	      seperatorR      çÆUæ      cursorAtS   l8oi	      selectionT      QB0w      wordAtU     Â’øP      progressV   ∂ñÅ      wordW   Ft∑µ      hideResultsNowX     ùoœ      crapY   Ù»ﬁÑ      skipPrevCheckZ      ‡∫Ê      currentValue[   t5à≤      lastWord\   óds      minChars]   åCRâ      loadingClass^   PgC	      matchCase_      ˙ù©      receiveData`    }≥˘      stopLoadinga    9Ã      mapb    ﬂY„	      substringc      êêh      autoFilld   Q¡=      sValuee     ÚÿÛÿ
+      wasVisiblef     ¢ázÎ	      mustMatchg      ÿÖ Ã      sliceh      e}ü      displayi    HáíK      showj   WHâ#      termk   …©\9      successl    ŸΩ>R      failurem    2áU)      loadn   •„D      extraParamso    B¸ø;      keyp    ÅUÄ      paramq      æd»ê      ajaxr   >R∆      ports   DoÄw      dataTypet    IÙ°      limitu      ¸ê(      parsedv     5ıá∆      parsew      {˘∑	      emptyListx      ”Qn$      rowsy   Ï%N¬      rowz     #√;      formatResult{   ˆ+      removeClass|    øB      ac_input}   Ω|p      resultsClass~   [´
+      ac_results     Bµ©ç
+      ac_loadingÄ     ı¶ö∑      matchSubsetÅ    ì#ï      matchContainsÇ      v6E       cacheLengthÉ    ôıÒ      selectFirstÑ    ÎƒJ˚      widthÖ      ˆ^v      , Ü     ¿a^      (?![^&;]+;)(?!<[^<>]*)(á    2*‚       ([\^\$\(\)\[\]\{\}\*\.\+\?\|\\])à   §1æÛ      \$1â    Z[Ô?      )(?![^<>]*>)(?![^&;]+;)ä    %Ûƒ¡      <strong>$1</strong>ã    LsAø      scrollHeightå   sc      subç    ⁄Eú¡      indexOfé    Ò˚‡Ö      \bè     /∂6      stMatchSetsê    lÔcœ      nullDataë   Y Æ      rawValueí   ¿ûS⁄	      firstCharì      våƒ      charAtî     Ñu2      pushï   %Èµ      csubñ   6ôfÿ      substró     ©B≤˚      CLASSESò    ÄQÑ;      ACTIVEô     °ŒÁ†      ac_overö    ÙÙb	      listItemsõ      å®Px      activeú     ?{ô.	      needsInitù      „Ç»≈      listû   íu`      initü   <;Î      <div/>†     >ü      css°    »Åí      position¢   H<*ê      absolute£   †Á„V      appendTo§   ∏OÄ      document•   òh;      body¶   Êï±8      <ul/>ß      y˜ãÑ	      mouseover®      U5_      nodeName©   ¨‚s◊      toUpperCase™    ◊Dô	      mousedown´      =0V      mouseup¨    ﬁﬁÿ      tagName≠    •_œ”
+      parentNodeÆ     F¡¿
+      moveSelectØ     Æ6nn      step∞   ïsÙ      movePosition±   »ŸÏ‘
+      activeItem≤     Bãwå      offsetHeight≥   ìGÎ	      scrollTop¥      À˙∏      clientHeightµ   0Uó      innerHeight∂    g‰◊      limitNumberOfItems∑     õ,™	      available∏      ^≠ì´      fillListπ   ∏™˝      empty∫      ±Aßû	      formattedª      ÏÆƒK      <li/>º      ‘„X      htmlΩ   kB-S      ac_evenæ    _≠Öx      ac_oddø     5Ró      ac_data¿    e«íâ      bgiframe¡   SZK#      :visible¬   ÜÉÎ˝      current√    >	≈      filterƒ     $√Á      top≈    ı]á      left∆   Ç⁄Œá	      maxHeight«      z¡≤S      auto»   5∂™‰      msie…   Ö¸@
+      listHeight      z∆Gx      scrollbarsVisibleÀ      ∑…≈      heightÃ     ‘Ê      padding-leftÕ   ]s˝¨      padding-rightŒ      *N∑∆      removeœ     ‹Yk1      createTextRange–    W1ú∞      selRange—   ⁄M!      move“   –¥ï$	      character”      #ùÁ¢      collapse‘   »íÉz	      moveStart’      ˝Ä”á      moveEnd÷    #´,      setSelectionRange◊      ÂA¸¨      selectionStartÿ     L0F      selectionEndŸ   †“ñ!      field⁄      ⁄ËS#      createRange€    5ï˛      orig‹   i≠È∏
+      teststring›     4ÎqŒ      <->ﬁ    Ó⁄ì
+      textLengthﬂ     à3¿µ      text‡   \1∑      caretAt·    >Â/      jQuery‚     ﬂ–      autocomplete/options.highlight<„    .ezj      autocomplete/<‰     ÁŒ>      $.AutocompleterÂ    £÷å+      $.Autocompleter/<Á      ≈
+‰      $.Autocompleter/</<È    •ä^Ë      $.Autocompleter/selectCurrent/<Ï    ¬Ws„      $.Autocompleter/trimWords/<Ò     ¡6J       $.Autocompleter/hideResultsNow/<Ù   Jåˆê      $.Autocompleter/request/<¯      πPa      $.Autocompleter.Cache¸      â°u       $.Autocompleter.Cache/populate/<ˇ   b5øk      $.Autocompleter.Cache/load/<   ¥ÏYÏ      $.Autocompleter.Select    ≈∞^•!      $.Autocompleter.Select/init/list<     ís∂ô#      $.Autocompleter.Select/moveSelect/<   T'Í      $.Autocompleter.Select/show/<     TËî       $.fn.selection    E†¥¶      $.fn.selection/<     L   e  L   L             Ô%,â                                                                                                                                                                       	                
+      
+                                 
+                 
+                                 
+                 
+                 
+                 
+                                  
+                  
+          !                 "                 #      
+           $      
+           %      
+                 
+                 
+                 
+                 
+                 
+                                                    
+                 
+                 
+                            &                 '                (      (           )      (           *      (           +      +           ,      (           -      (          .      .           /      .           0                1      1           2      2           3      2           4      2           5      2           6      1           7      1          8      8           9      1           :      1           ;      1           <      1           =      1           >      1           ?      1           @      1           A      1           B      1           C      1           D      1          E      E           F      1           G      1           H      1           I                J      J           K      ≥Oåc                         $ `                P  ã                P                ã                 ã                 ã                 ã                 ã                 ã                 `  P  P  P"  P#  P$  P&  P'  P(  P*  P-  P,  P:  PI  P[  Pc  PE  PW  P_  PK  Pv  P`  P              O  v  P  Q  PR  PT  PU  P             i  V              X  Y  Z               P `             V              P  P  R               q  d                                e              €  P               q                j  Pk  Pl    n  P             o  p                u                u  x  i  y                                               5                                                                ◊`G  P               q    €  i               i  P                                                                y               P  j                P  PI `Ä  P  `M  L  P            s  å  i               q  P                è  ê  i   ë  P  í  y               i  P                              q `ï  Pk  c  i               i  x               i  x                 P `*  P(  Pó  Pö  Põ  P  Pj  Pú  Pç  `ù  Pû  P `Æ  P∞  P∂  P∏  P                             5               5                                              5  ç               Ø  ±  • `              ã                Ø               ∑                  i  ∫  R              d  q                                                                                                                ã                 •  …  P                 ã                 O                                  	            ˇ `î  `Ÿ  »  €  ‹  ﬁ  ‡  ã                 –  ã   Ø¬0∞á     IÙ$KEÆ˙ö           €  €                      J                           o  r  s  J    k     
+    q  t           P  €  
+   2   3                          )     n     !  }  ]  \    ^  Ä  Å  Ç    f  n  É      c  Ñ  =  ?  
+  	  ã                           P    €                          L     M  m           ò     <     h  Ç  9  ;  <  @  8  ¬  i  O  w  N           Ñ  ƒ  ≈     
+   ∆  ¨     
+    ˇ  î      
+    ˇ  î   á&’™ç!´!L   D     ¨†ZD                             m    ª   w ﬂ•@`FÄ 'ˇˇˇˇP	P¯  ÷∂R≥¯  j  	              7       Ω  Œ   ﬂ¡   J   ·J   ‰9   m   <   m   <   m   <	   m
+   <   m   <   m   <   w ﬂ¡   m   L   ﬂ¡   J   9      <      <      <   <   ê<   <   <   <   
+<   d<   <    9!   <"   <#   m$   <%   <&   <'   <(   <)   *   <+   m,   <-   <.   ¥ </   L0   ﬂ¡   J   m1   L2   ﬂ¡   J   m3   L4   ﬂ¡   J   m5   L6   ﬂ•9`ë %JJJJJ"JP4'`ê0Ä ã`/***&(&&&''&*&*&&&&* &`ï0Ä 1`ï0Ä Ô`ï0Ä PÄ‡  \—≠‡  Å                       Ω Œ   ﬂﬁÕ  ﬂº  Õ   ﬂ¡  ·J   ‰9   ¡  J   J   9   æ   ö   ó   º  ô   ó   ó   <   æ   ö   ó	   ô   ó	   º  ó	   <   æ   ö#   ó   ¡  J   J   J   ô   ó   
+ó   <   ¡   ú   ó   ﬂ¡   J	   ó   ö   ó   
+ô   ó   ñ ó   <
+   ¡   s Œ   ﬂ¡   ¡   J   ù   ó   ﬂm   ó   L   ﬂ¡   ¡   J   ù   ó   ﬂ¡   J   ó   L   ﬂæ  ·J   ‰m   s ¢•/`*`%¶ ¶ ∏ ê ≥ EPI
+`™@`Ø@`ˇˇˇ˚PCQÄÄÄ,   ∫K¥^,                             º  ¢• 
+`QT   ´ˆªT   #                        ﬁÕ   ﬂ¡  J   Äæ   ¡   „  Å ﬂ•&`	ˇˇˇÊ$PÄP   U«:P                          ﬁÕ   ﬂæ   ·J   ‰   º  s ¢•&`ê ˇˇˇÒP#QÄÄ\   ûè;\   (                       ﬁÕ   ﬂæ   ·J   ‰   h   º  i    s ¢•&`ê ˇˇˇÌP#QÄÄH   ≈nÚ;H                           ﬁÕ   ﬂæ   ·J   ‰   s ¢•&`ê P#QÄÄ\   Tr¶œ\   (                       ﬁÕ   ﬂæ   ·J   ‰   h   º  i    s ¢•&`ê "ˇˇˇÈP#QÄÄH   ≈nÚ;H                           ﬁÕ   ﬂæ   ·J   ‰   s ¢•&`ê P#QÄÄ∞  øﬂ‘N∞  õ                H       Ω  Œ   ﬂΩ Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm	   Œ   ﬂm
+   Œ   ﬂm   Œ   ﬂ9   &<   (<   .<   	<   <   <   º <   !<   "<   <   Œ   ﬂ¡   ¡   s ·J   ‰      s ·J   ‰¡   J   s Œ   ﬂ   Œ   ﬂ¡  J   ·J   ‰¡   s Œ   ﬂŒ 	  ﬂ9   <    Œ   ﬂ¡  J   ·J!   ‰¡   ¡   ¡   ¡   s Œ   ﬂ¡  J"   J#   ú2   ó'   ﬂ¡   ¡   J$   s ·J%   ‰&   m'   w ó,   ﬂ¡   ·J%   ‰¡  J"   J#   ö   ó0   (   ô   ó0   )   ó0   *   &m+   s ·J,   ‰m-   s ·J.   ‰m/   s ·J0   ‰m1   s ·J%   ‰2   m3   s ·J%   ‰4   m5   s ·J%   ‰6   m7   s ·J%   ‰8   m9   w ﬂ•ˇL`%''''''(''M`ˇˇˇˇPî P
+%
+ˇˇˇ˜P9 `+`ë ˇˇˇ˙P)` `%L`ë 	ˇˇˇ⁄P9@`† 
+ˇˇˇ˛P*ˇˇˇ‰PI'`∏ =ˇˇˇΩPJhˇˇˇ˙PJl
+ˇˇˇ˚PJqˇˇˇ˙PJv
+ˇˇˇÒPJÄ  â
+ˇˇˇÌP 
+ˇˇˇÌPJÄ  ê
+ˇˇˇÈP4Ä  “0Ä  ˘0Ä  ˛0Ä 0Ä "0Ä K0Ä \PÄL   ;¥…õL                             ¡   ö   ó   Œ   ﬂ¢ó   • `/`'`AV$  ÎÁ$                   D       Œ 	  ﬂº  J   Œ 
+  ﬂº  J   ·¡   J   üÌ   ó   ·¡   J   ü3  ó   ·¡   J   üy  ó   ·¡   J   üø  ó
+   ·¡   J   ú?   ó   ﬂ¡  ·J   ‰¡   J   s 	   ú   ó   ﬂ¡   J
+   ó   ü¡  ó   ·¡   J   ü´  ó   ·¡   J   üï  ó   ·¡   J   ü∏  ó   †»  ó   º  ·J   ‰w  ﬂ¡   ·J   ‰s  ö   ó   ¡   ·J   ‰w  ﬂô   ó    ¡    w ﬂó!   ô£  ó!   º  ·J   ‰w  ﬂ¡   ·J   ‰s  ö   ó&   ¡   ·J   ‰w  ﬂô   ó(   ¡    w ﬂó)   ôG  ó)   º  ·J   ‰w  ﬂ¡   ·J   ‰s  ö   ó.   ¡   ·J   ‰w  ﬂô   ó0   ¡    w ﬂó1   ôÎ   ó1   º  ·J   ‰w  ﬂ¡   ·J   ‰s  ö   ó6   ¡   ·J   ‰w  ﬂô   ó8   ¡    w ﬂó9   ôè   ó9   ¡    s  ö!   ó;   º  ·J   ‰w  ﬂŒ   ﬂ¢ó=   ôV   ó=   ¡   ·J   ‰w  ﬂô<   ó?   ª    ¡   w ﬂª    ¡   ¡   J   s Œ   ﬂô   óD   •@`G`.
+`9ñ0ñ0ñ0#ñ@-$´ ˇˇˇ˚PØññ08ü0 `
+P$
+`P-`P `PI`: `
+P$
+`P-`P `PI`: `
+P$
+`P-`P `PI!`:# `
+P$
+`P-`P `PI*`:- 	`ì@2`
+P$`'`AAF6`:8 `P$`:< `ˇˇˇˇP$`
+
+ˇˇˇÎP)`JAP8   ™¸8                             ¡ 	  0(Œ 	  ﬂ•@`-PÄÄ\   jw¬)\   +                          Œ 	  ﬂ¡   J   õ   ó   ¡    w  ﬂó   • `'`î `OPÄÄÑ   æö<TÑ   L                  	        ¡ 	  0·(Œ 	  ﬂú   ó   ﬂ¡   ·J   ‰s  ó   ö   ó   ¡    w ﬂó	   •@`õ Pì `PIPÄÄ¥   ¡··8¥   p                        ‹Õ   ﬂm   Œ   ﬂæ   J   ö   ó   æ   Kô   ó   ó   Œ   ﬂ¡  ·J   ‰¡   ¡  ·J   ‰s  s m   w ﬂ•ë@`±@`
+PˇˇˇÔPˇˇˇ‚PDP†  ≤‹w∏ê                        º ú   ó   ﬂº J   ó   öÉ   ó   Õ  ﬂò   æ  º J   ö`   ó   º æ  KJ   ·J   ‰s  º  ·J   ‰s  ö   ó   º æ  KÕ   ﬂô   ó   æ  0(Õ  ﬂôíˇˇˇó   ¡   ö   ó   ¡    æ   w ﬂôT   ó   ¡  ·J   ‰   æ   ú,   ó   ﬂh   æ   J   i    æ   J   i   ó   w ﬂó   • `• 
+ `fì 
+`î P
+P.`-`J$`ï@
+`ë `ˇˇˇˇP.	`ë î ì ˇˇˇ÷P)PÄÄÄ†         +   s   L   øÑÙ◊L                            ¡   º ¡   ¡   w ﬂ• `ˇˇˇÂP$PÄ<   ¢ 8<                             ¡   ·J   ‰w  ﬂ• `P$PÄå   °>Héå   M                        ‹Õ   ﬂ¡  ·J   ‰¡   æ   Kw ﬂ   æ   K"ö   ó   ¡   ·J   ‰w  ﬂó   •&`		ˇˇˇPD`
+ë `P)PÄÑ   > ~ÕÑ   D                          ¡   ·J   ‰w  ﬂ¡   ·J   ‰w  ﬂ¡   ¡   J   s ·J   ‰   w ﬂ• `P$`P$`
+ˇˇˇˇPP$PÄÄ,  õí§,  Å                #        ¡  ·J   ‰s  Õ   ﬂæ   õ   ó   ¢ó   æ   J   Õ  ﬂæ  Œ  ﬂ¡  J   ö⁄   ó   ¡   ¡  ·J   ‰s  s Õ  ﬂæ  J   öé   ó   ¡  J   J   Œ   ﬂ¡   ¡  s ·J   ‰s  J   Œ   ﬂŒ   ﬂ¡  ·J	   ‰æ  m
+   w ﬂæ  ¡   æ  Nﬂæ  ·J   ‰¡  J   s Õ  ﬂó   æ  ¡  J   &.Õ  ﬂó   ¡  ·J   ‰æ  w ﬂ¡   w  ﬂ¡  ·J   ‰   h   æ   J   i    æ   J   i   w ﬂ¢• `P(`.`A"F`.`J`î `
+Pˇˇˇ¯P(	`ï `ï `ˇˇˇˇP
+P.`'`ˇˇˇÙPD`O`
+ˇˇˇ˙PM`ö@`ˇˇˇ¸P$`*`ë ˇˇˇﬁP$`!QÄå   Bfü.å   M                         ¡   º J   &.Œ   ﬂ¡   ¡   ö   ó   º  Œ   ﬂ¢ó   ¡   ¡   &.Œ   ﬂ• `ï 
+`ê `)`AF`í PÄÄÄ»  ≤. »  6                       ¡ 
+  ¡   J   ö   ó   ¡   ·J   ‰w  ﬂ ¢ó   ¡   ·J   ‰s  Õ   ﬂº ú   ó	   ﬂæ   ¡   ó
+   ö   ó    ¢ó   æ   Œ   ﬂ¡    æ   s Õ   ﬂæ   J   ¡   J    öm   ó   ¡   ·J   ‰¡   J   w ﬂ¡   J   õ   ó   æ   ·J	   ‰s  Õ   ﬂó   ¡    æ   ¡   ¡   w ﬂô$   ó   ¡    w  ﬂ¡   ·J   ‰w  ﬂó   • `ï `P$`AF`PH`ì "ï `AF`J`ˇˇˇ˜P(`	ï `
+ˇˇˇ˜P$`î `P-`ˇˇˇ‰P `*`PIPÄÄ   ≥˚f€   î   	                     Ω  Œ   ﬂ¡   õ   ó   h      i    ¢ó   ¡  J   õ)   ó   h   ¡  ·J   ‰¡   s i    ¢ó   ¡  ·J   ‰¡   ·J   ‰¡  J   s m   s ¢•)`/`OF`î `ˇˇˇ˚PHF`
+ˇˇˇ˙P"ˇˇˇ‘PCQÄÄÄÄ   /5˘±Ä   G                         ¡  ·J   ‰¡   s J   ö!   ó   ¡  ·J   ‰º  s ô   ó   ó   ¢• `ˇˇˇ˚Pû ˇˇˇ˚Pì Qt  µ}ÙÌt  Î          	              ¡   J   õ   ó   º  ¢ó   ¡    º  s Õ   ﬂæ   J   ö   ó   æ   K¢ó   ¡   ¡   s ·J   ‰s  J   Õ  ﬂæ  º  J   ö    ó   ¡    º  s Õ   ﬂô;   ó   ¡    º  ·J   ‰º  ·J   ‰æ  s    s s Õ   ﬂó   æ   æ   J   'K¢• `î `CF`
+ˇˇˇˇP(`ï `FF`ˇˇˇˇP
+P-`ì `ˇˇˇˆPí `
+
+ˇˇˇˆPˇˇˇÚPˇˇˇPM`ê QÄÄÄh  ¯∞KIh  Î                         ¡   J   úV   ó   ﬂ¡    ¡   ·J   ‰s  s ·J   ‰s  º  ·J   ‰s  ú   ó   ﬂ¡ 
+  ¡   J   ó   öÄ   ó   ¡   ·J   ‰¡   ·J   ‰s  º ·J   ‰¡    ¡   s J   s &w ﬂ¡   ¡   s ·J   ‰¡   J   ¡   J   º J   &w ﬂó   •@`õ PˇˇˇP
+P
+Pî &ö@`P
+	ˇˇˇ˜PˇˇˇˆPˇˇˇÊPD`ˇˇˇˇP
+
+
+	ˇˇˇ…PI	PÄÄÄd   ©iÿ9d   '                          ª    ¡   w ﬂª    ¡   » s Œ   ﬂ• `ˇˇˇˇP$`ˇˇˇıP)PÄÄÄº   ∫±{ßº   l                         ¡   ·J   ‰s  Õ   ﬂ¡   ·J   ‰w  ﬂª    ¡   w ﬂ¡    w  ﬂ¡   J   ö   ó	   ¡   ·J   ‰m   w ﬂó   • `P(`P$`ˇˇˇˇP$`*`î@`,EPIPÄÄÄD  ≠ÅLD  ‡                        º  õ◊   ó   ¡   J   öì   ó   ¡    ¡   ·J   ‰s  s ·J   ‰ˇs Õ   ﬂ¡   ·J   ‰æ   ·J   ‰¡   J   s æ   J   ö   ó   ¡   J   ô   ó      ó   &w ﬂô5   ó   ¡   ·J   ‰   w ﬂ¡   ·J   ‰	   w ﬂó   •@
+`-`î `
+Pˇˇˇ¯PP(`
+ˇˇˇ˚P#≤ ˇˇˇ“P> `ë P$`í PIPË   ôøË   ñ                         º ú#   ó   ﬂº J   ú   ó   ﬂ¡ 	  ó   öV   ó   ¡    w  ﬂ¡   ·J   ‰º º  w ﬂ¡    º  º KJ   w ﬂ¡   ·J   ‰w  ﬂô   ó   ¡    w  ﬂó   • `µ `*`ˇˇˇÚP$`	
+ˇˇˇ¸P$`P `O	PÄÄê  2‘ƒÊê  ﬂ        
+       3       Ω  Œ   ﬂΩ Œ   ﬂ¡  J   õ   ó   ¡   ·J   ‰s  Œ   ﬂó   ¡  ·J   ‰¡   s Õ   ﬂæ   ú   ó   ﬂæ   J   ó   ö"   ó	   ¡    ¡   æ   w ﬂôF  ó
+   ¡  J      ú   ó   ﬂ¡  J   J   ó   öË   ó   9   ª   Ä„  Å  <	   Œ   ﬂ¡  ·J
+   ‰¡  J   m   w ﬂ¡  ·J   ‰9      <      ¡  J   &<   ¡  J   <   ¡  J   <   ¡  ·J   ‰9   ¡   ¡   s <   ¡  J   <   ¡   s <   m   <   w ﬂô'   ó0   ¡  ·J   ‰w  ﬂº  ¡   w ﬂó3   •í `î `P.`ˇˇˇ˚PH`ß `ˇˇˇ˘PN`º@
+`% 
+PO`
+ˇˇˇÊPD`EJê //%ˇˇˇ˜P(/EPHJP>"@$`P$`ˇˇˇˇPI'PÄÄd   ÍYAd   3                         ¡   º  º ö   ó   º  s  ô   ó   º ó   Nﬂ• `ì Pó PÄÄÄ–   ÎF¥–   z                 	       ¡  J   ú   ó   ﬂ¡  ·J   ‰º  s ó   ù   ó   ﬂ¡   º  s ó   Õ   ﬂ¡  ·J   ‰¡   æ   w ﬂ¡    ¡   æ   w ﬂ• `° ˇˇˇ˙Pô ˇˇˇ˙P-`
+ˇˇˇˆP$`ˇˇˇ˘P$PÄÄÄ†  €óû>ê                        h    Õ   ﬂº  ·J   ‰   s Õ  ﬂÕ  ﬂò   æ  æ  J   öÿ   ó   ¡  ·J   ‰æ  æ  Ks Õ  ﬂæ  öò   ó
+   æ  ·J   ‰   s Õ  ﬂæ   æ   J   9   æ  <   æ  K<   ¡   J	   ú$   ó   ﬂ¡   ·J	   ‰æ  æ  Ks ó   ù   ó   ﬂæ  Kó   <
+   Nﬂó   æ  0(Õ  ﬂôˇˇˇó   æ   ¢• `*`P( `fî `	ˇˇˇ˚P(`.`ê 
+P(`í )+° 5ˇˇˇÓP™@"`ï@`$QÄÄ†         '   Ï   L   M¿^L                             ¡   ·J   ‰¡   J   w ﬂ• `
+ˇˇˇÙP$PÄÄ0   wÀµ0                            º  K¢• `QÄÄå   òø/å   I           	              º  ·J   ‰ª   Ä   º ·J   ‰l      s &   &   „  Å    s ¢• `
+
+
+ˇˇˇ¯Pì ˇˇˇ‘Pˇˇˇ¯P#QÄ–   dSw◊–   Ñ   	                    Ω  Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Õ   ﬂm   Œ   ﬂ9   Œ   ﬂŒ   ﬂª    æ   w ﬂ9   ¡   <   ¡   <	   æ   <
+   m   <   ¢•¥@`+`7@O`ˇˇˇˇPDV`%**):Ä  âQÄÄÄ(  Æ°(  «                        ¡   J   õ   ó   º  ·J   ‰s  Ã  ﬂó   º  ·J   ‰º s Õ   ﬂ¡   J      ö9   ó	   º  ·J   ‰s  ·J   ‰   º ·J   ‰s  &s Õ   ﬂó   æ   ˇö   ó   ¢ó   æ   ù   ó   ﬂ¡   J   ó   ¢• `î `
+P,`
+
+ˇˇˇ¯P(`ö `
+P
+
+PˇˇˇÌPM`ë 	`A	F`† QÄò   ∆ ·Úò   \                  	       ¡   ¡   J   ö   ó   ¡    w  ﬂó   ¡   º  Kõ   ó   ¡   0(Œ   ﬂó   ¡   º  º Nﬂ• `	ï `O`ì `í@`-PÄÄ8  ˇºß(  O                9       ¡   J   õ   ó   ¢ó   9   Õ   ﬂÕ  ﬂ¡   J   õ   ó   ¡   L   ﬂó   æ   h    L   ﬂÕ  ﬂ¡   J   J   Õ  ﬂò
+   æ  æ  ö®  ó   ¡   J   æ  KÕ  ﬂæ  ö   ó   h   æ  i    ô   ó   æ  ó   Õ  ﬂ¡   ·J   ‰æ  æ  &¡   J   J   s Õ  ﬂæ  ö   ó   ô  ó   æ  ·J   ‰s ·J	   ‰s  Õ  ﬂæ   æ  Kõ   ó   æ   æ  h    Nﬂó    9
+   æ  <   æ  <   ¡   J   ú   ó%   ﬂ¡   ·J   ‰æ  s ó'   ù   ó(   ﬂæ  ó(   <   Õ  ﬂæ   æ  K·J   ‰æ  w ﬂæ  0·(Õ  ﬂ¡   J   ö"   ó1   æ   J   ·J   ‰æ  w ﬂó4   æ  0(Õ  ﬂôN˛ˇˇó6   ¡  ·J   ‰æ   m   w ﬂ• `î `A2F`*`F`î `ë@
+`O	 ``î f/`î@` ï  °@`
+ˇˇˇÂP(	`ê `J`P
+
+PH`ì `î@`%))° 5ˇˇˇÛP¶@#`ê ˇˇˇ˚PD&	`ï `ê ˇˇˇ˚PI6`ï0)@,`ˇˇˇÓPD2PÄÄ8         y   ∑  \   ãÎï\   $                         ¡   ·J   0(L   ﬂ¡    º  º w ﬂ•@`ì@`ˇˇˇ¸P$PÄ@   ·»#Ô@                             9   Œ   ﬂŒ   ﬂ• `+`'PÄÄÄ§  E€ıÑ  “  	      	       (      Ω  Œ   ﬂ¡  J   ù   ó   ﬂ¡  ó   ö   ó   ¢ó   ¡  J   ú   ó   ﬂ¡  J   ó	   öä   ó
+   h    Œ   ﬂ¡  ^ò   _`õV   ó   Õ   æ   J   ö2   ó   ¡  æ   KÕ  ﬂ¡  ·J   ‰æ  m   w ﬂó   ﬂôßˇˇˇó   a¡   ¢ôÂ   ó   ¡  ¡   Kö   ó   ¡  ¡   K¢ô∫   ó   ¡  J   ö¶   ó   ¡   J   'Õ  ﬂò   æ  ¡  J    öv   ó   ¡  ¡   ·J	   ‰æ  s KÕ  ﬂæ  ö4   ó"   h    Œ   ﬂ¡  ·J   ‰æ  m
+   w ﬂ¡   ¢ó&   æ  0)Õ  ﬂôzˇˇˇó(   ¢•)`ñ ï `A-F`Ø@	`K`ò ˇˇˇ˜D
+`ï `/`ˇˇˇ¯PIL`E-K`ï `K-K`î 
+ `ë fï `í ˇˇˇˆP)
+`.`+`ˇˇˇ¯PD(`E-F7`ï@,`!Q§        {   ^          ?  ã   x   ô4Äx   9                         ¡   º J   ¡   s ö   ó   ¡   ·J   ‰º w ﬂó   •@`	ˇˇˇˆP-	`
+ˇˇˇ˚PIPÄp   %ˇjp   :                         ¡   º J   ¡   s ö   ó   ¡   ¡   J   º Nﬂó   • `	ˇˇˇˆP-	`ô@Pà  s•âÄà    $              !       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂ9      <	   Œ   ﬂˇŒ   ﬂ
+   Œ 
+  ﬂŒ   ﬂ9   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m    <!   m"   <#   ¢•Ê `%ê0 `H
+`+`7G@n`%JuJxJ{JÄ  ÇJÄ  âJÄ  é  JÄ  ±  QÄ§  ’&Í§                   "        ¡   õ   ó    ¢ó   ¡      s ·J   ‰s  ·J   ‰¡   J   s ·J   ‰      s ·J   ‰ª	   J
+   s Œ   ﬂ¡      s ·J   ‰¡   s ·J   ‰m   s ·J   ‰m   s ·J   ‰m   s ·J   ‰m   s Œ   ﬂ¡   J   ö)   ó   ¡   ·J   ‰   ¡   J   w ﬂó"   Œ   ﬂ• `/`AF`
+P*P*
+ˇˇˇ˜P*Z*
+ˇˇˇ˜PI	`P
+ˇˇˇ˜P
+ˇˇˇıPJˇˇˇ˙PJˇˇˇˆPJˇˇˇ¯PI`ñ `ë 
+ˇˇˇÛPI`'PÄÄ<  è∂tÚ<  ø                         ¡    º  s J   ú,   ó   ﬂ¡    º  s J   ·J   ‰s     ó   öw   ó	   ¡      ¡   s ·J   ‰¡   J   s ·J   ‰¡    º  s s Œ   ﬂ¡   ¡    º  s s ·J   ‰¡   J   w ﬂó   • `ˇˇˇˇPô ˇˇˇ˘PPò `ˇˇˇ¯P
+
+ˇˇˇÙP
+"ˇˇˇ˘Pˇˇˇ˙P)`ˇˇˇ˘PˇˇˇˇP
+
+ˇˇˇ˜PIPÄÄî   `¥Y8î   G                         ¡   ¡    º  s s ·J   ‰¡   J   w ﬂ¡    w  ﬂ¡   ·J   ‰w  ﬂ¢• `ˇˇˇ˘PˇˇˇˇP
+
+ˇˇˇ˜P$`J`P$`!QÄ4   Y>∆ 4                             ¡   L   ﬂ• `,P4   •4                             ¡   L   ﬂ• `,P»   ﬂ3ûU∏   w                       º  J   Õ   ﬂò   æ   ú   ó   ﬂæ   J      ó   ö   ó   æ   J   Õ   ﬂôøˇˇˇó   æ   õ   ó   h    ¢ó   æ   ¢• `-	f≠ `ò@`.`EF`$Q»             F     u◊⁄  ^                ,       ¡  ·J   ‰¡  ¡  &s ·J   ‰¡  J   w ﬂ¡   º  w ﬂ¡  ·J   ‰¡  ¡  &s ·J   ‰¡  J   s Õ   ﬂ¡  J   ö›   ó   Œ   ﬂ¡  ·J   ‰¡  s ·J   ‰m   w ﬂ¡   æ   KJ   &¡  ·J	   ‰s  '¡  KJ
+   ö@   ó   ¡  ·J	   ‰¡   æ   KJ   &¡  ·J   ‰s  'w ﬂô>   ó&   ¡   ¡  ·J	   ‰s  ö   ó*   ¡  ·J	   ‰¡   w ﬂó,   • `ˇˇˇÚP
+&
+ˇˇˇÙP$`ˇˇˇˇP$`ˇˇˇÚP
+#
+ˇˇˇ˜P(`î `'`ˇˇˇ˜P
+ˇˇˇ˚PD	`	Pó `	PˇˇˇÀP.`	P.`ˇˇˇˆPIPÄÄÄH   ø%⁄.H                           ﬁÕ   ﬂ¡   æ   J   &.Œ   ﬂ•&`ñ PÄÄÄ∞   äı’á∞   n                  
+       ¡   º  &.Œ   ﬂ¡   ö&   ó   ¡   ·J   ‰s  'Œ   ﬂô0   ó   ¡   ¡   ·J   ‰s   ö   ó
+   Œ   ﬂó
+   • `ê `ë `Pï `
+
+P.`LPÄÄÄÄ   V´µAÄ   P                         ¡   J   ú   ó   ﬂ¡   J   º  ó   ö   ó   ¡   J   ô   ó   º  ó   ¢• `ü $ìî(QÄÄ‡  ÙÒ\L–                  1       ¡   ·J   ‰w  ﬂ¡    ¡ 	  J   s Õ   ﬂÕ  ﬂò   æ  æ   ö7  ó   ¡ 	  æ  Kõ   ó   ô  ó   ¡   ·J   ‰¡ 	  æ  KJ   æ  &æ   ¡ 	  æ  KJ   ¡ 
+  s Õ  ﬂæ  ö   ó   ô©   ó   ¡      s ·J   ‰¡   ·J   ‰æ  ¡ 
+  s s ·J	   ‰æ  ,ö   ó   
+   ô   ó      ó   s ·J   ‰¡   s KÕ  ﬂ¡  ·J   ‰æ     ¡ 	  æ  Kw ﬂó!   æ  0(Õ  ﬂôø˛ˇˇó#   ¡   ·J   ‰   s Œ   ﬂ¡   J   ö7   ó'   ¡   ·J   ‰s ·J	   ‰¡   J   w ﬂŒ   ﬂó,   ¡  J   J   ö   ó/   ¡   ·J   ‰w  ﬂó1   • `P$`
+ˇˇˇˇP( `f/`î `*`ˇˇˇŒP(	`ê `*`P
+ˇˇˇÎPˇˇˇÚP
+4¨ ˇˇˇ˜P
+3ˇˇˇ˜P*`	
+ˇˇˇÏPI`ï@`ë P)`î `
+P
+
+ˇˇˇ˜P$`L`ô `P)PÄ‡         .   F  X   Å„qÚX   '                         ¡    w  ﬂº  Œ 	  ﬂº Œ 
+  ﬂ¡    w  ﬂ• `*`)`)`*PÄ8   ◊6G 8                             ¡    w ﬂ• `
+P$PÄÄ8   ÄDá8                             ¡    ˇw ﬂ• `
+P$PÄî   7∆÷î   W                          ¡   ú   ó   ﬂ¡   'ó   ö   ó   ¡    ¡   w ﬂô   ó   ¡    ¯w ﬂó   • `´ `ˇˇˇ˛P `
+PIPÄÄ‘   [÷Î#‘   Ü                          ¡   ¡   ·J   ‰s  'ú#   ó   ﬂ¡   &¡   ·J   ‰s  ó	   ö0   ó
+   ¡    ¡   ·J   ‰s  '¡   'w ﬂô   ó   ¡    w ﬂó   • `
+
+Pô 
+Pì `
+PˇˇˇÁP `
+PIPÄÄÄò   jÜ•⁄ò   ]                          ¡   ú   ó   ﬂ¡   ·J   ‰w  ó   ﬂ¡   ú$   ó   ﬂ¡   ·J   ‰¡   J   w ó   ﬂˇŒ   ﬂ• `ú P)`ú #
+ˇˇˇÙP)`(PÄX   $≥}ºX   +                          ¡   ú   ó   ﬂ¡   ·J   ‰   s ó   ¢• `° P(QÄÄ§   \Ò?∞§   n                        ﬁÕ   ﬂæ   ·J   ‰s  úS   ó   ﬂ¡   ·J   ‰   ¡   J   &s Kù'   ó	   ﬂ¡   J   ú   ó   ﬂ¡   Kó   ¢•&`Pö ˇˇˇÛP± Q  {ÿï“  H         
+       F        ¡   ¡  s ·J   ‰s  Õ   ﬂ¡  ·J   ‰9   ¡  J      ù   ó	   ﬂ¡  J   ó   ö   ó   ¡  J   ô"   ó   ¡   ¡  s ·J   ‰s  ó   <   æ   J   ¡  J   &<   æ   J   <   s ·J	   ‰w  ﬂ¡  J
+   öh  ó   ¡  ·J   ‰w ﬂ¡  ·J   ‰9   ¡  J   <      <   w ﬂ¡  J   J   ú&   ó'   ﬂª   J   J   J      ó-   öÂ   ó.   Œ   ﬂ¡  ·J   ‰m   w ﬂ¡   ¡  J   Õ  ﬂ¡  ·J   ‰   æ  ö   ó5   ¡  J   ô   ó6   ¡   ó6   w ﬂæ  õe   ó8   ¡  ·J   ‰¡  ·J   ‰s  ª    ¡  ·J   ‰   s s 'ª    ¡  ·J   ‰   s s 'w ﬂóF   • `ˇˇˇˇP
+P(`% — Jˇˇˇ˛P
+	P-	ê NPJP$`î `P$`	%/J	PD`ö ™ `'`ˇˇˇ˚PD`ê `ë ¨ ˇˇˇÚP$
+`N`P
+	ë 
+PˇˇˇÌP*	ë 
+PˇˇˇÌPˇˇˇ¿PIPÄÄH   åQˇXH                           ﬁÕ   ﬂ¡   æ   J   &.Œ   ﬂ•&`ñ PÄÄÄÿ   Ï\Áñÿ   ë                         ¡   ú>   ó   ﬂ¡   ·J   ‰   ¡   J   &s ·J   ‰¡   J   s ó   Õ   ﬂæ   ú9   ó	   ﬂæ   J   ú%   ó   ﬂ¡  ·J   ‰æ   K   s ó   ¢• `ú ˇˇˇÛP
+)
+ˇˇˇÙP-`Ø -ˇˇˇ˚P(QÄT   ´¸üUT   &                          ¡   ú   ó   ﬂ¡   ·J   ‰w  ó   ﬂ• `ú P)PÄÄÄT   - T   &                          ¡   ú   ó   ﬂ¡   ·J   ‰w  ó   ﬂ• `ú P)PÄÄÄË   Q¿”Ë  \               #       Ω  Œ   ﬂΩ Œ   ﬂﬁÕ  ﬂ¡    ö   ó   æ  ·J   ‰m   s ¢ó   æ  KÕ   ﬂæ   J   öƒ   ó   ª   J   ·J   ‰s  Õ  ﬂæ   J   Õ  ﬂ   Õ  ﬂæ  J	   J
+   Õ  ﬂæ  æ  L	   ﬂæ   J   ·J   ‰æ  s Õ  ﬂæ   æ  L   ﬂæ  ·J   ‰æ  æ  æ  &w ﬂ9   æ  <   æ  æ  &<   ¢ôA   ó   æ   J    ö,   ó   9   æ   J   <   æ   J   <   ¢ó#   •ò `
+,`ˇˇˇ˚P3*F`+`ì `ë P(`.`*`ì `.`ê ˇˇˇ¯P(`.`	
+ˇˇˇ„P$`%):*K$`	,`%.>*VÄÄÄ‰  „Nñù‰  W                      ﬁÕ  ﬂæ  J   ö÷   ó   æ  ·J   ‰s  Õ   ﬂ¡    ù   ó   ﬂ¡   ¡   ó   ö7   ó   æ   ·J   ‰   ¡   w ﬂæ   ·J   ‰w  ﬂô[   ó   æ   ·J   ‰w ﬂæ   ·J   ‰   ¡   w ﬂæ   ·J   ‰   ¡   w ﬂæ   ·J   ‰w  ﬂó   ôq   ó   æ  J   ö(   ó   æ  ·J   ‰¡   ¡   w ﬂô;   ó   æ  J	   ö(   ó   æ  ¡   L	   ﬂæ  ¡   L
+   ﬂó   •&`ì `P(	`í ï `ê ˇˇˇÓP$`	P `	P$`ê  ˇˇˇÈP$`ê ˇˇˇÎP$`	Pì@`ì `ˇˇˇÁP.`ì `/`î@P3ıÿ  `  `    `     @  n     @J      	    
+    p    å     p  `  €    `  €    `      `    	  `      `I    `O  €  =  J  I  ?  S  ˇ  å     p>      P    `  @  J  I  \     ]  ^  H    `>  I    `ê   =  >  a  ﬁ  ?    p  `=  I  S  ˇ  ⁄  b  ê     `c  J  H    b  I  S    `A  B    `=  J  g  >  ?  I  ê     €    `8  @  A  f  €    p  `I  h  P  i    `  `v       `^  H  m  I  J  w    @É    å   n  "  pq    @    o    {  r  s       @q    t    #  pk  w    `ﬁ  
+  I  >  |    @  P  z  €    `{  ]    `  `6  3       =  >  ?  ,          7  8  9  Ç  ;  <  @  A  B      `  `)    `8  !  `I  €  H      P  "  `   `  pI  å   J    p#  `L  $  `     M  %  `N  0  4  
+  `  p  p  p  p  p  p  p   p!  p$  p%  p  @3                            !  ê     %    @)  +  .  /  0    1    p2  3  4    pC    pD    pF    p€    p    p    p    p&  `'  `⁄  á  Ü     Pà  â   ä  )  `^  H  ç  Å  V  €  é  *  `Ç  ,  `Ç  +  `    @J  Ç  ê   I    ì  H    @P  z  €  î    å   ,  p-  `  @/  `P  î  0  `P  I  .  `Ç  J  Å  I  å   /  pÄ  \  ñ  0  p(  `)  p*  p+  p-  p  @B    @L     M  .  pm  3  `®  ©  Ï R {  ò       4  `   ò  C  5  `)  6  `)  2  `ü  @     }  †  °  ¢  £  §  •  ¶  ß  3  pF  4  p™  5  p´  6  pÑ  7  `  ¨  Ï ≠  9  `≤  8  `g  {  ò     	  å   9  p≤  ≥  ¥  µ  :  `¯  ;  `  <  `π  I      P  ª  º  
+     Ω  æ  £  ø  ∞   R É  g  ò  ◊ ¿  =  `>  `?  `@  `A  `¯  B  `@  {  ò  C  `ú ¡  D  `8  √  .  ò  É  F  `≤  E  `•  †    @Ñ  w  ƒ  ≤  ≈  i  	  ≥    @ã  ∆  «  ¨  .  »  §  •  
+  t  å   F  pÀ  ±  Ã  Õ  G  `√  .  ò  {  I    ø  H  `π  I  `Œ  1  `2  p7  p8  p:  p;  p<  p  @ô  ò  ê     @=  ph  >  pÇ  ?  p9  @  p;  A  p<  B  p@  C  p8  D  p¬  E  pi  G  pO  H  pw  I  pN  K  `œ  —  “  *  ”  ‘  ’  ÷  ◊  ÿ  J  `å   K  pœ  §  S  ⁄  P  ›  ﬂ  I  ç    @ˇ  î   ◊    @ÿ    `◊       @  p    p€    p€    p    p  	  p  
+  p  	  @|  !  ~  }    ]  \    ^  Ä  Å  Ç    f  
+  @n  É  &  p    c  Ñ  =  Ö  ?  '  p
+  	  ã  n   (  p%  1  p+  J  pS     `  p·  ˇXÑb                +  7                                  ‚              „              €              €                                                   ÿ   :   ‰        ¢      Â        £      Â        ª      Â        º      Â        æ      Â        »      Â        ¿      G        «      Á        Œ      Â        –      Â        ‘      Â        %      ,        #      È        4   
+   :        A      I        >      Ï        I      [        Q      c        Y      E        f      W        \   
+   Ò        m      _        v      K        r      Ù        s      k        î      v        ü      `                       	   
+        M     ¯             Ä        $              (     M        &     ¸        :     L        B     m        <     ˇ        ?     ˇ        Í  $           k     û        Z  	          c            g            i            Ä             á     Æ        Ö            ì     ∞        ï     ∂        ó     ∏        ¨     h        ≠     Ç        Æ     9        Ø     ;        ∞     <        ≤     @        ∂     8        π     ¬        ¡     i        ø            ﬁ     O        Ê     w        Ë     N                                ùH©¿      S      S                ÄK  S  C  S               Çx  <  p  <                 (  A     A     4             7     7                 O  Ñ  G  Ñ  #              ó  —  è  —  &              Ë    ‡    )               +  h  #  h  ,              É  ≥  {  ≥  /              Ä”  ˛)  À  ˛)  4               Ü  œ  ~  œ  S   G             ì	    ã	    [   T               É  ¯  É  ú                í  ‚  ä  ‚  †                Ú  t  Í  t  •              Äç  „  Ö  „  ™                  j  ˇ  j  ≠               ï  ﬁ  ç  ﬁ  ∫   +                 ¯    Ω                 5  ø  -  ø  ø                 ‡  6  ÿ  6  ƒ   $           ÄT    >    À                ‘  m  Ã  m  Ÿ               !  N    N  Ô             Äe  G  S  G                   B  ¯  B    @            \  ¬  K  ¬                a  “  P  “  $              Í  7   ÷  7   /              R   ù"  ;   ù"  4               !  ê"  !  ê"  <              µ"  q#  °"  q#  M            ÄÖ#  =(  u#  =(  X              9%  ë%  1%  ë%  e  (            Í&  y'  ‚&  y'  t              P(  Ø)  B(  Ø)  Å              «)  ˙)  ≥)  ˙)  í               5+  M+  -+  M+  ¶              ¿+  á,  ∏+  á,  ¨            Ä’,  È9  Õ,  È9  ≥  !            -  !.  -  !.  ∏              2.  ¨.  &.  ¨.  √             ¡.  ñ4  ∞.  ñ4  Õ                4  ë4  4  ë4  ˘              ‰4  5  ÷4  5               ÄT5  „9  L5  „9                Ç7  8  z7  8                J9  ®9  B9  ®9  0            Ä:  ÑN  :  ÑN  >  #           ⁄:  s>  Õ:  s>  L               ∂;  ≤<  Æ;  ≤<  U  :            ¬<  ë=  ∫<  ë=  Z              •=  —=  ù=  —=  `               „=  >  €=  >  b               á>  y?  x>  y?  l            Äè?  B  |?  B  v             µ@  ﬂ@  ≠@  ﬂ@  |  5             -B  æB  B  æB  á              ›B  >C  ¬B  >C  ê              SC  ÃE  BC  ÃE  ñ               ÏE  ,F  ‰E  ,F  ≠              >F  XF  6F  XF  ≥               jF  ÖF  bF  ÖF  ∂               ôF  	G  ëF  	G  π               G  ∆G  G  ∆G  ¿               ÿG  EH  –G  EH  «               [H  êH  SH  êH  Ã              •H  I  ùH  I  œ             Ä/I  @M  'I  @M  “              UK  áK  MK  áK  ‚               VM  
+N  NM  
+N  Ô               "N  BN  N  BN  Û               VN  ~N  NN  ~N  ˆ             Ç†N  S  òN  S  ¸             ÊN  ¸P  ﬁN  ¸P  ˛             5°›È?;~bÏb0Ë      g¯ﬁ˚g¯ﬁ˚Hıg¯Âw   [    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/jquery.autocomplete.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:08:01 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|7fb09734-9274-19c1-001f-25c6af57c5bb|
+Accept-Ranges: bytes
+ETag: W/"21271-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 21271
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:08:01 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|7fb09734-9274-19c1-001f-25c6af57c5bb|
+Accept-Ranges: bytes
+ETag: W/"21271-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 21271
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=91
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 444 net-response-time-onstop 444 alt-data 1;21271,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  5™

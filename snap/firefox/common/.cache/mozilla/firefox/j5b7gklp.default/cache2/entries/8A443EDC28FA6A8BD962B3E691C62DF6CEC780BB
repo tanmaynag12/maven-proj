@@ -1,0 +1,1406 @@
+/*
+ * Inline Form Validation Engine 1.6.4, jQuery plugin
+ * 
+ * Copyright(c) 2009, Cedric Dugas
+ * http://www.position-relative.net
+ *	
+ * Form validation engine allowing custom regex rules to be added.
+ * Thanks to Francois Duquette and Teddy Limousin 
+ * and everyone helping me find bugs on the forum
+ * Licenced under the MIT Licence
+ */
+ 
+(function($) {
+	
+	$.fn.validationEngine = function(settings) {
+		
+	if($.validationEngineLanguage){				// IS THERE A LANGUAGE LOCALISATION ?
+		allRules = $.validationEngineLanguage.allRules;
+	}else{
+		$.validationEngine.debug("Validation engine rules are not loaded check your external file");
+	}
+ 	settings = jQuery.extend({
+		allrules:allRules,
+		validationEventTriggers:"focusout",					
+		inlineValidation: true,	
+		returnIsValid:false,
+		liveEvent:true,
+		unbindEngine:true,
+		ajaxSubmit: false,
+		scroll:true,
+		promptPosition: "topRight",	// OPENNING BOX POSITION, IMPLEMENTED: topLeft, topRight, bottomLeft, centerRight, bottomRight
+		success : false,
+		beforeSuccess :  function() {},
+		failure : function() {}
+	}, settings);	
+	$.validationEngine.settings = settings;
+	$.validationEngine.ajaxValidArray = new Array();	// ARRAY FOR AJAX: VALIDATION MEMORY 
+	
+	if(settings.inlineValidation == true){ 		// Validating Inline ?
+		if(!settings.returnIsValid){					// NEEDED FOR THE SETTING returnIsValid
+			allowReturnIsvalid = false;
+			if(settings.liveEvent){						// LIVE event, vast performance improvement over BIND
+				$(this).find("[class*=validate][type!=checkbox]").live(settings.validationEventTriggers, function(caller){ _inlinEvent(this);})
+				$(this).find("[class*=validate][type=checkbox]").live("click", function(caller){ _inlinEvent(this); })
+			}else{
+				$(this).find("[class*=validate]").not("[type=checkbox]").bind(settings.validationEventTriggers, function(caller){ _inlinEvent(this); })
+				$(this).find("[class*=validate][type=checkbox]").bind("click", function(caller){ _inlinEvent(this); })
+			}
+			firstvalid = false;
+		}
+			function _inlinEvent(caller){
+				$.validationEngine.settings = settings;
+				if($.validationEngine.intercept == false || !$.validationEngine.intercept){		// STOP INLINE VALIDATION THIS TIME ONLY
+					$.validationEngine.onSubmitValid=false;
+					$.validationEngine.loadValidation(caller); 
+				}else{
+					$.validationEngine.intercept = false;
+				}
+			}
+	}
+	if (settings.returnIsValid){		// Do validation and return true or false, it bypass everything;
+		if ($.validationEngine.submitValidation(this,settings)){
+			return false;
+		}else{
+			return true;
+		}
+	}
+	$(this).bind("submit", function(caller){   // ON FORM SUBMIT, CONTROL AJAX FUNCTION IF SPECIFIED ON DOCUMENT READY
+		$.validationEngine.onSubmitValid = true;
+		$.validationEngine.settings = settings;
+		if($.validationEngine.submitValidation(this,settings) == false){
+			if($.validationEngine.submitForm(this,settings) == true) {return false;}
+		}else{
+			settings.failure && settings.failure(); 
+			return false;
+		}		
+	})
+	$(".formError").live("click",function(){	 // REMOVE BOX ON CLICK
+		$(this).fadeOut(150,function(){
+			$(this).remove();
+		}) 
+	})
+};	
+$.validationEngine = {
+	defaultSetting : function(caller) {		// NOT GENERALLY USED, NEEDED FOR THE API, DO NOT TOUCH
+		if($.validationEngineLanguage){				
+			allRules = $.validationEngineLanguage.allRules;
+		}else{
+			$.validationEngine.debug("Validation engine rules are not loaded check your external file");
+		}	
+		settings = {
+			allrules:allRules,
+			validationEventTriggers:"blur",					
+			inlineValidation: true,	
+			returnIsValid:false,
+			scroll:true,
+			unbindEngine:true,
+			ajaxSubmit: false,
+			promptPosition: "topRight",	// OPENNING BOX POSITION, IMPLEMENTED: topLeft, topRight, bottomLeft, centerRight, bottomRight
+			success : false,
+			failure : function() {}
+		}	
+		$.validationEngine.settings = settings;
+	},
+	loadValidation : function(caller) {		// GET VALIDATIONS TO BE EXECUTED
+		if(!$.validationEngine.settings){
+			$.validationEngine.defaultSetting()
+		}
+		rulesParsing = $(caller).attr('class');
+		rulesRegExp = /\[(.*)\]/;
+		getRules = rulesRegExp.exec(rulesParsing);
+		str = getRules[1];
+		pattern = /\[|,|\]/;
+		result= str.split(pattern);	
+		var validateCalll = $.validationEngine.validateCall(caller,result)
+		return validateCalll;
+	},
+	validateCall : function(caller,rules) {	// EXECUTE VALIDATION REQUIRED BY THE USER FOR THIS FIELD
+		var promptText =""	
+		
+		if(!$(caller).attr("id")) { $.validationEngine.debug("This field have no ID attribut( name & class displayed): "+$(caller).attr("name")+" "+$(caller).attr("class")) }
+
+		caller = caller;
+		ajaxValidate = false;
+		var callerName = $(caller).attr("name");
+		$.validationEngine.isError = false;
+		$.validationEngine.showTriangle = true;
+		callerType = $(caller).attr("type");
+
+		for (i=0; i<rules.length;i++){
+			switch (rules[i]){
+			case "optional": 
+				if(!$(caller).val()){
+					$.validationEngine.closePrompt(caller);
+					return $.validationEngine.isError;
+				}
+			break;
+			case "required": 
+				_required(caller,rules);
+			break;
+			case "custom": 
+				 _customRegex(caller,rules,i);
+			break;
+			case "exemptString": 
+				 _exemptString(caller,rules,i);
+			break;
+			case "ajax": 
+				if(!$.validationEngine.onSubmitValid){
+					_ajax(caller,rules,i);	
+				};
+			break;
+			case "length": 
+				 _length(caller,rules,i);
+			break;
+			case "maxCheckbox": 
+				_maxCheckbox(caller,rules,i);
+			 	groupname = $(caller).attr("name");
+			 	caller = $("input[name='"+groupname+"']");
+			break;
+			case "minCheckbox": 
+				_minCheckbox(caller,rules,i);
+				groupname = $(caller).attr("name");
+			 	caller = $("input[name='"+groupname+"']");
+			break;
+			case "confirm": 
+				 _confirm(caller,rules,i);
+			break;
+			case "funcCall": 
+		     	_funcCall(caller,rules,i);
+			break;
+			default :;
+			};
+		};
+		radioHack();
+		if ($.validationEngine.isError == true){
+			linkTofield = $.validationEngine.linkTofield(caller);
+			
+			($("div."+linkTofield).size() ==0) ? $.validationEngine.buildPrompt(caller,promptText,"error")	: $.validationEngine.updatePromptText(caller,promptText);
+		}else{ $.validationEngine.closePrompt(caller);}			
+		/* UNFORTUNATE RADIO AND CHECKBOX GROUP HACKS */
+		/* As my validation is looping input with id's we need a hack for my validation to understand to group these inputs */
+		function radioHack(){
+	      if($("input[name='"+callerName+"']").size()> 1 && (callerType == "radio" || callerType == "checkbox")) {        // Hack for radio/checkbox group button, the validation go the first radio/checkbox of the group
+	          caller = $("input[name='"+callerName+"'][type!=hidden]:first");     
+	          $.validationEngine.showTriangle = false;
+	      }      
+	    }
+		/* VALIDATION FUNCTIONS */
+		function _required(caller,rules){   // VALIDATE BLANK FIELD
+			callerType = $(caller).attr("type");
+			if (callerType == "text" || callerType == "password" || callerType == "textarea"){
+								
+				if(!$(caller).val()){
+					$.validationEngine.isError = true;
+					promptText += $.validationEngine.settings.allrules[rules[i]].alertText+"<br />";
+				}	
+			}	
+			if (callerType == "radio" || callerType == "checkbox" ){
+				callerName = $(caller).attr("name");
+		
+				if($("input[name='"+callerName+"']:checked").size() == 0) {
+					$.validationEngine.isError = true;
+					if($("input[name='"+callerName+"']").size() ==1) {
+						promptText += $.validationEngine.settings.allrules[rules[i]].alertTextCheckboxe+"<br />"; 
+					}else{
+						 promptText += $.validationEngine.settings.allrules[rules[i]].alertTextCheckboxMultiple+"<br />";
+					}	
+				}
+			}	
+			if (callerType == "select-one") { // added by paul@kinetek.net for select boxes, Thank you		
+				if(!$(caller).val()) {
+					$.validationEngine.isError = true;
+					promptText += $.validationEngine.settings.allrules[rules[i]].alertText+"<br />";
+				}
+			}
+			if (callerType == "select-multiple") { // added by paul@kinetek.net for select boxes, Thank you	
+				if(!$(caller).find("option:selected").val()) {
+					$.validationEngine.isError = true;
+					promptText += $.validationEngine.settings.allrules[rules[i]].alertText+"<br />";
+				}
+			}
+		}
+		function _customRegex(caller,rules,position){		 // VALIDATE REGEX RULES
+			customRule = rules[position+1];
+			pattern = eval($.validationEngine.settings.allrules[customRule].regex);
+			
+			if(!pattern.test($(caller).attr('value'))){
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules[customRule].alertText+"<br />";
+			}
+		}
+		function _exemptString(caller,rules,position){		 // VALIDATE REGEX RULES
+			customString = rules[position+1];
+			if(customString == $(caller).attr('value')){
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules['required'].alertText+"<br />";
+			}
+		}
+		
+		function _funcCall(caller,rules,position){  		// VALIDATE CUSTOM FUNCTIONS OUTSIDE OF THE ENGINE SCOPE
+			customRule = rules[position+1];
+			funce = $.validationEngine.settings.allrules[customRule].nname;
+			
+			var fn = window[funce];
+			if (typeof(fn) === 'function'){
+				var fn_result = fn();
+				$.validationEngine.isError = fn_result;
+				promptText += $.validationEngine.settings.allrules[customRule].alertText+"<br />";
+			}
+		}
+		function _ajax(caller,rules,position){				 // VALIDATE AJAX RULES
+			
+			customAjaxRule = rules[position+1];
+			postfile = $.validationEngine.settings.allrules[customAjaxRule].file;
+			fieldValue = $(caller).val();
+			ajaxCaller = caller;
+			fieldId = $(caller).attr("id");
+			ajaxValidate = true;
+			ajaxisError = $.validationEngine.isError;
+			
+			if(!$.validationEngine.settings.allrules[customAjaxRule].extraData){
+				extraData = $.validationEngine.settings.allrules[customAjaxRule].extraData;
+			}else{
+				extraData = "";
+			}
+			/* AJAX VALIDATION HAS ITS OWN UPDATE AND BUILD UNLIKE OTHER RULES */	
+			if(!ajaxisError){
+				$.ajax({
+				   	type: "POST",
+				   	url: postfile,
+				   	async: true,
+				   	data: "validateValue="+fieldValue+"&validateId="+fieldId+"&validateError="+customAjaxRule+extraData,
+				   	beforeSend: function(){		// BUILD A LOADING PROMPT IF LOAD TEXT EXIST		   			
+				   		if($.validationEngine.settings.allrules[customAjaxRule].alertTextLoad){
+				   		
+				   			if(!$("div."+fieldId+"formError")[0]){				   				
+	 			 				return $.validationEngine.buildPrompt(ajaxCaller,$.validationEngine.settings.allrules[customAjaxRule].alertTextLoad,"load");
+	 			 			}else{
+	 			 				$.validationEngine.updatePromptText(ajaxCaller,$.validationEngine.settings.allrules[customAjaxRule].alertTextLoad,"load");
+	 			 			}
+			   			}
+			  	 	},
+			  	 	error: function(data,transport){ $.validationEngine.debug("error in the ajax: "+data.status+" "+transport) },
+					success: function(data){					// GET SUCCESS DATA RETURN JSON
+						data = eval( "("+data+")");				// GET JSON DATA FROM PHP AND PARSE IT
+						ajaxisError = data.jsonValidateReturn[2];
+						customAjaxRule = data.jsonValidateReturn[1];
+						ajaxCaller = $("#"+data.jsonValidateReturn[0])[0];
+						fieldId = ajaxCaller;
+						ajaxErrorLength = $.validationEngine.ajaxValidArray.length;
+						existInarray = false;
+						
+			 			 if(ajaxisError == "false"){			// DATA FALSE UPDATE PROMPT WITH ERROR;
+			 			 	
+			 			 	_checkInArray(false)				// Check if ajax validation alreay used on this field
+			 			 	
+			 			 	if(!existInarray){		 			// Add ajax error to stop submit		 		
+				 			 	$.validationEngine.ajaxValidArray[ajaxErrorLength] =  new Array(2);
+				 			 	$.validationEngine.ajaxValidArray[ajaxErrorLength][0] = fieldId;
+				 			 	$.validationEngine.ajaxValidArray[ajaxErrorLength][1] = false;
+				 			 	existInarray = false;
+			 			 	}
+				
+			 			 	$.validationEngine.ajaxValid = false;
+							promptText += $.validationEngine.settings.allrules[customAjaxRule].alertText+"<br />";
+							$.validationEngine.updatePromptText(ajaxCaller,promptText,"",true);				
+						 }else{	 
+						 	_checkInArray(true);
+						 	$.validationEngine.ajaxValid = true; 			
+						 	if(!customAjaxRule)	{$.validationEngine.debug("wrong ajax response, are you on a server or in xampp? if not delete de ajax[ajaxUser] validating rule from your form ")}		   
+	 			 			if($.validationEngine.settings.allrules[customAjaxRule].alertTextOk){	// NO OK TEXT MEAN CLOSE PROMPT	 			
+	 			 				 				$.validationEngine.updatePromptText(ajaxCaller,$.validationEngine.settings.allrules[customAjaxRule].alertTextOk,"pass",true);
+ 			 				}else{
+				 			 	ajaxValidate = false;		 	
+				 			 	$.validationEngine.closePrompt(ajaxCaller);
+ 			 				}		
+			 			 }
+			 			function  _checkInArray(validate){
+			 				for(x=0;x<ajaxErrorLength;x++){
+			 			 		if($.validationEngine.ajaxValidArray[x][0] == fieldId){
+			 			 			$.validationEngine.ajaxValidArray[x][1] = validate;
+			 			 			existInarray = true;
+			 			 		
+			 			 		}
+			 			 	}
+			 			}
+			 		}				
+				});
+			}
+		}
+		function _confirm(caller,rules,position){		 // VALIDATE FIELD MATCH
+			confirmField = rules[position+1];
+			
+			if($(caller).attr('value') != $("#"+confirmField).attr('value')){
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules["confirm"].alertText+"<br />";
+			}
+		}
+		function _length(caller,rules,position){    	  // VALIDATE LENGTH
+		
+			startLength = eval(rules[position+1]);
+			endLength = eval(rules[position+2]);
+			feildLength = $(caller).attr('value').length;
+
+			if(feildLength<startLength || feildLength>endLength){
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules["length"].alertText+startLength+$.validationEngine.settings.allrules["length"].alertText2+endLength+$.validationEngine.settings.allrules["length"].alertText3+"<br />"
+			}
+		}
+		function _maxCheckbox(caller,rules,position){  	  // VALIDATE CHECKBOX NUMBER
+		
+			nbCheck = eval(rules[position+1]);
+			groupname = $(caller).attr("name");
+			groupSize = $("input[name='"+groupname+"']:checked").size();
+			if(groupSize > nbCheck){	
+				$.validationEngine.showTriangle = false;
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules["maxCheckbox"].alertText+"<br />";
+			}
+		}
+		function _minCheckbox(caller,rules,position){  	  // VALIDATE CHECKBOX NUMBER
+		
+			nbCheck = eval(rules[position+1]);
+			groupname = $(caller).attr("name");
+			groupSize = $("input[name='"+groupname+"']:checked").size();
+			if(groupSize < nbCheck){	
+			
+				$.validationEngine.isError = true;
+				$.validationEngine.showTriangle = false;
+				promptText += $.validationEngine.settings.allrules["minCheckbox"].alertText+" "+nbCheck+" "+$.validationEngine.settings.allrules["minCheckbox"].alertText2+"<br />";
+			}
+		}
+		return($.validationEngine.isError) ? $.validationEngine.isError : false;
+	},
+	submitForm : function(caller){
+		if($.validationEngine.settings.ajaxSubmit){		
+			if($.validationEngine.settings.ajaxSubmitExtraData){
+				extraData = $.validationEngine.settings.ajaxSubmitExtraData;
+			}else{
+				extraData = "";
+			}
+			$.ajax({
+			   	type: "POST",
+			   	url: $.validationEngine.settings.ajaxSubmitFile,
+			   	async: true,
+			   	data: $(caller).serialize()+"&"+extraData,
+			   	error: function(data,transport){ $.validationEngine.debug("error in the ajax: "+data.status+" "+transport) },
+			   	success: function(data){
+			   		if(data == "true"){			// EVERYTING IS FINE, SHOW SUCCESS MESSAGE
+			   			$(caller).css("opacity",1)
+			   			$(caller).animate({opacity: 0, height: 0}, function(){
+			   				$(caller).css("display","none");
+			   				$(caller).before("<div class='ajaxSubmit'>"+$.validationEngine.settings.ajaxSubmitMessage+"</div>");
+			   				$.validationEngine.closePrompt(".formError",true); 	
+			   				$(".ajaxSubmit").show("slow");
+			   				if ($.validationEngine.settings.success){	// AJAX SUCCESS, STOP THE LOCATION UPDATE
+								$.validationEngine.settings.success && $.validationEngine.settings.success(); 
+								return false;
+							}
+			   			})
+		   			}else{						// HOUSTON WE GOT A PROBLEM (SOMETING IS NOT VALIDATING)
+			   			data = eval( "("+data+")");	
+			   			if(!data.jsonValidateReturn){
+			   				 $.validationEngine.debug("you are not going into the success fonction and jsonValidateReturn return nothing");
+			   			}
+			   			errorNumber = data.jsonValidateReturn.length	
+			   			for(index=0; index<errorNumber; index++){	
+			   				fieldId = data.jsonValidateReturn[index][0];
+			   				promptError = data.jsonValidateReturn[index][1];
+			   				type = data.jsonValidateReturn[index][2];
+			   				$.validationEngine.buildPrompt(fieldId,promptError,type);
+		   				}
+	   				}
+   				}
+			})	
+			return true;
+		}
+		// LOOK FOR BEFORE SUCCESS METHOD		
+			if(!$.validationEngine.settings.beforeSuccess()){
+				if ($.validationEngine.settings.success){	// AJAX SUCCESS, STOP THE LOCATION UPDATE
+					if($.validationEngine.settings.unbindEngine){ $(caller).unbind("submit") }
+					$.validationEngine.settings.success && $.validationEngine.settings.success(); 
+					return true;
+				}
+			}else{
+				return true;
+			} 
+		return false;
+	},
+	buildPrompt : function(caller,promptText,type,ajaxed) {			// ERROR PROMPT CREATION AND DISPLAY WHEN AN ERROR OCCUR
+		if(!$.validationEngine.settings){
+			$.validationEngine.defaultSetting()
+		}
+		deleteItself = "." + $(caller).attr("id") + "formError"
+	
+		if($(deleteItself)[0]){
+			$(deleteItself).stop();
+			$(deleteItself).remove();
+		}
+		var divFormError = document.createElement('div');
+		var formErrorContent = document.createElement('div');
+		linkTofield = $.validationEngine.linkTofield(caller)
+		$(divFormError).addClass("formError")
+		
+		if(type == "pass"){ $(divFormError).addClass("greenPopup") }
+		if(type == "load"){ $(divFormError).addClass("blackPopup") }
+		if(ajaxed){ $(divFormError).addClass("ajaxed") }
+		
+		$(divFormError).addClass(linkTofield);
+		$(formErrorContent).addClass("formErrorContent");
+		
+		$("body").append(divFormError);
+		$(divFormError).append(formErrorContent);
+			
+		if($.validationEngine.showTriangle != false){		// NO TRIANGLE ON MAX CHECKBOX AND RADIO
+			var arrow = document.createElement('div');
+			$(arrow).addClass("formErrorArrow");
+			$(divFormError).append(arrow);
+			if($.validationEngine.settings.promptPosition == "bottomLeft" || $.validationEngine.settings.promptPosition == "bottomRight"){
+			$(arrow).addClass("formErrorArrowBottom")
+			$(arrow).html('<div class="line1"><!-- --></div><div class="line2"><!-- --></div><div class="line3"><!-- --></div><div class="line4"><!-- --></div><div class="line5"><!-- --></div><div class="line6"><!-- --></div><div class="line7"><!-- --></div><div class="line8"><!-- --></div><div class="line9"><!-- --></div><div class="line10"><!-- --></div>');
+		}
+			if($.validationEngine.settings.promptPosition == "topLeft" || $.validationEngine.settings.promptPosition == "topRight"){
+				$(divFormError).append(arrow);
+				$(arrow).html('<div class="line10"><!-- --></div><div class="line9"><!-- --></div><div class="line8"><!-- --></div><div class="line7"><!-- --></div><div class="line6"><!-- --></div><div class="line5"><!-- --></div><div class="line4"><!-- --></div><div class="line3"><!-- --></div><div class="line2"><!-- --></div><div class="line1"><!-- --></div>');
+			}
+		}
+		$(formErrorContent).html(promptText)
+	
+		callerTopPosition = $(caller).offset().top;
+		callerleftPosition = $(caller).offset().left;
+		callerWidth =  $(caller).width();
+		inputHeight = $(divFormError).height();
+	
+		/* POSITIONNING */
+		if($.validationEngine.settings.promptPosition == "topRight"){callerleftPosition +=  callerWidth -30; callerTopPosition += -inputHeight -10; }
+		if($.validationEngine.settings.promptPosition == "topLeft"){ callerTopPosition += -inputHeight -10; }
+		
+		if($.validationEngine.settings.promptPosition == "centerRight"){ callerleftPosition +=  callerWidth +13; }
+		
+		if($.validationEngine.settings.promptPosition == "bottomLeft"){
+			callerHeight =  $(caller).height();
+			callerleftPosition = callerleftPosition;
+			callerTopPosition = callerTopPosition + callerHeight + 15;
+		}
+		if($.validationEngine.settings.promptPosition == "bottomRight"){
+			callerHeight =  $(caller).height();
+			callerleftPosition +=  callerWidth -30;
+			callerTopPosition +=  callerHeight + 15;
+		}
+		$(divFormError).css({
+			top:callerTopPosition,
+			left:callerleftPosition,
+			opacity:0
+		})
+		return $(divFormError).animate({"opacity":0.87},function(){return true;});	
+	},
+	updatePromptText : function(caller,promptText,type,ajaxed) {	// UPDATE TEXT ERROR IF AN ERROR IS ALREADY DISPLAYED
+		
+		linkTofield = $.validationEngine.linkTofield(caller);
+		var updateThisPrompt =  "."+linkTofield;
+		
+		if(type == "pass") { $(updateThisPrompt).addClass("greenPopup") }else{ $(updateThisPrompt).removeClass("greenPopup")};
+		if(type == "load") { $(updateThisPrompt).addClass("blackPopup") }else{ $(updateThisPrompt).removeClass("blackPopup")};
+		if(ajaxed) { $(updateThisPrompt).addClass("ajaxed") }else{ $(updateThisPrompt).removeClass("ajaxed")};
+	
+		$(updateThisPrompt).find(".formErrorContent").html(promptText);
+		callerTopPosition  = $(caller).offset().top;
+		inputHeight = $(updateThisPrompt).height();
+		
+		if($.validationEngine.settings.promptPosition == "bottomLeft" || $.validationEngine.settings.promptPosition == "bottomRight"){
+			callerHeight =  $(caller).height();
+			callerTopPosition =  callerTopPosition + callerHeight + 15;
+		}
+		if($.validationEngine.settings.promptPosition == "centerRight"){  callerleftPosition +=  callerWidth +13;}
+		if($.validationEngine.settings.promptPosition == "topLeft" || $.validationEngine.settings.promptPosition == "topRight"){
+			callerTopPosition = callerTopPosition  -inputHeight -10;
+		}
+		$(updateThisPrompt).animate({ top:callerTopPosition });
+	},
+	linkTofield : function(caller){
+		linkTofield = $(caller).attr("id") + "formError";
+		linkTofield = linkTofield.replace(/\[/g,""); 
+		linkTofield = linkTofield.replace(/\]/g,"");
+		return linkTofield;
+	},
+	closePrompt : function(caller,outside) {						// CLOSE PROMPT WHEN ERROR CORRECTED
+		if(!$.validationEngine.settings){
+			$.validationEngine.defaultSetting()
+		}
+		if(outside){
+			$(caller).fadeTo("fast",0,function(){
+				$(caller).remove();
+			});
+			return false;
+		}
+		if(typeof(ajaxValidate)=='undefined'){ajaxValidate = false}
+		if(!ajaxValidate){
+			linkTofield = $.validationEngine.linkTofield(caller);
+			closingPrompt = "."+linkTofield;
+			$(closingPrompt).fadeTo("fast",0,function(){
+				$(closingPrompt).remove();
+			});
+		}
+	},
+	debug : function(error) {
+		if(!$("#debugMode")[0]){
+			$("body").append("<div id='debugMode'><div class='debugError'><strong>This is a debug mode, you got a problem with your form, it will try to help you, refresh when you think you nailed down the problem</strong></div></div>");
+		}
+		$(".debugError").append("<div class='debugerror'>"+error+"</div>");
+	},			
+	submitValidation : function(caller) {					// FORM SUBMIT VALIDATION LOOPING INLINE VALIDATION
+		var stopForm = false;
+		$.validationEngine.ajaxValid = true;
+		$(caller).find(".formError").remove();
+		var toValidateSize = $(caller).find("[class*=validate]").size();
+		
+		$(caller).find("[class*=validate]").each(function(){
+			linkTofield = $.validationEngine.linkTofield(this);
+			
+			if(!$("."+linkTofield).hasClass("ajaxed")){	// DO NOT UPDATE ALREADY AJAXED FIELDS (only happen if no normal errors, don't worry)
+				var validationPass = $.validationEngine.loadValidation(this);
+				return(validationPass) ? stopForm = true : "";					
+			};
+		});
+		ajaxErrorLength = $.validationEngine.ajaxValidArray.length;		// LOOK IF SOME AJAX IS NOT VALIDATE
+		for(x=0;x<ajaxErrorLength;x++){
+	 		if($.validationEngine.ajaxValidArray[x][1] == false){
+	 			$.validationEngine.ajaxValid = false;
+ 			}
+ 		}
+		if(stopForm || !$.validationEngine.ajaxValid){		// GET IF THERE IS AN ERROR OR NOT FROM THIS VALIDATION FUNCTIONS
+			if($.validationEngine.settings.scroll){
+				destination = $(".formError:not('.greenPopup'):first").offset().top;
+				$(".formError:not('.greenPopup')").each(function(){
+					testDestination = $(this).offset().top;
+					if(destination>testDestination){
+						destination = $(this).offset().top;
+					}
+				})
+				$("html:not(:animated),body:not(:animated)").animate({ scrollTop: destination}, 1100);
+			}
+			return true;
+		}else{
+			return false;
+		}
+	}
+}
+})(jQuery);        –Ê  x–Ê/   20250331133932-8l≥Ê  4;∏Ü5   https://erp.cmrit.ac.in/js/jquery.validationEngine.js      oa  /*
+ * Inline Form Validation Engine 1.6.4, jQuery plugin
+ * 
+ * Copyright(c) 2009, Cedric Dugas
+ * http://www.position-relative.net
+ *	
+ * Form validation engine allowing custom regex rules to be added.
+ * Thanks to Francois Duquette and Teddy Limousin 
+ * and everyone helping me find bugs on the forum
+ * Licenced under the MIT Licence
+ */
+ 
+(function($) {
+	
+	$.fn.validationEngine = function(settings) {
+		
+	if($.validationEngineLanguage){				// IS THERE A LANGUAGE LOCALISATION ?
+		allRules = $.validationEngineLanguage.allRules;
+	}else{
+		$.validationEngine.debug("Validation engine rules are not loaded check your external file");
+	}
+ 	settings = jQuery.extend({
+		allrules:allRules,
+		validationEventTriggers:"focusout",					
+		inlineValidation: true,	
+		returnIsValid:false,
+		liveEvent:true,
+		unbindEngine:true,
+		ajaxSubmit: false,
+		scroll:true,
+		promptPosition: "topRight",	// OPENNING BOX POSITION, IMPLEMENTED: topLeft, topRight, bottomLeft, centerRight, bottomRight
+		success : false,
+		beforeSuccess :  function() {},
+		failure : function() {}
+	}, settings);	
+	$.validationEngine.settings = settings;
+	$.validationEngine.ajaxValidArray = new Array();	// ARRAY FOR AJAX: VALIDATION MEMORY 
+	
+	if(settings.inlineValidation == true){ 		// Validating Inline ?
+		if(!settings.returnIsValid){					// NEEDED FOR THE SETTING returnIsValid
+			allowReturnIsvalid = false;
+			if(settings.liveEvent){						// LIVE event, vast performance improvement over BIND
+				$(this).find("[class*=validate][type!=checkbox]").live(settings.validationEventTriggers, function(caller){ _inlinEvent(this);})
+				$(this).find("[class*=validate][type=checkbox]").live("click", function(caller){ _inlinEvent(this); })
+			}else{
+				$(this).find("[class*=validate]").not("[type=checkbox]").bind(settings.validationEventTriggers, function(caller){ _inlinEvent(this); })
+				$(this).find("[class*=validate][type=checkbox]").bind("click", function(caller){ _inlinEvent(this); })
+			}
+			firstvalid = false;
+		}
+			function _inlinEvent(caller){
+				$.validationEngine.settings = settings;
+				if($.validationEngine.intercept == false || !$.validationEngine.intercept){		// STOP INLINE VALIDATION THIS TIME ONLY
+					$.validationEngine.onSubmitValid=false;
+					$.validationEngine.loadValidation(caller); 
+				}else{
+					$.validationEngine.intercept = false;
+				}
+			}
+	}
+	if (settings.returnIsValid){		// Do validation and return true or false, it bypass everything;
+		if ($.validationEngine.submitValidation(this,settings)){
+			return false;
+		}else{
+			return true;
+		}
+	}
+	$(this).bind("submit", function(caller){   // ON FORM SUBMIT, CONTROL AJAX FUNCTION IF SPECIFIED ON DOCUMENT READY
+		$.validationEngine.onSubmitValid = true;
+		$.validationEngine.settings = settings;
+		if($.validationEngine.submitValidation(this,settings) == false){
+			if($.validationEngine.submitForm(this,settings) == true) {return false;}
+		}else{
+			settings.failure && settings.failure(); 
+			return false;
+		}		
+	})
+	$(".formError").live("click",function(){	 // REMOVE BOX ON CLICK
+		$(this).fadeOut(150,function(){
+			$(this).remove();
+		}) 
+	})
+};	
+$.validationEngine = {
+	defaultSetting : function(caller) {		// NOT GENERALLY USED, NEEDED FOR THE API, DO NOT TOUCH
+		if($.validationEngineLanguage){				
+			allRules = $.validationEngineLanguage.allRules;
+		}else{
+			$.validationEngine.debug("Validation engine rules are not loaded check your external file");
+		}	
+		settings = {
+			allrules:allRules,
+			validationEventTriggers:"blur",					
+			inlineValidation: true,	
+			returnIsValid:false,
+			scroll:true,
+			unbindEngine:true,
+			ajaxSubmit: false,
+			promptPosition: "topRight",	// OPENNING BOX POSITION, IMPLEMENTED: topLeft, topRight, bottomLeft, centerRight, bottomRight
+			success : false,
+			failure : function() {}
+		}	
+		$.validationEngine.settings = settings;
+	},
+	loadValidation : function(caller) {		// GET VALIDATIONS TO BE EXECUTED
+		if(!$.validationEngine.settings){
+			$.validationEngine.defaultSetting()
+		}
+		rulesParsing = $(caller).attr('class');
+		rulesRegExp = /\[(.*)\]/;
+		getRules = rulesRegExp.exec(rulesParsing);
+		str = getRules[1];
+		pattern = /\[|,|\]/;
+		result= str.split(pattern);	
+		var validateCalll = $.validationEngine.validateCall(caller,result)
+		return validateCalll;
+	},
+	validateCall : function(caller,rules) {	// EXECUTE VALIDATION REQUIRED BY THE USER FOR THIS FIELD
+		var promptText =""	
+		
+		if(!$(caller).attr("id")) { $.validationEngine.debug("This field have no ID attribut( name & class displayed): "+$(caller).attr("name")+" "+$(caller).attr("class")) }
+
+		caller = caller;
+		ajaxValidate = false;
+		var callerName = $(caller).attr("name");
+		$.validationEngine.isError = false;
+		$.validationEngine.showTriangle = true;
+		callerType = $(caller).attr("type");
+
+		for (i=0; i<rules.length;i++){
+			switch (rules[i]){
+			case "optional": 
+				if(!$(caller).val()){
+					$.validationEngine.closePrompt(caller);
+					return $.validationEngine.isError;
+				}
+			break;
+			case "required": 
+				_required(caller,rules);
+			break;
+			case "custom": 
+				 _customRegex(caller,rules,i);
+			break;
+			case "exemptString": 
+				 _exemptString(caller,rules,i);
+			break;
+			case "ajax": 
+				if(!$.validationEngine.onSubmitValid){
+					_ajax(caller,rules,i);	
+				};
+			break;
+			case "length": 
+				 _length(caller,rules,i);
+			break;
+			case "maxCheckbox": 
+				_maxCheckbox(caller,rules,i);
+			 	groupname = $(caller).attr("name");
+			 	caller = $("input[name='"+groupname+"']");
+			break;
+			case "minCheckbox": 
+				_minCheckbox(caller,rules,i);
+				groupname = $(caller).attr("name");
+			 	caller = $("input[name='"+groupname+"']");
+			break;
+			case "confirm": 
+				 _confirm(caller,rules,i);
+			break;
+			case "funcCall": 
+		     	_funcCall(caller,rules,i);
+			break;
+			default :;
+			};
+		};
+		radioHack();
+		if ($.validationEngine.isError == true){
+			linkTofield = $.validationEngine.linkTofield(caller);
+			
+			($("div."+linkTofield).size() ==0) ? $.validationEngine.buildPrompt(caller,promptText,"error")	: $.validationEngine.updatePromptText(caller,promptText);
+		}else{ $.validationEngine.closePrompt(caller);}			
+		/* UNFORTUNATE RADIO AND CHECKBOX GROUP HACKS */
+		/* As my validation is looping input with id's we need a hack for my validation to understand to group these inputs */
+		function radioHack(){
+	      if($("input[name='"+callerName+"']").size()> 1 && (callerType == "radio" || callerType == "checkbox")) {        // Hack for radio/checkbox group button, the validation go the first radio/checkbox of the group
+	          caller = $("input[name='"+callerName+"'][type!=hidden]:first");     
+	          $.validationEngine.showTriangle = false;
+	      }      
+	    }
+		/* VALIDATION FUNCTIONS */
+		function _required(caller,rules){   // VALIDATE BLANK FIELD
+			callerType = $(caller).attr("type");
+			if (callerType == "text" || callerType == "password" || callerType == "textarea"){
+								
+				if(!$(caller).val()){
+					$.validationEngine.isError = true;
+					promptText += $.validationEngine.settings.allrules[rules[i]].alertText+"<br />";
+				}	
+			}	
+			if (callerType == "radio" || callerType == "checkbox" ){
+				callerName = $(caller).attr("name");
+		
+				if($("input[name='"+callerName+"']:checked").size() == 0) {
+					$.validationEngine.isError = true;
+					if($("input[name='"+callerName+"']").size() ==1) {
+						promptText += $.validationEngine.settings.allrules[rules[i]].alertTextCheckboxe+"<br />"; 
+					}else{
+						 promptText += $.validationEngine.settings.allrules[rules[i]].alertTextCheckboxMultiple+"<br />";
+					}	
+				}
+			}	
+			if (callerType == "select-one") { // added by paul@kinetek.net for select boxes, Thank you		
+				if(!$(caller).val()) {
+					$.validationEngine.isError = true;
+					promptText += $.validationEngine.settings.allrules[rules[i]].alertText+"<br />";
+				}
+			}
+			if (callerType == "select-multiple") { // added by paul@kinetek.net for select boxes, Thank you	
+				if(!$(caller).find("option:selected").val()) {
+					$.validationEngine.isError = true;
+					promptText += $.validationEngine.settings.allrules[rules[i]].alertText+"<br />";
+				}
+			}
+		}
+		function _customRegex(caller,rules,position){		 // VALIDATE REGEX RULES
+			customRule = rules[position+1];
+			pattern = eval($.validationEngine.settings.allrules[customRule].regex);
+			
+			if(!pattern.test($(caller).attr('value'))){
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules[customRule].alertText+"<br />";
+			}
+		}
+		function _exemptString(caller,rules,position){		 // VALIDATE REGEX RULES
+			customString = rules[position+1];
+			if(customString == $(caller).attr('value')){
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules['required'].alertText+"<br />";
+			}
+		}
+		
+		function _funcCall(caller,rules,position){  		// VALIDATE CUSTOM FUNCTIONS OUTSIDE OF THE ENGINE SCOPE
+			customRule = rules[position+1];
+			funce = $.validationEngine.settings.allrules[customRule].nname;
+			
+			var fn = window[funce];
+			if (typeof(fn) === 'function'){
+				var fn_result = fn();
+				$.validationEngine.isError = fn_result;
+				promptText += $.validationEngine.settings.allrules[customRule].alertText+"<br />";
+			}
+		}
+		function _ajax(caller,rules,position){				 // VALIDATE AJAX RULES
+			
+			customAjaxRule = rules[position+1];
+			postfile = $.validationEngine.settings.allrules[customAjaxRule].file;
+			fieldValue = $(caller).val();
+			ajaxCaller = caller;
+			fieldId = $(caller).attr("id");
+			ajaxValidate = true;
+			ajaxisError = $.validationEngine.isError;
+			
+			if(!$.validationEngine.settings.allrules[customAjaxRule].extraData){
+				extraData = $.validationEngine.settings.allrules[customAjaxRule].extraData;
+			}else{
+				extraData = "";
+			}
+			/* AJAX VALIDATION HAS ITS OWN UPDATE AND BUILD UNLIKE OTHER RULES */	
+			if(!ajaxisError){
+				$.ajax({
+				   	type: "POST",
+				   	url: postfile,
+				   	async: true,
+				   	data: "validateValue="+fieldValue+"&validateId="+fieldId+"&validateError="+customAjaxRule+extraData,
+				   	beforeSend: function(){		// BUILD A LOADING PROMPT IF LOAD TEXT EXIST		   			
+				   		if($.validationEngine.settings.allrules[customAjaxRule].alertTextLoad){
+				   		
+				   			if(!$("div."+fieldId+"formError")[0]){				   				
+	 			 				return $.validationEngine.buildPrompt(ajaxCaller,$.validationEngine.settings.allrules[customAjaxRule].alertTextLoad,"load");
+	 			 			}else{
+	 			 				$.validationEngine.updatePromptText(ajaxCaller,$.validationEngine.settings.allrules[customAjaxRule].alertTextLoad,"load");
+	 			 			}
+			   			}
+			  	 	},
+			  	 	error: function(data,transport){ $.validationEngine.debug("error in the ajax: "+data.status+" "+transport) },
+					success: function(data){					// GET SUCCESS DATA RETURN JSON
+						data = eval( "("+data+")");				// GET JSON DATA FROM PHP AND PARSE IT
+						ajaxisError = data.jsonValidateReturn[2];
+						customAjaxRule = data.jsonValidateReturn[1];
+						ajaxCaller = $("#"+data.jsonValidateReturn[0])[0];
+						fieldId = ajaxCaller;
+						ajaxErrorLength = $.validationEngine.ajaxValidArray.length;
+						existInarray = false;
+						
+			 			 if(ajaxisError == "false"){			// DATA FALSE UPDATE PROMPT WITH ERROR;
+			 			 	
+			 			 	_checkInArray(false)				// Check if ajax validation alreay used on this field
+			 			 	
+			 			 	if(!existInarray){		 			// Add ajax error to stop submit		 		
+				 			 	$.validationEngine.ajaxValidArray[ajaxErrorLength] =  new Array(2);
+				 			 	$.validationEngine.ajaxValidArray[ajaxErrorLength][0] = fieldId;
+				 			 	$.validationEngine.ajaxValidArray[ajaxErrorLength][1] = false;
+				 			 	existInarray = false;
+			 			 	}
+				
+			 			 	$.validationEngine.ajaxValid = false;
+							promptText += $.validationEngine.settings.allrules[customAjaxRule].alertText+"<br />";
+							$.validationEngine.updatePromptText(ajaxCaller,promptText,"",true);				
+						 }else{	 
+						 	_checkInArray(true);
+						 	$.validationEngine.ajaxValid = true; 			
+						 	if(!customAjaxRule)	{$.validationEngine.debug("wrong ajax response, are you on a server or in xampp? if not delete de ajax[ajaxUser] validating rule from your form ")}		   
+	 			 			if($.validationEngine.settings.allrules[customAjaxRule].alertTextOk){	// NO OK TEXT MEAN CLOSE PROMPT	 			
+	 			 				 				$.validationEngine.updatePromptText(ajaxCaller,$.validationEngine.settings.allrules[customAjaxRule].alertTextOk,"pass",true);
+ 			 				}else{
+				 			 	ajaxValidate = false;		 	
+				 			 	$.validationEngine.closePrompt(ajaxCaller);
+ 			 				}		
+			 			 }
+			 			function  _checkInArray(validate){
+			 				for(x=0;x<ajaxErrorLength;x++){
+			 			 		if($.validationEngine.ajaxValidArray[x][0] == fieldId){
+			 			 			$.validationEngine.ajaxValidArray[x][1] = validate;
+			 			 			existInarray = true;
+			 			 		
+			 			 		}
+			 			 	}
+			 			}
+			 		}				
+				});
+			}
+		}
+		function _confirm(caller,rules,position){		 // VALIDATE FIELD MATCH
+			confirmField = rules[position+1];
+			
+			if($(caller).attr('value') != $("#"+confirmField).attr('value')){
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules["confirm"].alertText+"<br />";
+			}
+		}
+		function _length(caller,rules,position){    	  // VALIDATE LENGTH
+		
+			startLength = eval(rules[position+1]);
+			endLength = eval(rules[position+2]);
+			feildLength = $(caller).attr('value').length;
+
+			if(feildLength<startLength || feildLength>endLength){
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules["length"].alertText+startLength+$.validationEngine.settings.allrules["length"].alertText2+endLength+$.validationEngine.settings.allrules["length"].alertText3+"<br />"
+			}
+		}
+		function _maxCheckbox(caller,rules,position){  	  // VALIDATE CHECKBOX NUMBER
+		
+			nbCheck = eval(rules[position+1]);
+			groupname = $(caller).attr("name");
+			groupSize = $("input[name='"+groupname+"']:checked").size();
+			if(groupSize > nbCheck){	
+				$.validationEngine.showTriangle = false;
+				$.validationEngine.isError = true;
+				promptText += $.validationEngine.settings.allrules["maxCheckbox"].alertText+"<br />";
+			}
+		}
+		function _minCheckbox(caller,rules,position){  	  // VALIDATE CHECKBOX NUMBER
+		
+			nbCheck = eval(rules[position+1]);
+			groupname = $(caller).attr("name");
+			groupSize = $("input[name='"+groupname+"']:checked").size();
+			if(groupSize < nbCheck){	
+			
+				$.validationEngine.isError = true;
+				$.validationEngine.showTriangle = false;
+				promptText += $.validationEngine.settings.allrules["minCheckbox"].alertText+" "+nbCheck+" "+$.validationEngine.settings.allrules["minCheckbox"].alertText2+"<br />";
+			}
+		}
+		return($.validationEngine.isError) ? $.validationEngine.isError : false;
+	},
+	submitForm : function(caller){
+		if($.validationEngine.settings.ajaxSubmit){		
+			if($.validationEngine.settings.ajaxSubmitExtraData){
+				extraData = $.validationEngine.settings.ajaxSubmitExtraData;
+			}else{
+				extraData = "";
+			}
+			$.ajax({
+			   	type: "POST",
+			   	url: $.validationEngine.settings.ajaxSubmitFile,
+			   	async: true,
+			   	data: $(caller).serialize()+"&"+extraData,
+			   	error: function(data,transport){ $.validationEngine.debug("error in the ajax: "+data.status+" "+transport) },
+			   	success: function(data){
+			   		if(data == "true"){			// EVERYTING IS FINE, SHOW SUCCESS MESSAGE
+			   			$(caller).css("opacity",1)
+			   			$(caller).animate({opacity: 0, height: 0}, function(){
+			   				$(caller).css("display","none");
+			   				$(caller).before("<div class='ajaxSubmit'>"+$.validationEngine.settings.ajaxSubmitMessage+"</div>");
+			   				$.validationEngine.closePrompt(".formError",true); 	
+			   				$(".ajaxSubmit").show("slow");
+			   				if ($.validationEngine.settings.success){	// AJAX SUCCESS, STOP THE LOCATION UPDATE
+								$.validationEngine.settings.success && $.validationEngine.settings.success(); 
+								return false;
+							}
+			   			})
+		   			}else{						// HOUSTON WE GOT A PROBLEM (SOMETING IS NOT VALIDATING)
+			   			data = eval( "("+data+")");	
+			   			if(!data.jsonValidateReturn){
+			   				 $.validationEngine.debug("you are not going into the success fonction and jsonValidateReturn return nothing");
+			   			}
+			   			errorNumber = data.jsonValidateReturn.length	
+			   			for(index=0; index<errorNumber; index++){	
+			   				fieldId = data.jsonValidateReturn[index][0];
+			   				promptError = data.jsonValidateReturn[index][1];
+			   				type = data.jsonValidateReturn[index][2];
+			   				$.validationEngine.buildPrompt(fieldId,promptError,type);
+		   				}
+	   				}
+   				}
+			})	
+			return true;
+		}
+		// LOOK FOR BEFORE SUCCESS METHOD		
+			if(!$.validationEngine.settings.beforeSuccess()){
+				if ($.validationEngine.settings.success){	// AJAX SUCCESS, STOP THE LOCATION UPDATE
+					if($.validationEngine.settings.unbindEngine){ $(caller).unbind("submit") }
+					$.validationEngine.settings.success && $.validationEngine.settings.success(); 
+					return true;
+				}
+			}else{
+				return true;
+			} 
+		return false;
+	},
+	buildPrompt : function(caller,promptText,type,ajaxed) {			// ERROR PROMPT CREATION AND DISPLAY WHEN AN ERROR OCCUR
+		if(!$.validationEngine.settings){
+			$.validationEngine.defaultSetting()
+		}
+		deleteItself = "." + $(caller).attr("id") + "formError"
+	
+		if($(deleteItself)[0]){
+			$(deleteItself).stop();
+			$(deleteItself).remove();
+		}
+		var divFormError = document.createElement('div');
+		var formErrorContent = document.createElement('div');
+		linkTofield = $.validationEngine.linkTofield(caller)
+		$(divFormError).addClass("formError")
+		
+		if(type == "pass"){ $(divFormError).addClass("greenPopup") }
+		if(type == "load"){ $(divFormError).addClass("blackPopup") }
+		if(ajaxed){ $(divFormError).addClass("ajaxed") }
+		
+		$(divFormError).addClass(linkTofield);
+		$(formErrorContent).addClass("formErrorContent");
+		
+		$("body").append(divFormError);
+		$(divFormError).append(formErrorContent);
+			
+		if($.validationEngine.showTriangle != false){		// NO TRIANGLE ON MAX CHECKBOX AND RADIO
+			var arrow = document.createElement('div');
+			$(arrow).addClass("formErrorArrow");
+			$(divFormError).append(arrow);
+			if($.validationEngine.settings.promptPosition == "bottomLeft" || $.validationEngine.settings.promptPosition == "bottomRight"){
+			$(arrow).addClass("formErrorArrowBottom")
+			$(arrow).html('<div class="line1"><!-- --></div><div class="line2"><!-- --></div><div class="line3"><!-- --></div><div class="line4"><!-- --></div><div class="line5"><!-- --></div><div class="line6"><!-- --></div><div class="line7"><!-- --></div><div class="line8"><!-- --></div><div class="line9"><!-- --></div><div class="line10"><!-- --></div>');
+		}
+			if($.validationEngine.settings.promptPosition == "topLeft" || $.validationEngine.settings.promptPosition == "topRight"){
+				$(divFormError).append(arrow);
+				$(arrow).html('<div class="line10"><!-- --></div><div class="line9"><!-- --></div><div class="line8"><!-- --></div><div class="line7"><!-- --></div><div class="line6"><!-- --></div><div class="line5"><!-- --></div><div class="line4"><!-- --></div><div class="line3"><!-- --></div><div class="line2"><!-- --></div><div class="line1"><!-- --></div>');
+			}
+		}
+		$(formErrorContent).html(promptText)
+	
+		callerTopPosition = $(caller).offset().top;
+		callerleftPosition = $(caller).offset().left;
+		callerWidth =  $(caller).width();
+		inputHeight = $(divFormError).height();
+	
+		/* POSITIONNING */
+		if($.validationEngine.settings.promptPosition == "topRight"){callerleftPosition +=  callerWidth -30; callerTopPosition += -inputHeight -10; }
+		if($.validationEngine.settings.promptPosition == "topLeft"){ callerTopPosition += -inputHeight -10; }
+		
+		if($.validationEngine.settings.promptPosition == "centerRight"){ callerleftPosition +=  callerWidth +13; }
+		
+		if($.validationEngine.settings.promptPosition == "bottomLeft"){
+			callerHeight =  $(caller).height();
+			callerleftPosition = callerleftPosition;
+			callerTopPosition = callerTopPosition + callerHeight + 15;
+		}
+		if($.validationEngine.settings.promptPosition == "bottomRight"){
+			callerHeight =  $(caller).height();
+			callerleftPosition +=  callerWidth -30;
+			callerTopPosition +=  callerHeight + 15;
+		}
+		$(divFormError).css({
+			top:callerTopPosition,
+			left:callerleftPosition,
+			opacity:0
+		})
+		return $(divFormError).animate({"opacity":0.87},function(){return true;});	
+	},
+	updatePromptText : function(caller,promptText,type,ajaxed) {	// UPDATE TEXT ERROR IF AN ERROR IS ALREADY DISPLAYED
+		
+		linkTofield = $.validationEngine.linkTofield(caller);
+		var updateThisPrompt =  "."+linkTofield;
+		
+		if(type == "pass") { $(updateThisPrompt).addClass("greenPopup") }else{ $(updateThisPrompt).removeClass("greenPopup")};
+		if(type == "load") { $(updateThisPrompt).addClass("blackPopup") }else{ $(updateThisPrompt).removeClass("blackPopup")};
+		if(ajaxed) { $(updateThisPrompt).addClass("ajaxed") }else{ $(updateThisPrompt).removeClass("ajaxed")};
+	
+		$(updateThisPrompt).find(".formErrorContent").html(promptText);
+		callerTopPosition  = $(caller).offset().top;
+		inputHeight = $(updateThisPrompt).height();
+		
+		if($.validationEngine.settings.promptPosition == "bottomLeft" || $.validationEngine.settings.promptPosition == "bottomRight"){
+			callerHeight =  $(caller).height();
+			callerTopPosition =  callerTopPosition + callerHeight + 15;
+		}
+		if($.validationEngine.settings.promptPosition == "centerRight"){  callerleftPosition +=  callerWidth +13;}
+		if($.validationEngine.settings.promptPosition == "topLeft" || $.validationEngine.settings.promptPosition == "topRight"){
+			callerTopPosition = callerTopPosition  -inputHeight -10;
+		}
+		$(updateThisPrompt).animate({ top:callerTopPosition });
+	},
+	linkTofield : function(caller){
+		linkTofield = $(caller).attr("id") + "formError";
+		linkTofield = linkTofield.replace(/\[/g,""); 
+		linkTofield = linkTofield.replace(/\]/g,"");
+		return linkTofield;
+	},
+	closePrompt : function(caller,outside) {						// CLOSE PROMPT WHEN ERROR CORRECTED
+		if(!$.validationEngine.settings){
+			$.validationEngine.defaultSetting()
+		}
+		if(outside){
+			$(caller).fadeTo("fast",0,function(){
+				$(caller).remove();
+			});
+			return false;
+		}
+		if(typeof(ajaxValidate)=='undefined'){ajaxValidate = false}
+		if(!ajaxValidate){
+			linkTofield = $.validationEngine.linkTofield(caller);
+			closingPrompt = "."+linkTofield;
+			$(closingPrompt).fadeTo("fast",0,function(){
+				$(closingPrompt).remove();
+			});
+		}
+	},
+	debug : function(error) {
+		if(!$("#debugMode")[0]){
+			$("body").append("<div id='debugMode'><div class='debugError'><strong>This is a debug mode, you got a problem with your form, it will try to help you, refresh when you think you nailed down the problem</strong></div></div>");
+		}
+		$(".debugError").append("<div class='debugerror'>"+error+"</div>");
+	},			
+	submitValidation : function(caller) {					// FORM SUBMIT VALIDATION LOOPING INLINE VALIDATION
+		var stopForm = false;
+		$.validationEngine.ajaxValid = true;
+		$(caller).find(".formError").remove();
+		var toValidateSize = $(caller).find("[class*=validate]").size();
+		
+		$(caller).find("[class*=validate]").each(function(){
+			linkTofield = $.validationEngine.linkTofield(this);
+			
+			if(!$("."+linkTofield).hasClass("ajaxed")){	// DO NOT UPDATE ALREADY AJAXED FIELDS (only happen if no normal errors, don't worry)
+				var validationPass = $.validationEngine.loadValidation(this);
+				return(validationPass) ? stopForm = true : "";					
+			};
+		});
+		ajaxErrorLength = $.validationEngine.ajaxValidArray.length;		// LOOK IF SOME AJAX IS NOT VALIDATE
+		for(x=0;x<ajaxErrorLength;x++){
+	 		if($.validationEngine.ajaxValidArray[x][1] == false){
+	 			$.validationEngine.ajaxValid = false;
+ 			}
+ 		}
+		if(stopForm || !$.validationEngine.ajaxValid){		// GET IF THERE IS AN ERROR OR NOT FROM THIS VALIDATION FUNCTIONS
+			if($.validationEngine.settings.scroll){
+				destination = $(".formError:not('.greenPopup'):first").offset().top;
+				$(".formError:not('.greenPopup')").each(function(){
+					testDestination = $(this).offset().top;
+					if(destination>testDestination){
+						destination = $(this).offset().top;
+					}
+				})
+				$("html:not(:animated),body:not(:animated)").animate({ scrollTop: destination}, 1100);
+			}
+			return true;
+		}else{
+			return false;
+		}
+	}
+}
+})(jQuery);”ò¿Ÿ¯   ‰        ñ™´[      validationEngine   —ôKö      settings   §§ÔÇ      validationEngineLanguage   ‹ñ¬      allRules   .`      debug      /£ƒû?      Validation engine rules are not loaded check your external file    >Â/      jQuery     ªl‡Ù      extend     aÁ>¯      allrules	   Í1†      validationEventTriggers
+    ZMÎÕ      focusout   %u÷W      inlineValidation   €á(\      returnIsValid      ®QiÁ	      liveEvent      øÍ(      unbindEngine   WQÚ
+      ajaxSubmit     \z˚      scroll     ÌÇòû      promptPosition     çbÚï      topRight   …©\9      success    üﬁ‹Ç      beforeSuccess      ŸΩ>R      failure    ≈>$Ê      ajaxValidArray     X       allowReturnIsvalid     I¬\!      [class*=validate][type!=checkbox]      _¸⁄      live   ’π¡‰      _inlinEvent    ôôÍ¶       [class*=validate][type=checkbox]   ü™‚X      click      ﬁ¨Õª      [class*=validate]      qûÅÄ      not    Ìë¡Ö      [type=checkbox]     ‡Õ      bind!   ƒ—V{
+      firstvalid"     ©»Ë	      intercept#      1Ïµ&      onSubmitValid$      £)      loadValidation%     Ü˚^µ      submitValidation&   dÙ∂      submit'     ;AQ
+      submitForm(     √ï°)
+      .formError)     –cH:      fadeOut*    *N∑∆      remove+     ÕgØå      defaultSetting,     ƒ∫·%      blur-   wêzb      rulesParsing.   A¢Ωê      attr/   z“Q       rulesRegExp0    ;ªÇ      \[(.*)\]1   Oå      getRules2   Ñ6¶1      str3    :/Ô      \[|,|\]4    ¢ö£      validateCalll5      †Ñ∆˙      validateCall6   :‹Ï      rules7      nª±Œ
+      promptText8     nÁ3~9      This field have no ID attribut( name & class displayed): 9      FuiA      ajaxValidate:   e™á 
+      callerName;     “‚{      showTriangle<   -oñÅ
+      callerType=     1iø      optional>   &⁄õ      val?    £ü	4      closePrompt@    o=j†	      _requiredA      o®µ2      customB     Ò∂¿≥      _customRegexC   Ù       exemptStringD   ã=      _exemptStringE      æd»ê      ajaxF   ¿
+ØI      _ajaxG      <C‘@      _lengthH    ƒÎ∫ñ      maxCheckboxI    ﬂÅGã      _maxCheckboxJ   	Î	      groupnameK      ¢0‡‹      input[name='L   NT€h      ']M     £KØ      minCheckboxN    »¡ÿ      _minCheckboxO   :}»@      confirmP    Èu¢ã      _confirmQ   5·ÍC      funcCallR   b¥?x	      _funcCallS      ëtÜ	      radioHackT      ˙WU      linkTofieldU    Õ*çÂ      div.V   ysïµ      buildPromptW    ˛tuW      errorX      (gÿ{      updatePromptTextY   6zgÚ      radioZ      ÿy*      checkbox[   .ã       '][type!=hidden]:first\     à3¿µ      text]   ¯©òﬂ      password^   ÷ŸÓ      textarea_   óoà	      alertText`      |N‰7      <br />a     F£fÎ
+      ']:checkedb     o°ÀL      alertTextCheckboxec     ~∞£      alertTextCheckboxMultipled      ‚¶ 
+      select-onee     UÄΩ      select-multiplef    $v      option:selectedg    »Åí      positionh   ◊Á,≈
+      customRulei     ≤cT      regexj      Ò@Ü≠      customStringk   3⁄ùA      funcel      ˝≥ã^      nnamem      ¯2áâ      windown     –_Ÿâ	      fn_resulto      +ª,t      customAjaxRulep     ≥*!*      postfileq   …«=      filer   u¥RË
+      fieldValues     9°n
+      ajaxCallert     ¶4\‰      fieldIdu    öùÃ      ajaxisErrorv    awY	      extraDataw      ﬂ:      POSTx   6ó(Å      datay   ‚¢÷”      validateValue=z     H@à—      &validateId={   ˚?Ï      &validateError=|    Ñ–ˇ
+      beforeSend}     ¸©}      alertTextLoad~      Y§RÆ	      formError      2áU)      loadÄ   ê†¬E	      transportÅ      ¢Ò„      error in the ajax: Ç    é:≈ﬁ      jsonValidateReturnÉ     Ñ6t*      ajaxErrorLengthÑ    B‘á"      existInarrayÖ   Jë‡      _checkInArrayÜ      •Çá$	      ajaxValidá      ñF*iu      wrong ajax response, are you on a server or in xampp? if not delete de ajax[ajaxUser] validating rule from your form à      ˆB      alertTextOkâ    ]\â3      passä   ˝ËS      validateã   ÜÑ˙
+      confirmFieldå   ˝K8Ω      startLengthç    }8Hè	      endLengthé      á—√‚      feildLengthè    ´õ∫e
+      alertText2ê     Ú!É«
+      alertText3ë     	a      nbCheckí    >7KÔ	      groupSizeì      Q∆ú°      ajaxSubmitExtraDataî    …tÏ      ajaxSubmitFileï     Á¨£	      serializeñ      >ü      cssó    ﬂue…      opacityò    ÷q1º      animateô    ∑…≈      heightö     e}ü      displayõ    ,Ω      noneú   çÕ”O      beforeù     ÕÃÜ      <div class='ajaxSubmit'>û   ≤‹∆      ajaxSubmitMessageü      ©è^      </div>†     E ◊¿      .ajaxSubmit°    HáíK      show¢   b{su      slow£   p$öQ      you are not going into the success fonction and jsonValidateReturn return nothing§      n≥:      errorNumber•    xtA      promptError¶    ı˛«Æ      unbindß     _Ä      ajaxed®     v\RÛ      deleteItself©   mêÅ      stop™   A˙B      divFormError´   ∏OÄ      document¨   DC      createElement≠      ú≥ÊŸ      divÆ    6_~å      formErrorContentØ   Bå|      addClass∞   EçoJ
+      greenPopup±     ¥Ia¬
+      blackPopup≤     òh;      body≥   ‹B-      append¥     !H	ß      arrowµ      ÙE%l      formErrorArrow∂     ´Ï7
+      bottomLeft∑     Ô^’      bottomRight∏    Áﬁçí      formErrorArrowBottomπ   ‘„X      html∫   kﬂzàK     <div class="line1"><!-- --></div><div class="line2"><!-- --></div><div class="line3"><!-- --></div><div class="line4"><!-- --></div><div class="line5"><!-- --></div><div class="line6"><!-- --></div><div class="line7"><!-- --></div><div class="line8"><!-- --></div><div class="line9"><!-- --></div><div class="line10"><!-- --></div>ª    kï›È      topLeftº    õæ‹K     <div class="line10"><!-- --></div><div class="line9"><!-- --></div><div class="line8"><!-- --></div><div class="line7"><!-- --></div><div class="line6"><!-- --></div><div class="line5"><!-- --></div><div class="line4"><!-- --></div><div class="line3"><!-- --></div><div class="line2"><!-- --></div><div class="line1"><!-- --></div>Ω    r11      callerTopPositionæ      $√Á      topø    âfªë      callerleftPosition¿     ı]á      left¡   Ò'l¥      callerWidth¬    ÎƒJ˚      width√      pAJë      inputHeightƒ    JÏGò      centerRight≈    e±>z      callerHeight∆   
+&*"      updateThisPrompt«   ˆ+      removeClass»    " f      .formErrorContent…      ¿·ÜK      \[      º”       \]À     ¸	“b      outsideÃ    iºxl      fadeToÕ     ˆï5û      fastŒ   õ“Å      closingPromptœ      ía
+      #debugMode–     cSÂÃ      <div id='debugMode'><div class='debugError'><strong>This is a debug mode, you got a problem with your form, it will try to help you, refresh when you think you nailed down the problem</strong></div></div>—   ')F®      .debugError“    ÅÒ      <div class='debugerror'>”   ¡A5      stopForm‘   hq      toValidateSize’     7ÑÉz      hasClass÷   ÈP5      validationPass◊     Ëá/      destinationÿ    ô<>í#      .formError:not('.greenPopup'):firstŸ    "˛ëN      .formError:not('.greenPopup')⁄      ¥‹yÜ      testDestination€    æÏ|Ω'      html:not(:animated),body:not(:animated)‹    ìGÎ	      scrollTop›      º €Ω      $.fn.validationEngine‡      €{      $.fn.validationEngine/<‚    ≠,—"      $.fn.validationEngine/</<Ù      ë»é8      submitForm/success/<ı   |      buildPrompt/<ˆ      `ô      closePrompt/<˜      ‰ÿ˝      submitValidation/<     .   ï  /   .          
+   Ô%,â                                                                                                                	                                                                                     
+                                                                                                                                                                                                                                                                                                                                                                                                 !      "           "                 #      $           $                 %                 &                '      (           (      (           )                 *                +      ,           ,      ,           -      ≥Oåc                         $ `  `ã  `á  `              Pã                                                P             9               9   ã               9   ã               9   ã               9   ã               9   ã                 ã                 ã                9                               9   4               9  `6  P7  P:  PS  P@  PB  PD  PR  PF  PP  PG  PI  PN  P  `ã  `á  `                             9   6               9  `6  Pg  P  `ã  `á  `             9   6  g              9   6  g  ◊ n               9  `6  Pg  P  `ã  `á  `                             x  Ä               x  PÖ  P  `ã  `á  `             ä               9   6  g               9  `6  Pg  P  `ã  `á  `             9  `6  Pg  P  `ã  `á  `             9  `6  Pg  P  `ã  `á  `             9  `  `ã  `á  `             x  Ä               x  P  `ã  `á  `                            9   7  0  ß  ™  Æ  ¥                              9   7  0  ß  ∆               9                9  `À                                               W              9   ”  P‘                ÷  ã                 ã   Ø¬0∞0      3      …           IÙ$KEÆ˙ö   <        	                      
+   2      +  $  5  '  V  X  T  ?    %  
+   2      	                     #    0  J     x  |  W          0  J     x  W       
+    ó  ô         æ  ¿  ó        ó          æ          ‹  á&’™ç!´!.   D      ∑¯QD                             m    ª   w ﬂ•@`FÄ LˇˇˇˇP	P  	ß^#  ®                        Ω  Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ¡   J   m   L   ﬂ¡   9   m   <   m   <   m	   <
+   m   <   m   <   m   <   m   <   m   <   m   <   m   <   L   ﬂ•û@`ï0G`*J\JiJÄ jJÄ °JÄ ÂJÄ ¸JÄ JÄ JÄ ê0Ä @PÄD  Ûçˇ¨4                 X      Ω  Œ   ﬂﬁÕ   ﬂ¡  J   ö)   ó   ∑   ¡  J   J       ﬂô$   ó   ¡  J   ·J   ‰   w ﬂó	   ª   ·J   ‰9   ª   <	   
+   <   <   <   <   <   <   <      <   <   m   <   m   <   ¡   s Œ   ﬂ¡  J   ¡   L   ﬂ¡  J   ª   Ä„  Å  L   ﬂ¡   J   öV  ó%   –   m   ≥   ﬂ¡  J   õ"  ó(   ∑       ﬂ¡  J   öv   ó,   ¡   æ   s ·J   ‰    s ·J!   ‰¡  J   m"   w ﬂ¡   æ   s ·J   ‰#   s ·J!   ‰$   m%   w ﬂôÄ   ó9   ¡   æ   s ·J   ‰&   s ·J'   ‰(   s ·J)   ‰¡  J   m*   w ﬂ¡   æ   s ·J   ‰#   s ·J)   ‰$   m+   w ﬂóH   ∑,    ,   ﬂóJ   ¡   Õ  ﬂ—óJ   ¡   J   ö?   óL   ¡  J   ·J-   ‰æ   ¡   s ö   óP   ¢ô   óP   ¢óP   ¡   æ   s ·J)   ‰.   m/   w ﬂ¡   0   s ·J!   ‰$   m1   w ﬂ•O`î `§ `ñ PI`%**&&&&&&*&**EPI`ï `î $PI`ñ "ê `î `,`î `ˇˇˇˇPP
+/
+"ˇˇˇŸP$`ˇˇˇˇPP7ˇˇˇÚP `ˇˇˇˇPPP
+
+"ˇˇˇŸP$`ˇˇˇˇPP7ˇˇˇÚPI"`°@.`î `ë $ˇˇˇÍP-`1D;1 `1DF5`ˇˇˇˇPˇˇˇÒPD?`PˇˇˇÛP4DPÄÄÄD     .  G  ˇˇˇˇ$   5õ9$                               • $   5õ9$                               • L   8.¥⁄L                          ﬁÕ   ﬂ¡   µ    æ   w ﬂ•
+`ˇˇˇˇPPÄÄÄL   †QŸL                          ﬁÕ   ﬂ¡   µ    æ   w ﬂ•
+`ˇˇˇˇPPÄÄÄL   †QŸL                          ﬁÕ   ﬂ¡   µ    æ   w ﬂ•
+`ˇˇˇˇPPÄÄÄL   †QŸL                          ﬁÕ   ﬂ¡   µ    æ   w ﬂ•
+`ˇˇˇˇPPÄÄÄ‡   ä´p‡   ö                         ¡  J   ¡  L   ﬂ¡  J   J   ù   ó   ﬂ¡  J   J   ó	   ö8   ó
+   ¡  J   L   ﬂ¡  J   ·J   ‰º  w ﬂô   ó   ¡  J   L   ﬂó   • `ï `ú )ü `ë `ë "ˇˇˇÒP `ñ@PÄ   åc¡A   ¡                       ﬁÕ   ﬂ¡  J   L   ﬂ¡  J   ¡   L   ﬂ¡  J   ·J   ‰æ   ¡   s ö?   ó	   ¡  J   ·J   ‰æ   ¡   s ö   ó   ¢ó   ô6   ó   ¡   J   ú   ó   ﬂ¡   ·J   ‰w  ó   ﬂ¢ó   •&`ë `ï `ë $ˇˇˇÍP/`ë ˇˇˇP$`A	ê0 `° P)`A	VÄÄÄ`   ¬/„`   '                        ﬁÕ   ﬂ¡   æ   s ·J   ‰ñ m   w ﬂ•&`ˇˇˇˇPˇˇˇÙPDPÄT   ˆ§®ÿT                           ﬁÕ   ﬂ¡   æ   s ·J   ‰w  ﬂ•&`ˇˇˇˇP
+P$PÄÄÄ  —ú6º  …                         ¡   J   ö)   ó   ∑   ¡   J   J       ﬂô$   ó   ¡   J   ·J   ‰   w ﬂó	   ∑   9   ª   <   	   <
+   <   <   <   <   <      <   <   m   <       ﬂ¡   J   ª   L   ﬂ• `î `§ `ñ PI`***&&&&&*&ê@`ï PÄ$   5õ9$                               • d  únd                   #       ¡   J   J   õ   ó   ¡   J   ·J   ‰w  ﬂó   ∑   ¡    º  s ·J   ‰   s     ﬂ∑   l       ﬂ∑	   ª   ·J
+   ‰ª   s  	   ﬂ∑   ª	   K    ﬂ∑   l       ﬂ∑   ª   ·J   ‰ª   s     ﬂ¡   J   ·J   ‰º  ª   s Õ   ﬂæ   ¢• `ô `ë PI`ˇˇˇ˛P
+P)`ê `ë ˇˇˇ˚P)`í `ê `ë ˇˇˇ˙P)`ë  ˇˇˇÏP(`$QÄ,  âœêj    '              ç      Ω  Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ 	  ﬂm   Œ 
+  ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm	   Œ   ﬂm
+   Œ   ﬂ   Œ   ﬂ¡   ¡   s ·J   ‰   s õf   ó   ¡  J   ·J   ‰   ¡   ¡   s ·J   ‰   s &   &¡   ¡   s ·J   ‰   s &w ﬂó   ¡   Œ   ﬂ∑       ﬂ¡   ¡   s ·J   ‰   s Œ   ﬂ¡  J   L   ﬂ¡  J   L   ﬂ∑   ¡   ¡   s ·J   ‰   s     ﬂ∑       ﬂò*   ª   ¡   J   ö  ó.   ¡   ª   K·   ü®   ó1   ·   üÚ   ó2   ·   üˇ   ó3   ·   ü  ó4   ·   ü#  ó5   ·   üS  ó6   ·    üe  ó7   ·!   üø  ó8   ·"   ü  ó9   ·#   ü+  ó:   †D  ó:   ¡   ¡   s ·J$   ‰s  õ4   ó>   ¡  J   ·J%   ‰¡   w ﬂ¡  J   J   ¢óC   ôÈ  óC   ¡    ¡   ¡   w ﬂôÀ  óD   ¡    ¡   ¡   ª   w ﬂô®  óF   ¡ 	   ¡   ¡   ª   w ﬂôÖ  óH   ¡  J   J&   õ#   óK   ¡    ¡   ¡   ª   w ﬂóM   ôD  óM   ¡    ¡   ¡   ª   w ﬂô!  óO   ¡    ¡   ¡   ª   w ﬂ∑'   ¡   ¡   s ·J   ‰   s  '   ﬂ¡   (   ª'   &)   &s Œ   ﬂô∂   óZ   ¡    ¡   ¡   ª   w ﬂ∑'   ¡   ¡   s ·J   ‰   s  '   ﬂ¡   (   ª'   &)   &s Œ   ﬂôK   óe   ¡    ¡   ¡   ª   w ﬂô(   óg   ¡ 
+   ¡   ¡   ª   w ﬂô   ói   ∑   ª   0(    ﬂô–¸ˇˇón   ¡    w  ﬂ¡  J   J   öÆ   ós   ∑*   ¡  J   ·J*   ‰¡   s  *   ﬂ¡   +   ª*   &s ·J,   ‰s  ö2   ó   ¡  J   ·J-   ‰¡   ¡   .   w ô(   óÇ   ¡  J   ·J/   ‰¡   ¡   w óÖ   ﬂô$   óÖ   ¡  J   ·J%   ‰¡   w ﬂóà   ¡  J   J   ö   óã   ¡  J   J   ô   óç   óç   ¢•ˇñ `K`ˇˇˇ˛P
+P`ë <ˇˇˇ˛P
+P
+ˇˇˇ˛P
+PˇˇˇôPI`+`,`ˇˇˇˇP	P)`ë `ë `ˇˇˇ˛P
+PI`fï `ˇ¿ `ˇˇˇ˛P
+
+P-`ë ˇˇˇÙP$`OÄ  F` `
+ˇˇˇ¯P$` `ˇˇˇÚP$` `ˇˇˇÚP$` `ô `ˇˇˇÚP ` `ˇˇˇÚP$` `ˇˇˇÚP$`ˇˇˇ˛P
+P)`ˇˇˇÔP)` `ˇˇˇÚP$`ˇˇˇ˛P
+P)`ˇˇˇÔP)` `	ˇˇˇÚP$` 	`
+ˇˇˇÚP$`@`ú07 `*`õ `ñ -ˇˇˇÙPI<`ˇˇˇ¯P
+P† -
+ˇˇˇÌPû MˇˇˇËPì 
+`ë ˇˇˇÙPIÄ  ˇ`∏ QÄÄÄ,         ∏  5  ‡   w*]‡   ò                          ¡      ¡   &   &s ·J   ‰s  ú,   ó   ﬂª      ù   ó
+   ﬂª      ó   ö;   ó   ¡      ¡   &   &s Œ   ﬂ¡  J   L	   ﬂó   • `ˇˇˇP
+!P¿ `ˇˇˇÔP)`ñ@PÄ  Á"]  '                 n       ∑   ¡   º  s ·J   ‰   s     ﬂª      ù,   ó   ﬂª      ù   ó   ﬂª      ó   öq   ó   ¡   º  s ·J   ‰s  õQ   ó   ¡  J   L	   ﬂ¡   ¡  J   J
+   J   º ª   KKJ      &&.Œ   ﬂó   ª      ù   ó    ﬂª      ó"   ö  ó#   ¡   º  s ·J   ‰   s Œ   ﬂ¡      ¡   &   &s ·J   ‰s  ö¡   ó-   ¡  J   L	   ﬂ¡      ¡   &   &s ·J   ‰s  öE   ó6   ¡   ¡  J   J
+   J   º ª   KKJ      &&.Œ   ﬂô@   ó?   ¡   ¡  J   J
+   J   º ª   KKJ      &&.Œ   ﬂóH   ª      öq   óK   ¡   º  s ·J   ‰s  õQ   óO   ¡  J   L	   ﬂ¡   ¡  J   J
+   J   º ª   KKJ      &&.Œ   ﬂóZ   ª      öÄ   ó]   ¡   º  s ·J   ‰   s ·J   ‰s  õQ   óc   ¡  J   L	   ﬂ¡   ¡  J   J
+   J   º ª   KKJ      &&.Œ   ﬂón   • `ˇˇˇ˛P
+P)`∆@`ˇˇˇ˛P
+
+P-`ë `ª@	`∞ `ˇˇˇ˛P
+PI`ˇˇˇP
+)P/`ë 	`ˇˇˇP
+!P/`¿ `ª@`ï `ˇˇˇ˛P
+
+P-`ë `ª@`ï `ˇˇˇ˛P
+P
+P-`ë `ª@!PÄ\  Ã`Æ_\    0              &       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ∏   ¡   ¡   &K»   ﬂ∏   ∫    ∫   J   J   J   ∫   KJ   z Ë·   »   ﬂ∫   ·J	   ‰∫    ¡   s ·J
+   ‰   s s õS   ó   ∫   J   L   ﬂ∏   ·ƒ   ∫   J   J   J   ∫   KJ      &&.»   ﬂó&   •∞ `ò `ü ˇˇˇ˚PN`ˇˇˇ˛P
+PˇˇˇÒP-`ë `Ω@PÄÄ»    7»   á                         ∑   º º &K    ﬂª   ¡   º  s ·J   ‰   s öL   ó
+   ¡  J   L   ﬂ¡   ¡  J   J   J   J   J	   
+   &&.Œ   ﬂó   • `î `ˇˇˇ˛P
+P.`ë `∂@P¯   Ãú7f¯   ∑                        ∑   º º &K    ﬂ∑   ¡  J   J   J   ª   KJ       ﬂª   ª   KÕ   ﬂæ   ö]   ó   æ    s  Õ  ﬂ¡  J   æ  L   ﬂ¡   ¡  J   J   J   ª   KJ	   
+   &&.Œ   ﬂó   • `î `™@`ê `ê `-`î `∑@
+PÄ  –{Ä  ı  0              I       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ∑   ¡   ¡   &K    ﬂ∑   ¡  J   J   J   ª   KJ       ﬂ∑   ¡   ¡   s ·J   ‰s      ﬂ∑	   ¡    	   ﬂ∑
+   ¡   ¡   s ·J   ‰   s  
+   ﬂ∑       ﬂ∑   ¡  J   J       ﬂ¡  J   J   J   ª   KJ   õ9   ó%   ∑   ¡  J   J   J   ª   KJ       ﬂô   ó-   ∑          ﬂó/   ª   õÖ   ó1   ¡  ·J   ‰9      <   ª   <   <      ª   &   &ª
+   &   &ª   &ª   &<   m   <   m   <   m    <!   w ﬂóI   •∞@`ò `™ `ˇˇˇ˛P
+
+P)`ê `ˇˇˇ˛P
+P)`,`ö@
+`© `¥ `ï@`/`%	*	*	&	+	J 	*JPIOPÄÄÄ8  Êk…ô8  €                  !        ¡  J   J   J   ª   KJ   ö∂   ó   ¡      ª   &   &s KõM   ó   ¡  J   ·J	   ‰ª
+   ¡  J   J   J   ª   KJ      s ¢ôH   ó   ¡  J   ·J   ‰ª
+   ¡  J   J   J   ª   KJ      w ﬂó!   • `©@`ˇˇˇ˜P/`ë &§ ˇˇˇÈPC		; `ë $§ ˇˇˇ‰PI		PÄÄÄd   Âﬂﬁ∆d   .                         ¡  J   ·J   ‰   º  J   &   &º &w ﬂ• `ë ˇˇˇ‘P7PÄÄ†  N®Í†  €                v       Ω  Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂm   Œ   ﬂ∫       ¡   &   &z Ë  Œ   ﬂ∏   ¡   J   K»   ﬂ∏   ¡   J   K»   ﬂ∏   ∫	    
+   ¡   J   K&s K»   ﬂ∏   ∫   »   ﬂ∏   ∫	   J   J   J   »   ﬂ∏   »   ﬂ∫      ö  ó#   ¡    w ﬂ∫   õq   ó&   ∫	   J   J   ∫   ∫   Ä„  Å Nﬂ∫	   J   J   ∫   K∫   Nﬂ∫	   J   J   ∫   KNﬂ∏   »   ﬂó<   ∫	   J   L   ﬂ∏   ·ƒ   ∫	   J   J   J   ∫   KJ      &&.»   ﬂ∫	   J   ·J   ‰∫   ∫      w ﬂôÏ   óQ   ¡    w ﬂ∫	   J   L   ﬂ∫   õ$   óW   ∫	   J   ·J   ‰   w ﬂó[   ∫	   J   J   J   ∫   KJ   öN   óc   ∫	   J   ·J   ‰∫   ∫	   J   J   J   ∫   KJ      w ﬂô0   óo   ∏   »   ﬂ∫	   J   ·J    ‰∫   w ﬂóv   •© `ˇˇˇˆP.`ò `ó `ˇˇˇ˙P+`ê `ü `L	`ï@
+`PD`/`† 6P%`ù `ô `ë@
+`ë `∏ `ë $ˇˇˇ‰P 	`P$	`ë ``ñ P)`© `ë $• ˇˇˇ‰P `,`ë ˇˇˇÙPI+P   /!ÒU‡   ò                        ∏   »   ﬂò   ∫   ∫   öu   ó   ∫   J   J   ∫   KK∫   ö1   ó   ∫   J   J   ∫   Kº  Nﬂ∏   »   ﬂó   ∏   ·ƒ   0(»   ﬂôˇˇˇó   • `fê `ó +ê `õ `ë@#`ù@PÄÄ             Ü   Ù   ¡ÇF”Ù   •                         ∑   º º &K    ﬂ¡   º  s ·J   ‰   s ¡      ª   &s ·J   ‰   s öL   ó   ¡  J   L   ﬂ¡   ¡  J   J   J   J	   J
+      &&.Œ   ﬂó   • `î@`ˇˇˇˇP	Pˇˇˇ˙PP.`ë `∂@P‹  `‹˛ﬂ‹  r  0              ;       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ∏   ∫    ¡   ¡   &Kz ËU  »   ﬂ∏   ∫    ¡   ¡   &Kz ËV  »   ﬂ∏   ∫    ¡   s ·J   ‰   s J   »   ﬂ∫   ∫   ù   ó   ﬂ∫   ∫   ó   öú   ó   ∫   J	   L
+   ﬂ∏   ·ƒ   ∫   J	   J   J   J   J   ∫   &∫   J	   J   J   J   J   &∫   &∫   J	   J   J   J   J   &   &&.»   ﬂó;   •∞@`ˇˇˇ˚P.`ˇˇˇ˚P.`ˇˇˇ˛P
+PN`ñ ï `ë `© Gü :
+≤@
+PÄÄÄÑ  ˙Ç+Ñ  !  0              *       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ∏   ∫    ¡   ¡   &Kz Ë`  »   ﬂ∏   ∫    ¡   s ·J   ‰   s »   ﬂ∏   ∫       ∫   &	   &s ·J
+   ‰s  »   ﬂ∫   ∫   öc   ó   ∫   J   L   ﬂ∫   J   L   ﬂ∏   ·ƒ   ∫   J   J   J   J   J      &&.»   ﬂó*   •∞@`ˇˇˇ˚P.`ˇˇˇ˛P
+P)`ˇˇˇÔP
+)P)`ê `ë `ë `º@
+PÄº  Ê(Æ≥º  R  0              5       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ∏   ∫    ¡   ¡   &Kz Ëk  »   ﬂ∏   ∫    ¡   s ·J   ‰   s »   ﬂ∏   ∫       ∫   &	   &s ·J
+   ‰s  »   ﬂ∫   ∫   öî   ó   ∫   J   L   ﬂ∫   J   L   ﬂ∏   ·ƒ   ∫   J   J   J   J   J      &∫   &   &∫   J   J   J   J   J   &   &&.»   ﬂó5   •∞@`ˇˇˇ˚P.`ˇˇˇ˛P
+P)`ˇˇˇÔP
+)P)`ê@`ë `ë `Ø P≤@PÄÄê  ÿ{n‡ê  ı                ;       Ω  Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ¡  J   J   J   ö„   ó   ¡  J   J   J   ö.   ó   ∑   ¡  J   J   J       ﬂô   ó   ∑          ﬂó   ¡  ·J   ‰9   	   <
+   ¡  J   J   J   <   <   ¡   ¡   s ·J   ‰s     &ª   &<   m   <   m   <   w ﬂ¢ó#   ¡  J   J   ·J   ‰s  õ≥   ó(   ¡  J   J   J   öã   ó,   ¡  J   J   J   ö(   ó0   ¡   ¡   s ·J   ‰   w ﬂó3   ¡  J   J   J   ú$   ó7   ﬂ¡  J   J   ·J   ‰w  ó;   ﬂ¢ó;   ô   ó;   ¢ó;   ¢•û `û `û `© `ï@`%*ô &ˇˇˇ˛P
+
+P	+*JPD)`A6F,`ñ P-	`û 	`û +`ˇˇˇˇP	P)`µ CP)`A6ê02 `A6F5`!QÄÄd   åK%d   .                         ¡  J   ·J   ‰   º  J   &   &º &w ﬂ• `ë ˇˇˇ‘P7PÄÄp  eñÏ™`  æ                B      Ω  Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ¡      ö]   ó   ∫    ∫   s ·J   ‰   w ﬂ∫    ∫   s ·J   ‰9   <   <   m	   w ﬂô7  ó   ∫
+       ¡   &   &z Ëí  Œ   ﬂ¡   J   õ$   ó   ∫   J   ·J   ‰   w ﬂó   ∏   ¡   J   J   »   ﬂ∏   »   ﬂò    ∫   ∫   öû   ó$   ∏   ¡   J   ∫   KK»   ﬂ∏   ¡   J   ∫   KK»   ﬂ∏   ¡   J   ∫   KK»   ﬂ∫   J   ·J   ‰∫   ∫   ∫   w ﬂ∏   ·ƒ   0(»   ﬂôVˇˇˇóB   •û `ï 
+`ˇˇˇˇPê 	P$
+`ˇˇˇˇP
+ˇˇˇﬂP> 
+`ˇˇˇˆP.`î `ñ PI
+`ö `	fê `ù `ù `û `ë ˇˇˇ‡PD*`ù@PÄÄÄp         	  Ø   d  å6ÁYd  ˘                  '        ∫    ∫   s ·J   ‰      w ﬂ∫    ∫   s ·J   ‰   ∫   J   J	   J
+   &   &w ﬂ∫   J   ·J   ‰   w ﬂ∫       s ·J   ‰   w ﬂ∫   J   J	   J   öJ   ó   ∫   J   J	   J   ú$   ó"   ﬂ∫   J   J	   ·J   ‰w  ó'   ﬂ¢ó'   • `ˇˇˇˇPî 	P$`ˇˇˇˇP
+õ ˇˇˇﬁP$`ó P$`PP$`û 	`µ CP)	`A	
+VÄÄÄ¯  pEª¯  °                È       ¡   J   J   õ   ó   ¡   J   ·J   ‰w  ﬂó   ∑      ¡    º  s ·J   ‰   s &   &    ﬂ¡    ª   s Kö<   ó   ¡    ª   s ·J	   ‰w  ﬂ¡    ª   s ·J
+   ‰w  ﬂó   ª   ·J   ‰   s Õ   ﬂª   ·J   ‰   s Õ  ﬂ∑   ¡   J   ·J   ‰º  s     ﬂ¡    æ   s ·J   ‰   w ﬂº    ö'   ó)   ¡    æ   s ·J   ‰   w ﬂó,   º    ö'   ó.   ¡    æ   s ·J   ‰   w ﬂó1   º ö'   ó2   ¡    æ   s ·J   ‰   w ﬂó5   ¡    æ   s ·J   ‰ª   w ﬂ¡    æ  s ·J   ‰   w ﬂ¡       s ·J   ‰æ   w ﬂ¡    æ   s ·J   ‰æ  w ﬂ¡   J   J   öp  óF   ª   ·J   ‰   s Õ  ﬂ¡    æ  s ·J   ‰   w ﬂ¡    æ   s ·J   ‰æ  w ﬂ¡   J   J   J      ù%   óT   ﬂ¡   J   J   J      óX   öD   óY   ¡    æ  s ·J   ‰   w ﬂ¡    æ  s ·J   ‰   w ﬂó_   ¡   J   J   J       ù%   ód   ﬂ¡   J   J   J   !   óh   öC   ói   ¡    æ   s ·J   ‰æ  w ﬂ¡    æ  s ·J   ‰"   w ﬂóo   ¡    æ  s ·J   ‰º w ﬂ∑#   ¡    º  s ·J$   ‰s  J%    #   ﬂ∑&   ¡    º  s ·J$   ‰s  J'    &   ﬂ∑(   ¡    º  s ·J)   ‰s   (   ﬂ∑*   ¡    æ   s ·J+   ‰s   *   ﬂ¡   J   J   J   !   ö?   óç   ∑&   ª&   ª(   '&. &   ﬂ∑#   ª#   ª*   
+'&. #   ﬂóö   ¡   J   J   J       ö%   óü   ∑#   ª#   ª*   
+'&. #   ﬂó¶   ¡   J   J   J   ,   ö$   ó´   ∑&   ª&   ª(   &&. &   ﬂó±   ¡   J   J   J      öT   ó∂   ∑-   ¡    º  s ·J+   ‰s   -   ﬂ∑&   ª&    &   ﬂ∑#   ª#   ª-   && #   ﬂóƒ   ¡   J   J   J      ö_   ó…   ∑-   ¡    º  s ·J+   ‰s   -   ﬂ∑&   ª&   ª(   '&. &   ﬂ∑#   ª#   ª-   &&. #   ﬂó⁄   ¡    æ   s ·J.   ‰9/   ª#   <%   ª&   <'   <0   w ﬂ¡    æ   s ·J1   ‰92   
+◊£p=
+◊Î?<0   m3   s ¢• `ô `ë PI`
+ˇˇˇ˛P
+Pê@`ˇˇˇˇP/`ˇˇˇˇP
+P$`ˇˇˇˇP
+PI
+`ë 	P(`ë 	P(`ñ -ˇˇˇÙP)`ˇˇˇˇPPD`ì `ˇˇˇˇPP)`ì `ˇˇˇˇPP)`	`ˇˇˇˇPPI`ˇˇˇˇP
+ˇˇˇ˜P$`ˇˇˇˇPPD`P
+ˇˇˇ˘P$`ˇˇˇˇP
+ˇˇˇ˘PD`õ `ë 	P(`ˇˇˇˇPP$`ˇˇˇˇP
+ˇˇˇ˘P$`Œ `ˇˇˇˇPP$`ˇˇˇˇPPI!`Œ `ˇˇˇˇP
+ˇˇˇ˘P$`ˇˇˇˇPPI&`ˇˇˇˇP
+ˇˇˇ˚PD(`ˇˇˇ˛P
+
+P.`ˇˇˇ˛P
+
+P.`ˇˇˇ˛P
+
+P)`ˇˇˇ˛P
+PI.`§ :`ö (`
+ñ `§ :`
+ñ@1`§ >`ü@3`§ `ˇˇˇ˛P
+
+P)`ê `
+(î@8`§ `ˇˇˇ˛P
+
+P)`ö `ü@=`ˇˇˇˇP
+%**F=PDB`	ˇˇˇ˛P
+ˇˇˇÁP#QÄ,   ∆öw,                              ¢• `QÄÄ$  6t$                  d       ∑   ¡   J   ·J   ‰º  s     ﬂ   ª   &Õ   ﬂº    ö,   ó	   ¡    æ   s ·J   ‰   w ﬂô'   ó   ¡    æ   s ·J   ‰   w ﬂó   º    ö,   ó   ¡    æ   s ·J   ‰	   w ﬂô'   ó   ¡    æ   s ·J   ‰	   w ﬂó   º ö,   ó   ¡    æ   s ·J   ‰
+   w ﬂô'   ó   ¡    æ   s ·J   ‰
+   w ﬂó   ¡    æ   s ·J   ‰   s ·J   ‰º w ﬂ∑   ¡    º  s ·J   ‰s  J       ﬂ∑   ¡    æ   s ·J   ‰s      ﬂ¡   J   J   J      ù%   ó3   ﬂ¡   J   J   J      ó7   öD   ó8   ∑   ¡    º  s ·J   ‰s      ﬂ∑   ª   ª   &&    ﬂóC   ¡   J   J   J      ö$   óH   ∑   ª   ª   &&.    ﬂóN   ¡   J   J   J      ù%   óS   ﬂ¡   J   J   J      óW   ö#   óX   ∑   ª   ª   '
+'    ﬂó^   ¡    æ   s ·J   ‰9   ª   <   w ﬂ•@`ñ -ˇˇˇÙP)`K`ì `ˇˇˇˇPP`ˇˇˇˇPP)`ì `ˇˇˇˇPP`ˇˇˇˇPP)`
+`ˇˇˇˇPP`ˇˇˇˇPPI	`ˇˇˇˇPP
+ˇˇˇ˚P$`ˇˇˇ˛P
+
+P.`ˇˇˇ˛P
+PI`Œ `ˇˇˇ˛P
+
+P)`
+)î@`§ ?`ü `Œ `
+(î@`ˇˇˇˇP
+
+ˇˇˇˆP$PÄÄÄ»   çMöÛ»   {                         ∑   ¡    º  s ·J   ‰   s    &    ﬂ∑   ª   ·J   ‰l      s     ﬂ∑   ª   ·J   ‰l      s     ﬂª   ¢• `ˇˇˇ˛P
+P/`ë "
+ˇˇˇ¯P)`ë "
+ˇˇˇ¯P)`%Qå  ˝°aå  	  	                      Ω  Œ   ﬂ¡  J   J   õ   ó   ¡  J   ·J   ‰w  ﬂó   º ö0   ó   ¡   ¡   s ·J   ‰   m   w ﬂ¢ó   ª    ö   ó   ∑       ﬂó   ª   õh   ó   ∑   ¡  J   ·J   ‰¡   s     ﬂ∑	   
+   ª   & 	   ﬂ¡   ª	   s ·J   ‰   m   w ﬂó    •)`ô `ë PI`-`ˇˇˇˇPê ˇˇˇPD`AF
+`ë #`ë `/`ñ -ˇˇˇÙP)`
+,`ˇˇˇˇPê  ˇˇˇPIPÄÄÄL   °è”0L                             ¡   ¡   s ·J   ‰w  ﬂ• `ˇˇˇˇP
+	P$PL   ‚NâL                             ¡   ª   s ·J   ‰w  ﬂ• `ˇˇˇˇP
+P$P¨   *S¨   f                         ¡       s Kõ(   ó   ¡       s ·J   ‰   w ﬂó   ¡       s ·J   ‰   º  &   &w ﬂ• `P/`P	PI`P
+
+ˇˇˇﬁP$PÄÄ‹  3‰•|Ã                  D      Œ   ﬂ¡  J   L   ﬂ¡   º  s ·J   ‰   s ·J   ‰w  ﬂ¡   º  s ·J   ‰   s ·J   ‰s  Õ   ﬂ¡   º  s ·J   ‰   s ·J   ‰m	   w ﬂ∑
+   ¡  J   J   J    
+   ﬂ∑       ﬂò   ª   ª
+   öZ   ó   ¡  J   J   ª   KKö   ó$   ¡  J   L   ﬂó&   ∑   ª   0(    ﬂôöˇˇˇó+   ¡   ù   ó,   ﬂ¡  J   J   ó/   ö•   ó0   ¡  J   J   J   ö{   ó4   ∑   ¡      s ·J   ‰s  J       ﬂ¡      s ·J   ‰m   w ﬂ¡      s ·J   ‰9   ª   <   Lw ﬂóD   ¢ô   óD   ¢óD   • `'`ë `ˇˇˇˇP	P
+P$`ˇˇˇˇP	P
+PH`ˇˇˇˇP	P
+ˇˇˇ˚PD`ü `fê `£ `ñ@`ú@`ê ü `û `ê P
+)P.`P
+'ˇˇˇ˚PD`P
+4ˇˇˇˆPI`A#;  `A#VÄÄ‹         æ   k   ¯   º:‘¯   ¢                        ﬁÕ  ﬂ∑   ¡  J   ·J   ‰æ  s     ﬂ¡      ª   &s ·J   ‰   s õP   ó   ¡  J   ·J   ‰æ  s Õ   ﬂæ   ö   ó   Œ   ô   ó      ó   ¢ó   •&`ñ -ˇˇˇÙPI`ˇˇˇ˙PP-`ë "ˇˇˇÒP(`®@6 P∏   ≈ ¥F∏   o                        ﬁÕ   ﬂ∑   ¡   æ   s ·J   ‰s  J       ﬂª   ª   ö1   ó
+   ∑   ¡   æ   s ·J   ‰s  J       ﬂó   •&`ˇˇˇ˛P
+P.	`ê `ˇˇˇ˛P
+Pì@PÄ3ıÿ  `  `  `     "  #  $    `  `	  `
+  `  `   #    %  '      `*    `)    p  `                  @  
+  	                      p    p    Ä      `	  p  ∞         p      p           p  p!  %  &  
+  p(    p  `  `               @  ,  	                    p    `     +  -  .  A   /     P1  °   2  ≤    P€  ﬁ  5    `K  L  ¯  <  Y  Z  [     ;    `<  .  0  \  ]  ^  >     &      i  _  `  Y  Z  {  K  a  ¯  L  b  c  d  e  ∞   f    `h  ≤  †   $         i    .  P  &  7  _  `    `j  .  P     &      ÷  _  `    `h  k         l  m  &  _  `    `       o  }  U  t  ~  V  s    X    `     Å         `x  É  $       t  Ñ    `  p†   (  )  u  Ç  o  s  $  #  t  É       I  Ñ  ®   Ä  Ü  7      _  `  X  ê     á  à  â  9  ?    `o  p         q  r  >  s  t  .  ç 9  u  &  v  ê   E    @w  0  J     y  z  {  x    p|    pW    p    `ã  .  P  #     &      O  _  `    `å  †   ç  é  $  .  P  I     &  7      _  è  ê  `    `ë  †   J  $  .  {  í  K  a  ¯     ;  &  7      H  _  `    `ë  †   J  $  .  {  í  K  a  ¯     &  ;  7      M  _     è  `    `  p  p  p  p  p  p  p  p  p  pê   .  ç      8  {     A   9  &  ;  <  0  i  I  =  ÷  A  C  E  H  M  O  Q  >  ?  #  J  K  L  T  U  ¯  V  W  X  !  `     Å       #  `$  9   ñ  ö  õ  ú  ù       û  ü  ?  (  †  °  ¢    "  `-  $  9   ñ  ó  ò    @ô  "  p†   (  )  Ç       £  §  I    t  •  0  V     `       ì  v  ê   E    @w  0  î  J     ï  &  x     pW  !  p      ¶  &  %  `$  `     +  ®  .  .  ç ~  ©  *  ´  ¨  ≠  T  Ø  â  ∞    ±  ß  Æ  ≤  ≥  ;  µ    ∂  ∑  ∏  π  ∫  ª    º  Ω  •  æ  ø  ¿  ¡  ¬  √  ô  ƒ  ≈  ñ    @ó  ò    @$  p&  `T     .  â  Ø  ∞  «    ±  ß  ∞   »  π  Ω  •  æ  √  ô      ∂  ∑  ≈  ƒ  ø  ¡  ª    ò    @'  `T  .  ç ~  ⁄    Pê     P)  `*  *  `Œ  *  (  `     +  Ã  Õ  (  p9  T  Œ  .  )  p+  `œ  ≤  ≥  –  —  “  ü  -  `T     .  ’  ß  $  ê   .  `⁄  •  æ  ◊  ,  `   Ü  ∞   (  *    ¯  å   ,  pÉ    I  x      ◊  ÿ  •  æ  Ÿ  -  p€  ò  	  @‹    `◊   p     @  p+    p$    p5    p'  #  pV  %  pX  &  pT  '  p?  *  p  +  p%     `  p  ˇXÑí                y                  2   ›                                           ‡        	      ‡        
+      ‡              ‡                            ‡              ‡              ‚        K      +        J              `      $        c  0   5        q   
+   S        {      @        ó      B        ß      D        ≤      R        ˘   "   F        Ω      |               W        ÿ   !           –      Ö             P        '     G        9     I        M     N        √     '        ì     W        ´             ô     Ù        ›  4   V        ‹     ı             X        0  	   T        >     ?        9     ˆ        ;     ˆ        J             _     %        R     ˜        Z     ˜        ùH©¿      oa      oa                Ç.m  ea  e  ea     
+          Çò  }  ê  }     "            %  *    *  !                A  F  9  F  "               I  f  A  f  +   f           ¥  “  ¨  “  ,   L           L  j  D  j  .   m           ∏  ÷  ∞  ÷  /   L              i	  ˇ  i	  3              b
+  Ò  Z
+  Ò  D   !            y    y  N   '            U  s  M  s  O               ≥  l  ´  l  U               2  7  *  7  e                â  /  Å  /  i             Ç.J  +;  B  +;  v               r  Ï  `  Ï  ∂                   Ø     Ø   Ω             É.»   *"  ≥   *"  ﬂ               D"  X#  ."  X#  Ë               r#  %  `#  %               Ç.0%  ™3  "%  ™3  ˚               Ö(  ö*  }(  ö*                 ¥*  +  ¨*  +              É.*+  í3  "+  í3                Ç2  â3  k2  â3  >              ø3  Ï4  Æ3  Ï4  K            É. 5  	7  4  	7  S            É."7  »8  7  »8  ^            É.·8  €:  Ã8  €:  i            Ç.D;  bD  <;  bD  w              €<  8=  ”<  8=  É            É.S=  ïB  K=  ïB  Ñ              >  Ù?  ˇ=  Ù?  á  =            |D  ƒQ  tD  ƒQ  Æ              ≠Q  ΩQ  •Q  ΩQ    ;             „Q  W  €Q  W  Ú              "W  ‹W  W  ‹W  	            ÄˆW  Z  ÓW  Z                ªX  ›X  ≥X  ›X    &             ÿY  Z  –Y  Z    -              Z  {[  Z  {[  "            Äù[  _a  ï[  _a  (             «\  ^  ø\  ^  .  4            4`  ∆`  ,`  ∆`  ?  5           5°›'Ò‘CfæHág      g¯ﬁ˚g¯ﬁ˚Hıg¯Âw   _    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/jquery.validationEngine.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:08:01 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|f4b9b826-8db4-81d5-001f-25c6ad874df2|
+Accept-Ranges: bytes
+ETag: W/"24943-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 24943
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:08:01 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|f4b9b826-8db4-81d5-001f-25c6ad874df2|
+Accept-Ranges: bytes
+ETag: W/"24943-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 24943
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=92
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 414 net-response-time-onstop 414 alt-data 1;24943,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  HV

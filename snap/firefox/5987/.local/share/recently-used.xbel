@@ -93,4 +93,54 @@
       </metadata>
     </info>
   </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/WhatsApp_Image_2022-11-02_at_13.35.36.jpeg" added="2025-04-11T09:21:25.993129Z" modified="2025-04-11T09:21:25.993143Z" visited="2025-04-11T09:21:25.993131Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/jpeg"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-04-11T09:21:25.993136Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/WhatsApp_Image_2022-11-02_at_13.35.37.jpeg" added="2025-04-11T09:21:31.079035Z" modified="2025-04-11T09:21:31.079047Z" visited="2025-04-11T09:21:31.079037Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/jpeg"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-04-11T09:21:31.079040Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/WhatsApp_Image_2022-11-02_at_13.35.37(1).jpeg" added="2025-04-11T09:25:55.157028Z" modified="2025-04-11T09:25:55.157034Z" visited="2025-04-11T09:25:55.157029Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/jpeg"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-04-11T09:25:55.157031Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/Deepu%20sign.pdf" added="2025-04-11T09:31:16.176803Z" modified="2025-04-11T09:31:16.176826Z" visited="2025-04-11T09:31:16.176805Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="application/pdf"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-04-11T09:31:16.176815Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
+  <bookmark href="file:///home/student-devops/Downloads/WhatsApp_Image_2022-11-02_at_13.35.34_(1).jpeg" added="2025-04-11T09:33:49.081963Z" modified="2025-04-11T09:33:49.081968Z" visited="2025-04-11T09:33:49.081964Z">
+    <info>
+      <metadata owner="http://freedesktop.org">
+        <mime:mime-type type="image/jpeg"/>
+        <bookmark:applications>
+          <bookmark:application name="Firefox" exec="&apos;firefox_firefox %u&apos;" modified="2025-04-11T09:33:49.081965Z" count="1"/>
+        </bookmark:applications>
+      </metadata>
+    </info>
+  </bookmark>
 </xbel>

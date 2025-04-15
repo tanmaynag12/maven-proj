@@ -1,0 +1,1749 @@
+/**
+ * @author vimal kr.
+ * @since 13 Oct 2012
+ */
+
+var gExtensionArray = ['doc','docx','xls','xlsx','xlsm','pdf','jpg','text','png','gif','ppt','zip','r'];
+var gCategoryType = '';
+
+var gjArrTextDocument = new Array();
+var gjArrUploadedDocument= new Array();
+var gNodeId='';
+var gExtraData = {};
+function UploadDocument(){
+	this.elementId = '';
+	this.categoryId = '';
+	this.barcode = ''; //optional parameter
+	this.tags = '';
+	this.subjectName = '';
+	var fileSize = AllowedFileSize.EXCELSHEET_UPLOAD;
+	var fileType = gExtensionArray;
+	var elementId = '';
+	this.init = function(jObject,callback){
+		if(jObject == undefined){
+			jAlert('Object is undefined');
+			return undefined;
+		} else {
+			try{
+				this.elementId = jObject.elementId;
+				elementId = jObject.elementId;
+				this.categoryId = jObject.categoryId;
+				this.barcode = jObject.barcode;
+				this.tags = jObject.tags;
+				this.subjectName = jObject.subjectName;
+				if(this.elementId == undefined || this.elementId == '' || this.categoryId == undefined || this.categoryId == '' || this.categoryId == 'null' || this.categoryId == 'undefined'){
+				    jAlert('Error: Undefined parameters categoryId and elementId. These parameters are mandatory');
+					return null;
+				}	
+				
+				if(jObject.fileSize == undefined || isNaN(jObject.fileSize)){
+					fileSize = AllowedFileSize.EXCELSHEET_UPLOAD;
+				} else {
+					fileSize = jObject.fileSize;
+				}
+				
+				if(jObject.caption == undefined || jObject.caption == ''){
+					uploadButtonCaption = 'Upload';//Upload Document
+				} else {
+					uploadButtonCaption = jObject.caption;
+				}
+				
+				if(jObject.fileType != undefined){
+					if(typeof jObject.fileType != 'array' && typeof jObject.fileType != 'object' ){
+						jAlert('File type parameter must be an Array');
+						return null;
+					} else
+						fileType = jObject.fileType;
+				}
+				
+			} catch(e){
+				alert(e);
+				return null;
+			}
+		}
+		paintBoiler(this.elementId,this.categoryId,function(){
+			$('.uploadButtonLabel').text(uploadButtonCaption);
+			$(document).ready(function(){
+				var fileElementId = 'txtUploadDocument-'+jObject.elementId+'-'+jObject.categoryId+'';
+				new AjaxUpload(fileElementId,{
+					action : 'uploadDocument.json',
+					name : 'fileData',
+					timeout:60000,
+					size:fileSize,
+					data:{},
+					onSubmit : function(file, extension) {
+						$('#'+fileElementId).attr('disabled','disabled');
+						
+						if ($.inArray(extension.toString().toLowerCase(),fileType) != -1 || fileType=='ALL') {
+							$('#elementId').find('div.preview').addClass('loading');
+							var arrayToSend = {};
+							arrayToSend["categoryId"] = jObject.categoryId;
+							arrayToSend["fileSize"] = fileSize;
+							if(jObject.onUpload != undefined){
+								if (false === jObject.onUpload.call(this)){
+									return false;
+								}
+								for (var prop in gExtraData) {
+					                if (gExtraData.hasOwnProperty(prop)){
+					                	arrayToSend[prop] = gExtraData[prop];
+					                }
+							    }
+							}
+							
+							this.setData(arrayToSend);
+							return true;
+						} else {
+							jAlert('File type is not valid ! Please upload only <strong>&nbsp;'+fileType.join(', ')+'&nbsp;<strong> files');
+							$('#'+fileElementId).removeAttr('disabled');
+							return false;
+						}
+					},
+					onComplete : function(file, response) {
+						$('#'+fileElementId).removeAttr('disabled');
+						try{
+							response = eval('('+response+')');
+							$('#elementId').find('div.preview').removeClass('loading');
+							if(response[0].responseFlag == '1'){
+								callback(response[1]["eDocId"]);
+							} else {
+								throw response[0].responseText;
+							}
+						} catch (e){
+							jAlert(e);
+						}
+					}
+				});
+			});
+		});
+
+	};
+
+	this.getDocument = function(categoryId,callback){
+		return new Promise(function(resolve, reject){
+
+
+
+			if(categoryId == undefined || categoryId == '' || categoryId=='null' || categoryId=='undefined'){
+				//jAlert('Error: define category id');
+				reject('Category not found!');
+				return null;
+			}		
+			try{
+				gNodeId=categoryId;
+				$.ajax({
+					url:'getUploadedDocumentAjax.json?categoryid='+categoryId,
+					dataType:'json',
+					async:callback==undefined,//false
+					success:function(jArray){
+
+						var jsonArray = new Array();
+						for(var i = 0; i < jArray.length ; i++){
+							var documentObj = new GemsDocument();
+							documentObj.categoryId = jArray[i]['categoryId'];
+							documentObj.eCatId = jArray[i]['eCatId'];
+							documentObj.catName = jArray[i]['catName'];
+
+							documentObj.documentName = jArray[i]['name'].gemsDecode();
+							documentObj.name = jArray[i]['name'].gemsDecode();
+							documentObj.hasProfileImage = jArray[i]['hasProfileImage'];
+							documentObj.gender = jArray[i]['gender'];
+							documentObj.sharedStatus = jArray[i]['sharedStatus'];
+							documentObj.documentId = jArray[i]['documentPathId'];
+							documentObj.eDocId = jArray[i]['eDocPathId'];
+							documentObj.creationDate = jArray[i]['creationDate'];
+							documentObj.ownerEmployeeId = jArray[i]['ownerEmployeeId'];
+							documentObj.extension = jArray[i]['extension'];
+							documentObj.type = jArray[i]['extension'];
+							documentObj.isTemporary = false;
+							documentObj.description = jArray[i]['description'];
+							documentObj.documentBody = jArray[i]['documentBody'];
+							documentObj.createdAt = jArray[i]['createdAt'];
+							jsonArray.push(documentObj);
+						}
+						gjArrUploadedDocument=jArray;
+						if(callback!=undefined)
+							callback(jsonArray);
+						resolve(jsonArray);
+					},
+					error:function(){
+
+					}
+
+				});
+			} catch(e){
+				alert(e);
+				reject(e);
+			}
+		});
+	};
+
+	/** Showing document as in dms look*/
+
+	this.showDocument = function(jsonObject,callback) {
+
+		var gFileId = 1;
+		if(jsonObject == undefined){
+			jAlert('Error: Parameter expected!');
+			return; 
+
+		}  else {
+			try{
+				
+
+				if(jsonObject.elementId == '' || jsonObject.documentList == undefined){
+					if(jsonObject.elementId == ''){
+						jAlert('Error: Required parameter "elementId" is mission');
+						return null;
+					}
+					if(jsonObject.documentList == undefined) {
+						jAlert('Error: Required parameter "documentJArray" is mission');
+						return null;
+					}
+				} else {
+					var jArray = jsonObject.documentList;
+					if (jArray.length > 0) {
+						var attachementBoiler = "<table class = 'table'>";
+						for ( var i = 0; i < jArray.length; i++) {
+							var attachmentFileName = jArray[i]["name"].toString();
+							var documentId = jArray[i]["documentId"];
+							var eDocId = jArray[i]["eDocId"]!=undefined?jArray[i]["eDocId"]:jArray[i]["documentId"];
+							var isTemporary = jArray[i]["isTemporary"];
+
+							var trId = 'trAttachmentFile-' + eDocId;
+
+							var fileType = jArray[i]["type"];
+							iconPath = gFileTypeIconMapping[fileType];
+							if (!isTemporary) {
+								var downloadLinkTmp = (juno.label['a.download.json'].setIndexedArgs((eDocId), "UPLOADED", encodeURIComponent(attachmentFileName), attachmentFileName));
+								attachementBoiler += '<tr id = "'
+										+ trId
+										+ '"><td><img src="'
+										+ iconPath
+										+ '" />&nbsp;&nbsp;&nbsp;&nbsp;'+downloadLinkTmp+'</td>';
+								if (true) {
+									attachementBoiler += '<td><img style = "cursor:pointer" title = "remove" src = "img/remove-icon.png" onclick = "deleteUploadedDMSDocument(this,\''
+											+ eDocId + '\')" /></td>';
+								}
+								attachementBoiler += '</tr>';
+							} else {
+								attachementBoiler += '<tr id = "'
+										+ trId
+										+ '"><td><img src="'
+										+ iconPath
+										+ '" />&nbsp;&nbsp;&nbsp;&nbsp;<a href = "javascript:void(0);">'
+										+ attachmentFileName
+										+ '</a></td><td><img style = "cursor:pointer" title = "remove" src = "img/remove-icon.png" onclick = "deleteUploadedCV(\''
+										+ eDocId
+										+ '\')" />&nbsp;&nbsp;&nbsp;&nbsp<img src = "img/unsaved.png" title = "Unsaved"/></td></tr>';
+							}
+						}
+						attachementBoiler += "</table>";
+						if (jsonObject.elementId == undefined)
+							$('#uploadedDocList').html(attachementBoiler);
+						else
+							$('#' + jsonObject.elementId).html(attachementBoiler);
+					} else {
+						$('#' + jsonObject.elementId).html('No document uploaded!!!');
+					}
+			}	
+			
+			} catch(e){
+				alert(e);
+				return null;
+			}
+		}
+
+
+	};
+	
+	this.setData= function(data){
+    	gExtraData = data;
+    };
+    
+    this.getAllUserRootFolder = function(typeArray,parentType,callback) {
+    	$.ajax({
+    		url:'getDocumentCategoriesForHome.json?categoryPath=undefined&typeArray=undefined&parentType='+parentType+'&root=undefined',
+    		dataType:'json',
+    		beforeSend: function() {
+    			$('.ulDMSCourseFileAttachmentTree').html('<div class="preview-large"></div>');
+    			$('.ulDMSCourseFileAttachmentTree').find('.preview-large').addClass('loading-large');
+    		},
+    		complete: function() {
+    			$('.ulDMSCourseFileAttachmentTree').find('.preview-large').removeClass('loading-large');
+    		},
+    		success:function(jArray){
+    			callback(jArray);
+    		},
+    		error:function(){
+    		}
+    	});
+    };
+    
+    this.getAllUserRootFolderforHome = function(typeArray,parentType,callback) {
+    	$.ajax({
+    		url:'getDocumentCategoriesForHome.json?categoryPath=undefined&typeArray=undefined&parentType='+parentType+'&root=undefined',
+    		dataType:'json',
+    		beforeSend: function() {
+    			$('.ulDMSCourseFileAttachmentTree').html('<div class="preview-large"></div>');
+    			$('.ulDMSCourseFileAttachmentTree').find('.preview-large').addClass('loading-large');
+    		},
+    		complete: function() {
+    			$('.ulDMSCourseFileAttachmentTree').find('.preview-large').removeClass('loading-large');
+    		},
+    		success:function(jArray){
+    			callback(jArray);
+    		},
+    		error:function(){
+    		}
+    	});
+    };
+    
+    this.getFilesForCourseFileAttachment = function(categoryId,callback){
+    	$.ajax({
+    		url:'getAllUserDocumentByCategoryId.json',
+    		dataType:'json',
+    		data:'categoryId='+categoryId,
+    		beforeSend: function() {
+    			$('.divUserFileList').html('<div class="preview-large"></div>');
+    			$('.divUserFileList').find('.preview-large').addClass('loading-large');
+    		},
+    		complete: function() {
+    			$('.divUserFileList').find('.preview-large').removeClass('loading-large');
+    		},
+    		success:function(jArray){
+    			callback(jArray);
+    		},
+    		error:function(){
+    		}
+    	});
+    };
+    
+    this.getCategoryPathWithId = function(documentCategoryId,callback){
+    	$.ajax({
+    		url:'getCategoryPathWithIdAjax.json?categoryId='+documentCategoryId,
+    		dataType:'json',
+    		async:false,
+    		success:function(jArray){
+    			try{
+    				callback(jArray);
+    			}catch(e){
+    			}
+    		},
+    		error:function(){
+
+    		}
+    	});
+    };
+    
+    this.getTextDocumentWithAttachment = function(documentId,callback){
+    	$.ajax({
+    		url:'getTextDocumentAjax.json?d__documentId='+documentId,
+    		beforeSend: function() {
+    			startCommonAjaxSpinner();
+    		},
+    		complete: function() {
+    			stopCommonAjaxSpinner();
+    		},
+    		dataType:'json',
+    		async:false,
+    		success:function(jArray){
+    			if(jArray.length > 0){
+    				try{
+    					jArray[0].documentBody = jArray[0].documentBody!=undefined?jArray[0].documentBody.gemsDecode():'';
+    					jArray[0].description = jArray[0].description!=undefined?jArray[0].description.gemsDecode():'';
+    				}catch(e){console.log(e);}
+    				callback(jArray[0]);
+    			} else {
+    				jAlert('No Data Found!!!');
+    			}
+    		},
+    		error:function(){
+
+    		}
+    	});
+    };
+    
+    this.getAttachmentListAjax = function(documentId,callback) {
+    	try{
+    	$.ajax({
+    		url:'getAttachmentList.json?d__documentId='+documentId,
+    		async:false,
+    		dataType:'json',
+    		beforeSend: function() {
+    			$('#tblAttachementList').html('<div class = "preview-large"></div>');
+    			$('.preview-large').addClass('loading-large');
+    		},
+    		complete: function() {
+    			$('.preview-large').removeClass('loading-large');
+    		},
+    		success:function(jArray){
+    			callback(jArray);
+    		},
+    		error:function(){
+
+    		}
+    	});
+    	} catch(e){
+    		
+    	}
+    };
+    this.showDocumentAttachmentList = function(jArray,tableId,documentId,isOwner){
+    	var attachementBoiler = "";
+    	if(jArray.length > 0){
+    		for(var i = 0 ; i < jArray.length; i++){
+    			var attachmentFileName = jArray[i]["name"].toString(); 
+    			var trId = 'trAttachmentFile-'+documentId+'-'+i;
+    			var downloadLinkTmp = (juno.label['a.download.json'].setIndexedArgs((documentId), "TEXT", encodeURIComponent(attachmentFileName), attachmentFileName));
+    			var downloadLinkTmpIcon = (juno.label['a.download.json'].setIndexedArgs((documentId), "TEXT", encodeURIComponent(attachmentFileName), '<i class = "icon-download-alt"></i>'));
+    			var fileType = jArray[i]["type"];
+    			iconPath = gFileTypeIconMapping[fileType];
+    			if(isOwner == undefined || isOwner){
+    				attachementBoiler += 
+    					'<tr id = "'+trId+'"><td><img src="'+iconPath+'" />&nbsp;&nbsp;&nbsp;&nbsp;'+downloadLinkTmp+'</td><td><i style = "cursor:pointer" title = "remove" class = "icon-remove-sign" onclick = "removeAttachmentAjax(\''+trId+'\',\''+attachmentFileName+'\')" ></i>&nbsp;&nbsp;&nbsp;&nbsp'+downloadLinkTmpIcon+'</td></tr>';
+    			} else {
+    				attachementBoiler += 
+    					'<tr id = "'+trId+'"><td><img src="'+iconPath+'" />&nbsp;&nbsp;&nbsp;&nbsp;'+downloadLinkTmp+'</td><td>&nbsp;&nbsp;&nbsp;&nbsp'+downloadLinkTmpIcon+'</td></tr>';			
+    			}
+
+    		}
+    		if(tableId == undefined)
+    			$('#tblAttachementList').html(attachementBoiler);
+    		else
+    			$('#'+tableId).html(attachementBoiler);		
+    	} else {
+    		$('#'+tableId).html('<div class="alert alert-info" style="padding:2px"><strong style="color:red">No attachments!!!</strong></div>');
+    	}
+    };
+}
+
+function  paintBoiler(elementId,categoryId,callback){
+	var boiler = 
+		'<form id = "uploadDocument" action="uploadDocument.json" method="POST" enctype="multipart/form-data">'+
+		'<table class = "table tblUploadDoc">'+
+		'<tr>'+
+		
+		'<td>'+
+		'<div class="span6">'+
+		'<div class="span2">'+
+    	'<div class="preview"></div></div>'+
+		'<div class="span4">'+
+		'<div class="btn btn-info" style = "width:150px;height:20px;">'+//style = "width:165px;height:20px"
+			'<span class="uploadButtonLabel"> Upload file</span>'+
+			'<input  type="file" style = "margin-top:-22px;margin-left:5px;opacity:0;" name="fileData" id="txtUploadDocument-'+elementId+'-'+categoryId+'"></div>'+//style = "margin-top:-40px;margin-left:-10px;opacity:0;"
+			'</div>'+
+		'</div>'+
+		'</td>'+
+		
+		'</tr>'+
+		'</table>'+
+		'</form>';
+
+	$('#'+elementId).html(boiler);
+	$('#uploadDocument').reset();
+	try{
+		callback();
+	} catch(e){
+		alert(e);
+	}
+};
+
+
+
+/**
+ * @type Document
+ * @author Vimal Kr.
+ */
+function GemsDocument() {
+	this.documentId;
+	this.categoryId;
+	this.catName;
+	this.documentBody;
+	this.documentName;
+	this.hasProfileImage;
+	this.gender;
+	this.shareStatus;
+	this.creationDate;
+	this.description;
+	this.extension;
+	this.type;
+	this.isTemporary;
+	this.ownerEmployeeId;
+	this.name;
+}
+
+
+
+function removeUploadedDocumentById(docId,callback){
+	jConfirm("Do you want to Remove Document ?","Confirm",function(r)
+	{
+		if(r ==true)
+		{	
+			$.ajax({
+				url:'removeUploadedDocumentById.json?d__docId='+docId,
+				dataType:'json',
+				success:function(jObject){
+					callback(jObject);
+				}
+			});
+		}
+	});
+}
+
+
+function getUploadedDocumentById(docId,callback) {
+	$.ajax({
+		url:'getUploadedDocumentById.json?d__docId='+docId,
+		dataType:'json',
+		success:function(jObject){
+			callback(jObject);
+		}
+	});
+}
+
+
+
+/*********************************************Temporary Code- It has to be implement for he dmsStudent.js *************888*//*
+function UploadStudentDocument(){
+	this.elementId = '';
+	this.categoryId = '';
+	this.barcode = ''; //optional parameter
+
+	fileSize = AllowedFileSize.DEFAULT;
+
+	this.init = function(jObject,callback){
+		if(jObject == undefined){
+			jAlert('Object is undefined');
+			return undefined;
+		} else {
+			try{
+				this.elementId = jObject.elementId;
+				this.categoryId = jObject.categoryId;
+				if(this.elementId == '' || this.categoryId == undefined || this.categoryId == '' || isNaN(parseInt(this.categoryId))){
+					jAlert('Error: undefined parameters');
+					return null;
+				}
+
+
+				if(jObject.fileSize == undefined || isNaN(jObject.fileSize)){
+					fileSize = AllowedFileSize.DEFAULT;
+				} else {
+					fileSize = jObject.fileSize;
+				}
+			} catch(e){
+				alert(e);
+				return null;
+			}
+		}
+		paintBoiler(this.elementId,this.categoryId,function(){
+			$(document).ready(function(){
+				new AjaxUpload('txtUploadDocument-'+jObject.elementId+'-'+jObject.categoryId+'',{
+					action : 'uploadDocumentStudent.json',
+					name : 'fileData',
+					timeout:60000,
+					size:AllowedFileSize.DOCUMENT_UPLOAD,
+					data:{},
+					onSubmit : function(file, extension) {
+						if ($.inArray(extension.toString().toLowerCase(),gExtensionArray) != -1) {
+							$('div.preview').addClass('loading');
+							this.setData({
+								'categoryId':jObject.categoryId,
+								'fileSize':fileSize,
+							});
+							return true;
+						} else {
+							jAlert('File type is not valid!');
+							return false;
+						}
+					},
+					onComplete : function(file, response) {
+						try{
+							response = eval('('+response+')');
+							$('div.preview').removeClass('loading');
+							if(response[0].responseFlag == '1'){
+								callback(response[1]["DocumentId"]);
+							} else {
+								throw response[0].responseText;
+							}
+						} catch (e){
+							jAlert(e);
+						}
+					}
+				});
+			});
+		});
+
+
+
+	};
+
+	this.getDocument = function(categoryId,callback){
+		if(categoryId == undefined || categoryId == '' || isNaN(parseInt(categoryId))){
+			jAlert('Error: define category id');
+			return null;
+		}		
+		try{
+			$.ajax({
+				url:'getUploadedDocumentAjaxStudent.json?categoryid='+categoryId,
+				dataType:'json',
+				beforeSend: function() {
+				},
+				complete: function() {
+				},
+				async:false,
+				success:function(jArray){
+					gjArrUploadedDocument=jArray;
+					var jsonArray = new Array();
+					for(var i = 0; i < jArray.length ; i++) {
+						var documentObj = new GemsDocument();
+						documentObj.categoryId = jArray[i]['categoryId'];
+						documentObj.catName = jArray[i]['catName'];
+
+						documentObj.documentName = jArray[i]['name'];
+						documentObj.name = jArray[i]['name'];
+						documentObj.hasProfileImage = jArray[i]['hasProfileImage'];
+						documentObj.gender = jArray[i]['gender'];
+						documentObj.sharedStatus = jArray[i]['sharedStatus'];
+						documentObj.documentId = jArray[i]['documentId'];
+						documentObj.creationDate = jArray[i]['creationDate'];
+						documentObj.ownerEmployeeId = jArray[i]['ownerStudentId'];
+						documentObj.extension = jArray[i]['extension'];
+						documentObj.type = jArray[i]['extension'];
+						documentObj.isTemporary = false;
+						documentObj.description = jArray[i]['description'];
+						documentObj.documentBody = jArray[i]['documentBody'];
+						jsonArray.push(documentObj);
+					}
+					callback(jsonArray);
+				},
+				error:function(){
+
+				}
+
+			});
+		} catch(e){
+			alert(e);
+		}
+
+	};
+
+	*//**
+	 * student placement id is only required for getting the owner information of the document
+	 *//*
+	this.getDocumentByStudentPlacementId = function(categoryId,studentPlacementId,callback){
+		if(categoryId == undefined || categoryId == '' || isNaN(parseInt(categoryId))){
+			jAlert('Error: define category id');
+			return null;
+		}		
+		try{
+			$.ajax({
+				url:'getUploadedDocumentAjaxStudentForTPO.json?categoryid='+categoryId+'&studentPlacementId='+studentPlacementId,
+				dataType:'json',
+				beforeSend: function() {
+				},
+				complete: function() {
+				},
+				async:false,
+				success:function(jArray){
+					gjArrUploadedDocument=jArray;
+					var jsonArray = new Array();
+					for(var i = 0; i < jArray.length ; i++) {
+						var documentObj = new GemsDocument();
+						documentObj.categoryId = jArray[i]['categoryId'];
+						documentObj.catName = jArray[i]['catName'];
+						documentObj.documentName = jArray[i]['name'];
+						documentObj.gender = jArray[i]['gender'];
+						documentObj.sharedStatus = jArray[i]['sharedStatus'];
+						documentObj.documentId = jArray[i]['documentId'];
+						documentObj.creationDate = jArray[i]['creationDate'];
+						documentObj.extension = jArray[i]['extension'];
+						documentObj.description = jArray[i]['description'];
+						documentObj.documentBody = jArray[i]['documentBody'];
+						jsonArray.push(documentObj);
+					}
+					callback(jsonArray);
+				},
+				error:function(){
+
+				}
+
+			});
+		} catch(e){
+			alert(e);
+		}
+
+	};
+
+	*//** Showing document as in dms look*//*
+
+	this.showDocument = function(jsonObject,callback) {
+
+		var gFileId = 1;
+		if(jsonObject == undefined){
+			jAlert('Error: Parameter expected!');
+			return; 
+
+		}  else {
+			try{
+				gjArrTextDocument=jsonObject;
+
+				if(jsonObject.elementId == '' || jsonObject.documentList == undefined){
+					if(jsonObject.elementId == ''){
+						jAlert('Error: Required parameter "elementId" is mission');
+						return null;
+					}
+					if(jsonObject.documentList == undefined) {
+						jAlert('Error: Required parameter "documentJArray" is mission');
+						return null;
+					}
+				} else {
+					var link = "";
+					for(var i = 0 ; i < jsonObject.documentList.length ; i++){
+
+						var downloadLink = '#';
+						var iconPath = 'css/img/add_attachment_icon.png';
+						if(jsonObject.documentList[i]["documentBody"] != undefined){
+							downloadLink = (juno.label['url.download.json'].setIndexedArgs(jsonObject.documentList[i]["documentId"], "UPLOADED", encodeURIComponent(attachmentFileName)));
+						}
+						var fileType = jsonObject.documentList[i]["extension"].toLowerCase();
+						iconPath = gFileTypeIconMapping[fileType];
+
+						link += '<tr><td  class="ui-state-default" width="40px"><input type = "checkbox" id = "chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]+'"  class = "chkFileListIcon" name = "chkFileListIcon" ></td><td class="context-menu-one tooltiplink ui-state-default" id = "tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentPathId"]+'" onmouseover = "showFileDetail(\'tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]+'\')" style =  "cursor:pointer"><a class="ui-state-default" href = "'+downloadLink+'" ><span><image src = "'+iconPath+'" /></span>&nbsp;&nbsp;'+jsonObject.documentList[i]["documentName"]+'</a></td>';
+
+						if(jsonObject.documentList[i]["sharedStatus"]==1)
+						{
+							link += '<td width="20px;" class="ui-state-default"><a href="javascript:void(0);" onclick="#" title="view Shared Employees"><img src="img/share.png" alt="Shared" /></a></td>';
+						}
+						else
+						{
+							link += '<td width="20px;" class = "ui-state-default"></td>';
+						}
+						link += '<td valign="top" width="70px">'+
+						'<a href="#" class="btn btn-inverse btn-mini  ">Share</a></td>';
+
+						if(jsonObject.documentList[i]["sharedStatus"]==1)
+						{
+							link += '<td valign="top" width="70px;"><ul class="jbar">'+
+							'<li><a href="javascript:void(0);" class="has_down_arrow trigger first" onclick="showComment('+gFileId+','+jsonObject.documentList[i]["documentId"]+',\'uploaded\','+i+')"><span class="link_text">Comment</span></a></li>'+
+							'</td></tr>'+
+							'<tr id="trshowComment'+gFileId+'" style="display:none;"><td colspan="5"><table style="margin-left:95%"><tr><th align="right"><a href="#" onclick="javascript:$(\'#trshowComment'+gFileId+'\').hide();"><img src="img/remove.png" /></a></th></tr></table>'+
+							'<div id="showComment'+gFileId+'">'+
+							'<div class="commentPanel" id="commentPanel-first-'+gFileId+'" align="left">'+
+							'<div class="commentBox" align="right" id="commentBox-'+gFileId+'">';
+							if(jsonObject.documentList[i]["hasProfileImage"] == undefined) {
+
+								if(jsonObject.documentList[i]["ownerGender"] != undefined){
+									if(jsonObject.documentList[i]["ownerGender"].toString().toLowerCase() == 'male') {
+										link+='<img src="img/boy.gif" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+										gProfileImgPath='img/boy.gif';
+									} else if(jsonObject.documentList[i]["ownerGender"].toString().toLowerCase() == 'male') {
+										link+='<img src="img/girl.gif" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+										gProfileImgPath='img/girl.gif';
+									}
+								} else {
+									link+='<img src="img/girl.gif" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+									gProfileImgPath='img/girl.gif';
+								}
+							} else {
+
+								link += '<img src="getStudentProfileImage.json?id='+jsonObject.documentList[i]["ownerStudentId"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+
+							}
+							link+='<input type="hidden" id="owner" value="" />'+
+							'<label id="record-">'+
+							'<textarea class="commentMark" id="commentMark-first-'+gFileId+'" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitComment(this,event,\'uploaded\','+jsonObject.documentList[i]["documentId"]+','+gFileId+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>'+
+							'</label>'+
+							'<br clear="all" />'+
+							'</div>'+
+							'</div>'+
+							'</div>'+
+							'</div></td>';
+						}
+						else
+							link+='<td></td>';
+
+						link+='</tr>'+
+						'<tr id="trshowStudentShare'+gFileId+'" style="display:none;"><td colspan="6"><div id="showStudentShare'+gFileId+'"></div></td></tr>'+
+						'<tr id="trshowEmployeeShare'+gFileId+'" style="display:none;"><td colspan="6"><div id="showEmployeeShare'+gFileId+'"></div></td></tr>'+
+						'<tr id="trshowPrivateComment'+gFileId+'" style="display:none;"><td colspan="6"><div id="showPrivateComment'+gFileId+'"></div></td></tr>';
+						gFileId++;
+					}
+					$('#'+jsonObject.elementId).append(link);
+					$(document).ready(function(){	 $('.commentMark').elastic(); });
+					jQuery(function(){
+						jQuery('.jbar').jbar();
+					});
+					*//**file detail data association with checkbox and td element id using jquery data function*//*
+					for(var i = 0 ; i < jsonObject.documentList.length ; i++){
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data("Type","uploaded");
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Id',jsonObject.documentList[i]["documentId"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('CreationDate',jsonObject.documentList[i]["creationDate"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Name',jsonObject.documentList[i]["documentName"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Parent',jsonObject.documentList[i]["catName"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Description',jsonObject.documentList[i]["description"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('DocumentPath',jsonObject.documentList[i]["documentPath"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data("Type","uploaded");
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Id',jsonObject.documentList[i]["documentId"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('CreationDate',jsonObject.documentList[i]["creationDate"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Name',jsonObject.documentList[i]["documentName"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Parent',jsonObject.documentList[i]["parentDocumentName"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Description',jsonObject.documentList[i]["description"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('DocumentPath',jsonObject.documentList[i]["documentPath"]);
+					}
+				}	
+
+			} catch(e){
+				alert(e);
+				return null;
+			}
+		}
+
+
+	};
+	this.undoUploadedDocumentDelete = function undoUploadedDocumentDelete(documentId,callback){
+		$.ajax({
+			url:'undoUploadedDocumentDelete.json',
+			dataType:'text',
+			type:"POST",
+			data:{d__documentId:documentId},
+			success:function(flag){
+				callback(flag);
+			}
+		});
+	};
+}*/        H€  xH€∑$   20250331133932-8l+€  Ω◊‹í*   https://erp.cmrit.ac.in/scripts/dms/dms.js      ïp  /**
+ * @author vimal kr.
+ * @since 13 Oct 2012
+ */
+
+var gExtensionArray = ['doc','docx','xls','xlsx','xlsm','pdf','jpg','text','png','gif','ppt','zip','r'];
+var gCategoryType = '';
+
+var gjArrTextDocument = new Array();
+var gjArrUploadedDocument= new Array();
+var gNodeId='';
+var gExtraData = {};
+function UploadDocument(){
+	this.elementId = '';
+	this.categoryId = '';
+	this.barcode = ''; //optional parameter
+	this.tags = '';
+	this.subjectName = '';
+	var fileSize = AllowedFileSize.EXCELSHEET_UPLOAD;
+	var fileType = gExtensionArray;
+	var elementId = '';
+	this.init = function(jObject,callback){
+		if(jObject == undefined){
+			jAlert('Object is undefined');
+			return undefined;
+		} else {
+			try{
+				this.elementId = jObject.elementId;
+				elementId = jObject.elementId;
+				this.categoryId = jObject.categoryId;
+				this.barcode = jObject.barcode;
+				this.tags = jObject.tags;
+				this.subjectName = jObject.subjectName;
+				if(this.elementId == undefined || this.elementId == '' || this.categoryId == undefined || this.categoryId == '' || this.categoryId == 'null' || this.categoryId == 'undefined'){
+				    jAlert('Error: Undefined parameters categoryId and elementId. These parameters are mandatory');
+					return null;
+				}	
+				
+				if(jObject.fileSize == undefined || isNaN(jObject.fileSize)){
+					fileSize = AllowedFileSize.EXCELSHEET_UPLOAD;
+				} else {
+					fileSize = jObject.fileSize;
+				}
+				
+				if(jObject.caption == undefined || jObject.caption == ''){
+					uploadButtonCaption = 'Upload';//Upload Document
+				} else {
+					uploadButtonCaption = jObject.caption;
+				}
+				
+				if(jObject.fileType != undefined){
+					if(typeof jObject.fileType != 'array' && typeof jObject.fileType != 'object' ){
+						jAlert('File type parameter must be an Array');
+						return null;
+					} else
+						fileType = jObject.fileType;
+				}
+				
+			} catch(e){
+				alert(e);
+				return null;
+			}
+		}
+		paintBoiler(this.elementId,this.categoryId,function(){
+			$('.uploadButtonLabel').text(uploadButtonCaption);
+			$(document).ready(function(){
+				var fileElementId = 'txtUploadDocument-'+jObject.elementId+'-'+jObject.categoryId+'';
+				new AjaxUpload(fileElementId,{
+					action : 'uploadDocument.json',
+					name : 'fileData',
+					timeout:60000,
+					size:fileSize,
+					data:{},
+					onSubmit : function(file, extension) {
+						$('#'+fileElementId).attr('disabled','disabled');
+						
+						if ($.inArray(extension.toString().toLowerCase(),fileType) != -1 || fileType=='ALL') {
+							$('#elementId').find('div.preview').addClass('loading');
+							var arrayToSend = {};
+							arrayToSend["categoryId"] = jObject.categoryId;
+							arrayToSend["fileSize"] = fileSize;
+							if(jObject.onUpload != undefined){
+								if (false === jObject.onUpload.call(this)){
+									return false;
+								}
+								for (var prop in gExtraData) {
+					                if (gExtraData.hasOwnProperty(prop)){
+					                	arrayToSend[prop] = gExtraData[prop];
+					                }
+							    }
+							}
+							
+							this.setData(arrayToSend);
+							return true;
+						} else {
+							jAlert('File type is not valid ! Please upload only <strong>&nbsp;'+fileType.join(', ')+'&nbsp;<strong> files');
+							$('#'+fileElementId).removeAttr('disabled');
+							return false;
+						}
+					},
+					onComplete : function(file, response) {
+						$('#'+fileElementId).removeAttr('disabled');
+						try{
+							response = eval('('+response+')');
+							$('#elementId').find('div.preview').removeClass('loading');
+							if(response[0].responseFlag == '1'){
+								callback(response[1]["eDocId"]);
+							} else {
+								throw response[0].responseText;
+							}
+						} catch (e){
+							jAlert(e);
+						}
+					}
+				});
+			});
+		});
+
+	};
+
+	this.getDocument = function(categoryId,callback){
+		return new Promise(function(resolve, reject){
+
+
+
+			if(categoryId == undefined || categoryId == '' || categoryId=='null' || categoryId=='undefined'){
+				//jAlert('Error: define category id');
+				reject('Category not found!');
+				return null;
+			}		
+			try{
+				gNodeId=categoryId;
+				$.ajax({
+					url:'getUploadedDocumentAjax.json?categoryid='+categoryId,
+					dataType:'json',
+					async:callback==undefined,//false
+					success:function(jArray){
+
+						var jsonArray = new Array();
+						for(var i = 0; i < jArray.length ; i++){
+							var documentObj = new GemsDocument();
+							documentObj.categoryId = jArray[i]['categoryId'];
+							documentObj.eCatId = jArray[i]['eCatId'];
+							documentObj.catName = jArray[i]['catName'];
+
+							documentObj.documentName = jArray[i]['name'].gemsDecode();
+							documentObj.name = jArray[i]['name'].gemsDecode();
+							documentObj.hasProfileImage = jArray[i]['hasProfileImage'];
+							documentObj.gender = jArray[i]['gender'];
+							documentObj.sharedStatus = jArray[i]['sharedStatus'];
+							documentObj.documentId = jArray[i]['documentPathId'];
+							documentObj.eDocId = jArray[i]['eDocPathId'];
+							documentObj.creationDate = jArray[i]['creationDate'];
+							documentObj.ownerEmployeeId = jArray[i]['ownerEmployeeId'];
+							documentObj.extension = jArray[i]['extension'];
+							documentObj.type = jArray[i]['extension'];
+							documentObj.isTemporary = false;
+							documentObj.description = jArray[i]['description'];
+							documentObj.documentBody = jArray[i]['documentBody'];
+							documentObj.createdAt = jArray[i]['createdAt'];
+							jsonArray.push(documentObj);
+						}
+						gjArrUploadedDocument=jArray;
+						if(callback!=undefined)
+							callback(jsonArray);
+						resolve(jsonArray);
+					},
+					error:function(){
+
+					}
+
+				});
+			} catch(e){
+				alert(e);
+				reject(e);
+			}
+		});
+	};
+
+	/** Showing document as in dms look*/
+
+	this.showDocument = function(jsonObject,callback) {
+
+		var gFileId = 1;
+		if(jsonObject == undefined){
+			jAlert('Error: Parameter expected!');
+			return; 
+
+		}  else {
+			try{
+				
+
+				if(jsonObject.elementId == '' || jsonObject.documentList == undefined){
+					if(jsonObject.elementId == ''){
+						jAlert('Error: Required parameter "elementId" is mission');
+						return null;
+					}
+					if(jsonObject.documentList == undefined) {
+						jAlert('Error: Required parameter "documentJArray" is mission');
+						return null;
+					}
+				} else {
+					var jArray = jsonObject.documentList;
+					if (jArray.length > 0) {
+						var attachementBoiler = "<table class = 'table'>";
+						for ( var i = 0; i < jArray.length; i++) {
+							var attachmentFileName = jArray[i]["name"].toString();
+							var documentId = jArray[i]["documentId"];
+							var eDocId = jArray[i]["eDocId"]!=undefined?jArray[i]["eDocId"]:jArray[i]["documentId"];
+							var isTemporary = jArray[i]["isTemporary"];
+
+							var trId = 'trAttachmentFile-' + eDocId;
+
+							var fileType = jArray[i]["type"];
+							iconPath = gFileTypeIconMapping[fileType];
+							if (!isTemporary) {
+								var downloadLinkTmp = (juno.label['a.download.json'].setIndexedArgs((eDocId), "UPLOADED", encodeURIComponent(attachmentFileName), attachmentFileName));
+								attachementBoiler += '<tr id = "'
+										+ trId
+										+ '"><td><img src="'
+										+ iconPath
+										+ '" />&nbsp;&nbsp;&nbsp;&nbsp;'+downloadLinkTmp+'</td>';
+								if (true) {
+									attachementBoiler += '<td><img style = "cursor:pointer" title = "remove" src = "img/remove-icon.png" onclick = "deleteUploadedDMSDocument(this,\''
+											+ eDocId + '\')" /></td>';
+								}
+								attachementBoiler += '</tr>';
+							} else {
+								attachementBoiler += '<tr id = "'
+										+ trId
+										+ '"><td><img src="'
+										+ iconPath
+										+ '" />&nbsp;&nbsp;&nbsp;&nbsp;<a href = "javascript:void(0);">'
+										+ attachmentFileName
+										+ '</a></td><td><img style = "cursor:pointer" title = "remove" src = "img/remove-icon.png" onclick = "deleteUploadedCV(\''
+										+ eDocId
+										+ '\')" />&nbsp;&nbsp;&nbsp;&nbsp<img src = "img/unsaved.png" title = "Unsaved"/></td></tr>';
+							}
+						}
+						attachementBoiler += "</table>";
+						if (jsonObject.elementId == undefined)
+							$('#uploadedDocList').html(attachementBoiler);
+						else
+							$('#' + jsonObject.elementId).html(attachementBoiler);
+					} else {
+						$('#' + jsonObject.elementId).html('No document uploaded!!!');
+					}
+			}	
+			
+			} catch(e){
+				alert(e);
+				return null;
+			}
+		}
+
+
+	};
+	
+	this.setData= function(data){
+    	gExtraData = data;
+    };
+    
+    this.getAllUserRootFolder = function(typeArray,parentType,callback) {
+    	$.ajax({
+    		url:'getDocumentCategoriesForHome.json?categoryPath=undefined&typeArray=undefined&parentType='+parentType+'&root=undefined',
+    		dataType:'json',
+    		beforeSend: function() {
+    			$('.ulDMSCourseFileAttachmentTree').html('<div class="preview-large"></div>');
+    			$('.ulDMSCourseFileAttachmentTree').find('.preview-large').addClass('loading-large');
+    		},
+    		complete: function() {
+    			$('.ulDMSCourseFileAttachmentTree').find('.preview-large').removeClass('loading-large');
+    		},
+    		success:function(jArray){
+    			callback(jArray);
+    		},
+    		error:function(){
+    		}
+    	});
+    };
+    
+    this.getAllUserRootFolderforHome = function(typeArray,parentType,callback) {
+    	$.ajax({
+    		url:'getDocumentCategoriesForHome.json?categoryPath=undefined&typeArray=undefined&parentType='+parentType+'&root=undefined',
+    		dataType:'json',
+    		beforeSend: function() {
+    			$('.ulDMSCourseFileAttachmentTree').html('<div class="preview-large"></div>');
+    			$('.ulDMSCourseFileAttachmentTree').find('.preview-large').addClass('loading-large');
+    		},
+    		complete: function() {
+    			$('.ulDMSCourseFileAttachmentTree').find('.preview-large').removeClass('loading-large');
+    		},
+    		success:function(jArray){
+    			callback(jArray);
+    		},
+    		error:function(){
+    		}
+    	});
+    };
+    
+    this.getFilesForCourseFileAttachment = function(categoryId,callback){
+    	$.ajax({
+    		url:'getAllUserDocumentByCategoryId.json',
+    		dataType:'json',
+    		data:'categoryId='+categoryId,
+    		beforeSend: function() {
+    			$('.divUserFileList').html('<div class="preview-large"></div>');
+    			$('.divUserFileList').find('.preview-large').addClass('loading-large');
+    		},
+    		complete: function() {
+    			$('.divUserFileList').find('.preview-large').removeClass('loading-large');
+    		},
+    		success:function(jArray){
+    			callback(jArray);
+    		},
+    		error:function(){
+    		}
+    	});
+    };
+    
+    this.getCategoryPathWithId = function(documentCategoryId,callback){
+    	$.ajax({
+    		url:'getCategoryPathWithIdAjax.json?categoryId='+documentCategoryId,
+    		dataType:'json',
+    		async:false,
+    		success:function(jArray){
+    			try{
+    				callback(jArray);
+    			}catch(e){
+    			}
+    		},
+    		error:function(){
+
+    		}
+    	});
+    };
+    
+    this.getTextDocumentWithAttachment = function(documentId,callback){
+    	$.ajax({
+    		url:'getTextDocumentAjax.json?d__documentId='+documentId,
+    		beforeSend: function() {
+    			startCommonAjaxSpinner();
+    		},
+    		complete: function() {
+    			stopCommonAjaxSpinner();
+    		},
+    		dataType:'json',
+    		async:false,
+    		success:function(jArray){
+    			if(jArray.length > 0){
+    				try{
+    					jArray[0].documentBody = jArray[0].documentBody!=undefined?jArray[0].documentBody.gemsDecode():'';
+    					jArray[0].description = jArray[0].description!=undefined?jArray[0].description.gemsDecode():'';
+    				}catch(e){console.log(e);}
+    				callback(jArray[0]);
+    			} else {
+    				jAlert('No Data Found!!!');
+    			}
+    		},
+    		error:function(){
+
+    		}
+    	});
+    };
+    
+    this.getAttachmentListAjax = function(documentId,callback) {
+    	try{
+    	$.ajax({
+    		url:'getAttachmentList.json?d__documentId='+documentId,
+    		async:false,
+    		dataType:'json',
+    		beforeSend: function() {
+    			$('#tblAttachementList').html('<div class = "preview-large"></div>');
+    			$('.preview-large').addClass('loading-large');
+    		},
+    		complete: function() {
+    			$('.preview-large').removeClass('loading-large');
+    		},
+    		success:function(jArray){
+    			callback(jArray);
+    		},
+    		error:function(){
+
+    		}
+    	});
+    	} catch(e){
+    		
+    	}
+    };
+    this.showDocumentAttachmentList = function(jArray,tableId,documentId,isOwner){
+    	var attachementBoiler = "";
+    	if(jArray.length > 0){
+    		for(var i = 0 ; i < jArray.length; i++){
+    			var attachmentFileName = jArray[i]["name"].toString(); 
+    			var trId = 'trAttachmentFile-'+documentId+'-'+i;
+    			var downloadLinkTmp = (juno.label['a.download.json'].setIndexedArgs((documentId), "TEXT", encodeURIComponent(attachmentFileName), attachmentFileName));
+    			var downloadLinkTmpIcon = (juno.label['a.download.json'].setIndexedArgs((documentId), "TEXT", encodeURIComponent(attachmentFileName), '<i class = "icon-download-alt"></i>'));
+    			var fileType = jArray[i]["type"];
+    			iconPath = gFileTypeIconMapping[fileType];
+    			if(isOwner == undefined || isOwner){
+    				attachementBoiler += 
+    					'<tr id = "'+trId+'"><td><img src="'+iconPath+'" />&nbsp;&nbsp;&nbsp;&nbsp;'+downloadLinkTmp+'</td><td><i style = "cursor:pointer" title = "remove" class = "icon-remove-sign" onclick = "removeAttachmentAjax(\''+trId+'\',\''+attachmentFileName+'\')" ></i>&nbsp;&nbsp;&nbsp;&nbsp'+downloadLinkTmpIcon+'</td></tr>';
+    			} else {
+    				attachementBoiler += 
+    					'<tr id = "'+trId+'"><td><img src="'+iconPath+'" />&nbsp;&nbsp;&nbsp;&nbsp;'+downloadLinkTmp+'</td><td>&nbsp;&nbsp;&nbsp;&nbsp'+downloadLinkTmpIcon+'</td></tr>';			
+    			}
+
+    		}
+    		if(tableId == undefined)
+    			$('#tblAttachementList').html(attachementBoiler);
+    		else
+    			$('#'+tableId).html(attachementBoiler);		
+    	} else {
+    		$('#'+tableId).html('<div class="alert alert-info" style="padding:2px"><strong style="color:red">No attachments!!!</strong></div>');
+    	}
+    };
+}
+
+function  paintBoiler(elementId,categoryId,callback){
+	var boiler = 
+		'<form id = "uploadDocument" action="uploadDocument.json" method="POST" enctype="multipart/form-data">'+
+		'<table class = "table tblUploadDoc">'+
+		'<tr>'+
+		
+		'<td>'+
+		'<div class="span6">'+
+		'<div class="span2">'+
+    	'<div class="preview"></div></div>'+
+		'<div class="span4">'+
+		'<div class="btn btn-info" style = "width:150px;height:20px;">'+//style = "width:165px;height:20px"
+			'<span class="uploadButtonLabel"> Upload file</span>'+
+			'<input  type="file" style = "margin-top:-22px;margin-left:5px;opacity:0;" name="fileData" id="txtUploadDocument-'+elementId+'-'+categoryId+'"></div>'+//style = "margin-top:-40px;margin-left:-10px;opacity:0;"
+			'</div>'+
+		'</div>'+
+		'</td>'+
+		
+		'</tr>'+
+		'</table>'+
+		'</form>';
+
+	$('#'+elementId).html(boiler);
+	$('#uploadDocument').reset();
+	try{
+		callback();
+	} catch(e){
+		alert(e);
+	}
+};
+
+
+
+/**
+ * @type Document
+ * @author Vimal Kr.
+ */
+function GemsDocument() {
+	this.documentId;
+	this.categoryId;
+	this.catName;
+	this.documentBody;
+	this.documentName;
+	this.hasProfileImage;
+	this.gender;
+	this.shareStatus;
+	this.creationDate;
+	this.description;
+	this.extension;
+	this.type;
+	this.isTemporary;
+	this.ownerEmployeeId;
+	this.name;
+}
+
+
+
+function removeUploadedDocumentById(docId,callback){
+	jConfirm("Do you want to Remove Document ?","Confirm",function(r)
+	{
+		if(r ==true)
+		{	
+			$.ajax({
+				url:'removeUploadedDocumentById.json?d__docId='+docId,
+				dataType:'json',
+				success:function(jObject){
+					callback(jObject);
+				}
+			});
+		}
+	});
+}
+
+
+function getUploadedDocumentById(docId,callback) {
+	$.ajax({
+		url:'getUploadedDocumentById.json?d__docId='+docId,
+		dataType:'json',
+		success:function(jObject){
+			callback(jObject);
+		}
+	});
+}
+
+
+
+/*********************************************Temporary Code- It has to be implement for he dmsStudent.js *************888*//*
+function UploadStudentDocument(){
+	this.elementId = '';
+	this.categoryId = '';
+	this.barcode = ''; //optional parameter
+
+	fileSize = AllowedFileSize.DEFAULT;
+
+	this.init = function(jObject,callback){
+		if(jObject == undefined){
+			jAlert('Object is undefined');
+			return undefined;
+		} else {
+			try{
+				this.elementId = jObject.elementId;
+				this.categoryId = jObject.categoryId;
+				if(this.elementId == '' || this.categoryId == undefined || this.categoryId == '' || isNaN(parseInt(this.categoryId))){
+					jAlert('Error: undefined parameters');
+					return null;
+				}
+
+
+				if(jObject.fileSize == undefined || isNaN(jObject.fileSize)){
+					fileSize = AllowedFileSize.DEFAULT;
+				} else {
+					fileSize = jObject.fileSize;
+				}
+			} catch(e){
+				alert(e);
+				return null;
+			}
+		}
+		paintBoiler(this.elementId,this.categoryId,function(){
+			$(document).ready(function(){
+				new AjaxUpload('txtUploadDocument-'+jObject.elementId+'-'+jObject.categoryId+'',{
+					action : 'uploadDocumentStudent.json',
+					name : 'fileData',
+					timeout:60000,
+					size:AllowedFileSize.DOCUMENT_UPLOAD,
+					data:{},
+					onSubmit : function(file, extension) {
+						if ($.inArray(extension.toString().toLowerCase(),gExtensionArray) != -1) {
+							$('div.preview').addClass('loading');
+							this.setData({
+								'categoryId':jObject.categoryId,
+								'fileSize':fileSize,
+							});
+							return true;
+						} else {
+							jAlert('File type is not valid!');
+							return false;
+						}
+					},
+					onComplete : function(file, response) {
+						try{
+							response = eval('('+response+')');
+							$('div.preview').removeClass('loading');
+							if(response[0].responseFlag == '1'){
+								callback(response[1]["DocumentId"]);
+							} else {
+								throw response[0].responseText;
+							}
+						} catch (e){
+							jAlert(e);
+						}
+					}
+				});
+			});
+		});
+
+
+
+	};
+
+	this.getDocument = function(categoryId,callback){
+		if(categoryId == undefined || categoryId == '' || isNaN(parseInt(categoryId))){
+			jAlert('Error: define category id');
+			return null;
+		}		
+		try{
+			$.ajax({
+				url:'getUploadedDocumentAjaxStudent.json?categoryid='+categoryId,
+				dataType:'json',
+				beforeSend: function() {
+				},
+				complete: function() {
+				},
+				async:false,
+				success:function(jArray){
+					gjArrUploadedDocument=jArray;
+					var jsonArray = new Array();
+					for(var i = 0; i < jArray.length ; i++) {
+						var documentObj = new GemsDocument();
+						documentObj.categoryId = jArray[i]['categoryId'];
+						documentObj.catName = jArray[i]['catName'];
+
+						documentObj.documentName = jArray[i]['name'];
+						documentObj.name = jArray[i]['name'];
+						documentObj.hasProfileImage = jArray[i]['hasProfileImage'];
+						documentObj.gender = jArray[i]['gender'];
+						documentObj.sharedStatus = jArray[i]['sharedStatus'];
+						documentObj.documentId = jArray[i]['documentId'];
+						documentObj.creationDate = jArray[i]['creationDate'];
+						documentObj.ownerEmployeeId = jArray[i]['ownerStudentId'];
+						documentObj.extension = jArray[i]['extension'];
+						documentObj.type = jArray[i]['extension'];
+						documentObj.isTemporary = false;
+						documentObj.description = jArray[i]['description'];
+						documentObj.documentBody = jArray[i]['documentBody'];
+						jsonArray.push(documentObj);
+					}
+					callback(jsonArray);
+				},
+				error:function(){
+
+				}
+
+			});
+		} catch(e){
+			alert(e);
+		}
+
+	};
+
+	*//**
+	 * student placement id is only required for getting the owner information of the document
+	 *//*
+	this.getDocumentByStudentPlacementId = function(categoryId,studentPlacementId,callback){
+		if(categoryId == undefined || categoryId == '' || isNaN(parseInt(categoryId))){
+			jAlert('Error: define category id');
+			return null;
+		}		
+		try{
+			$.ajax({
+				url:'getUploadedDocumentAjaxStudentForTPO.json?categoryid='+categoryId+'&studentPlacementId='+studentPlacementId,
+				dataType:'json',
+				beforeSend: function() {
+				},
+				complete: function() {
+				},
+				async:false,
+				success:function(jArray){
+					gjArrUploadedDocument=jArray;
+					var jsonArray = new Array();
+					for(var i = 0; i < jArray.length ; i++) {
+						var documentObj = new GemsDocument();
+						documentObj.categoryId = jArray[i]['categoryId'];
+						documentObj.catName = jArray[i]['catName'];
+						documentObj.documentName = jArray[i]['name'];
+						documentObj.gender = jArray[i]['gender'];
+						documentObj.sharedStatus = jArray[i]['sharedStatus'];
+						documentObj.documentId = jArray[i]['documentId'];
+						documentObj.creationDate = jArray[i]['creationDate'];
+						documentObj.extension = jArray[i]['extension'];
+						documentObj.description = jArray[i]['description'];
+						documentObj.documentBody = jArray[i]['documentBody'];
+						jsonArray.push(documentObj);
+					}
+					callback(jsonArray);
+				},
+				error:function(){
+
+				}
+
+			});
+		} catch(e){
+			alert(e);
+		}
+
+	};
+
+	*//** Showing document as in dms look*//*
+
+	this.showDocument = function(jsonObject,callback) {
+
+		var gFileId = 1;
+		if(jsonObject == undefined){
+			jAlert('Error: Parameter expected!');
+			return; 
+
+		}  else {
+			try{
+				gjArrTextDocument=jsonObject;
+
+				if(jsonObject.elementId == '' || jsonObject.documentList == undefined){
+					if(jsonObject.elementId == ''){
+						jAlert('Error: Required parameter "elementId" is mission');
+						return null;
+					}
+					if(jsonObject.documentList == undefined) {
+						jAlert('Error: Required parameter "documentJArray" is mission');
+						return null;
+					}
+				} else {
+					var link = "";
+					for(var i = 0 ; i < jsonObject.documentList.length ; i++){
+
+						var downloadLink = '#';
+						var iconPath = 'css/img/add_attachment_icon.png';
+						if(jsonObject.documentList[i]["documentBody"] != undefined){
+							downloadLink = (juno.label['url.download.json'].setIndexedArgs(jsonObject.documentList[i]["documentId"], "UPLOADED", encodeURIComponent(attachmentFileName)));
+						}
+						var fileType = jsonObject.documentList[i]["extension"].toLowerCase();
+						iconPath = gFileTypeIconMapping[fileType];
+
+						link += '<tr><td  class="ui-state-default" width="40px"><input type = "checkbox" id = "chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]+'"  class = "chkFileListIcon" name = "chkFileListIcon" ></td><td class="context-menu-one tooltiplink ui-state-default" id = "tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentPathId"]+'" onmouseover = "showFileDetail(\'tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]+'\')" style =  "cursor:pointer"><a class="ui-state-default" href = "'+downloadLink+'" ><span><image src = "'+iconPath+'" /></span>&nbsp;&nbsp;'+jsonObject.documentList[i]["documentName"]+'</a></td>';
+
+						if(jsonObject.documentList[i]["sharedStatus"]==1)
+						{
+							link += '<td width="20px;" class="ui-state-default"><a href="javascript:void(0);" onclick="#" title="view Shared Employees"><img src="img/share.png" alt="Shared" /></a></td>';
+						}
+						else
+						{
+							link += '<td width="20px;" class = "ui-state-default"></td>';
+						}
+						link += '<td valign="top" width="70px">'+
+						'<a href="#" class="btn btn-inverse btn-mini  ">Share</a></td>';
+
+						if(jsonObject.documentList[i]["sharedStatus"]==1)
+						{
+							link += '<td valign="top" width="70px;"><ul class="jbar">'+
+							'<li><a href="javascript:void(0);" class="has_down_arrow trigger first" onclick="showComment('+gFileId+','+jsonObject.documentList[i]["documentId"]+',\'uploaded\','+i+')"><span class="link_text">Comment</span></a></li>'+
+							'</td></tr>'+
+							'<tr id="trshowComment'+gFileId+'" style="display:none;"><td colspan="5"><table style="margin-left:95%"><tr><th align="right"><a href="#" onclick="javascript:$(\'#trshowComment'+gFileId+'\').hide();"><img src="img/remove.png" /></a></th></tr></table>'+
+							'<div id="showComment'+gFileId+'">'+
+							'<div class="commentPanel" id="commentPanel-first-'+gFileId+'" align="left">'+
+							'<div class="commentBox" align="right" id="commentBox-'+gFileId+'">';
+							if(jsonObject.documentList[i]["hasProfileImage"] == undefined) {
+
+								if(jsonObject.documentList[i]["ownerGender"] != undefined){
+									if(jsonObject.documentList[i]["ownerGender"].toString().toLowerCase() == 'male') {
+										link+='<img src="img/boy.gif" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+										gProfileImgPath='img/boy.gif';
+									} else if(jsonObject.documentList[i]["ownerGender"].toString().toLowerCase() == 'male') {
+										link+='<img src="img/girl.gif" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+										gProfileImgPath='img/girl.gif';
+									}
+								} else {
+									link+='<img src="img/girl.gif" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+									gProfileImgPath='img/girl.gif';
+								}
+							} else {
+
+								link += '<img src="getStudentProfileImage.json?id='+jsonObject.documentList[i]["ownerStudentId"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+
+							}
+							link+='<input type="hidden" id="owner" value="" />'+
+							'<label id="record-">'+
+							'<textarea class="commentMark" id="commentMark-first-'+gFileId+'" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitComment(this,event,\'uploaded\','+jsonObject.documentList[i]["documentId"]+','+gFileId+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>'+
+							'</label>'+
+							'<br clear="all" />'+
+							'</div>'+
+							'</div>'+
+							'</div>'+
+							'</div></td>';
+						}
+						else
+							link+='<td></td>';
+
+						link+='</tr>'+
+						'<tr id="trshowStudentShare'+gFileId+'" style="display:none;"><td colspan="6"><div id="showStudentShare'+gFileId+'"></div></td></tr>'+
+						'<tr id="trshowEmployeeShare'+gFileId+'" style="display:none;"><td colspan="6"><div id="showEmployeeShare'+gFileId+'"></div></td></tr>'+
+						'<tr id="trshowPrivateComment'+gFileId+'" style="display:none;"><td colspan="6"><div id="showPrivateComment'+gFileId+'"></div></td></tr>';
+						gFileId++;
+					}
+					$('#'+jsonObject.elementId).append(link);
+					$(document).ready(function(){	 $('.commentMark').elastic(); });
+					jQuery(function(){
+						jQuery('.jbar').jbar();
+					});
+					*//**file detail data association with checkbox and td element id using jquery data function*//*
+					for(var i = 0 ; i < jsonObject.documentList.length ; i++){
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data("Type","uploaded");
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Id',jsonObject.documentList[i]["documentId"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('CreationDate',jsonObject.documentList[i]["creationDate"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Name',jsonObject.documentList[i]["documentName"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Parent',jsonObject.documentList[i]["catName"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Description',jsonObject.documentList[i]["description"]);
+						$('#chkFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('DocumentPath',jsonObject.documentList[i]["documentPath"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data("Type","uploaded");
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Id',jsonObject.documentList[i]["documentId"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('CreationDate',jsonObject.documentList[i]["creationDate"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Name',jsonObject.documentList[i]["documentName"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Parent',jsonObject.documentList[i]["parentDocumentName"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('Description',jsonObject.documentList[i]["description"]);
+						$('#tdFileListIcon-uploaded-'+jsonObject.documentList[i]["documentId"]).data('DocumentPath',jsonObject.documentList[i]["documentPath"]);
+					}
+				}	
+
+			} catch(e){
+				alert(e);
+				return null;
+			}
+		}
+
+
+	};
+	this.undoUploadedDocumentDelete = function undoUploadedDocumentDelete(documentId,callback){
+		$.ajax({
+			url:'undoUploadedDocumentDelete.json',
+			dataType:'text',
+			type:"POST",
+			data:{d__documentId:documentId},
+			success:function(flag){
+				callback(flag);
+			}
+		});
+	};
+}*/”ò¿Ÿ˚   —         ög	      gExtensionArray    ?U3      doc    ŒÃìL      docx   ÓMUe      xls    + i      xlsx   Y"‚™      xlsm   ewÓ      pdf    ú⁄t      jpg    à3¿µ      text	   ñƒ$=      png
+    Eo®Á      gif    Úvøç      ppt    ÆÑh      gCategoryType      S
+N‰      gjArrTextDocument      	$Qå      gjArrUploadedDocument      ûíÄ      gNodeId    ß3E|
+      gExtraData     kT      UploadDocument     ÌNu¿	      elementId      ¢∑ÿ
+      categoryId     ã^¶l      barcode    É¥m      tags   S¨:      subjectName    ﬁ¶≠      fileSize   ⁄ëh`      AllowedFileSize    ¢€ö      EXCELSHEET_UPLOAD      3s>¬      fileType   íu`      init   °ÂV      jObject    Ë€˘      callback   Òp^      jAlert     ‡¡Æ9      Object is undefined     ZÉó£T      Error: Undefined parameters categoryId and elementId. These parameters are mandatory!   wì1S      caption"    +æòπ      uploadButtonCaption#    ≥4i      Upload$     1      array%      ŸrëE$      File type parameter must be an Array&   “Ô¢Z      alert'      róÿ„      paintBoiler(    Â›V      .uploadButtonLabel)     ∏OÄ      document*   ¢Ñ
+      ready+      öx≥      fileElementId,      •Yú£      txtUploadDocument--     Á¿IC
+      AjaxUpload.     	‡Ï      action/     -ﬁÚm      uploadDocument.json0    C«l      fileData1   ∑\o      timeout2    6ó(Å      data3   Èp~      onSubmit4   …«=      file5   0ÂGi	      extension6      A¢Ωê      attr7   ûzÉw      disabled8   ∞≠ÿG      inArray9    RâDo      toLowerCase:    ãÆ?»      ALL;    uÀˇZ
+      #elementId<     ¯±{ˆ      div.preview=    Bå|      addClass>   cÅÁÙ      loading?    9¸Zõ      arrayToSend@    ”\«      onUploadA   “P…ù      propB   ún◊´      setDataC    ÒXÊ‡:      File type is not valid ! Please upload only <strong>&nbsp;D     ˆ^v      , E     tqÄ9      &nbsp;<strong> filesF   Ûûí
+      removeAttrG     ﬂ∫∫”
+      onCompleteH     âOÁù      responseI   ˆ+      removeClassJ    ®ûG      responseFlagK   0k      eDocIdL     H}ı#      responseTextM   Z¡ñ	      getDocumentN    ªço      Category not found!O    æd»ê      ajaxP   2´¬(      getUploadedDocumentAjax.json?categoryid=Q   DoÄw      dataTypeR   …©\9      successS    ı≤z      jArrayT     }zı∞	      jsonArrayU      ≈v≥      documentObjV    ¡‚      GemsDocumentW   E∆ag      eCatIdX     √¡ÆÍ      catNameY    ?è≈8      documentNameZ   L|
+      gemsDecode[     )	+S      hasProfileImage\    ÄM0      gender]     „∂\¬      sharedStatus^   O¸MM
+      documentId_     —'Ü      documentPathId`     ã≥Ê
+      eDocPathIda     mØ‰C      creationDateb   Iö=ß      ownerEmployeeIdc    ∂2€o      isTemporaryd    Ñàö      descriptione    #8f      documentBodyf   ﬂ’M=	      createdAtg      Ñu2      pushh   ˛tuW      errori      kfrö      showDocumentj   ΩˇbE
+      jsonObjectk     @.!      gFileIdl    Í–      Error: Parameter expected!m     û§qª      documentListn   ¨–dh0      Error: Required parameter "elementId" is missiono   ™D∫ñ5      Error: Required parameter "documentJArray" is missionp      ú%æ˙      attachementBoilerq      ˚Ÿâ      <table class = 'table'>r    ÄkÉ      attachmentFileNames     %ﬂã¨      trIdt   çﬂí°      trAttachmentFile-u      VçE«      iconPathv   ]Ï„–      gFileTypeIconMappingw   ˛[‹«      downloadLinkTmpx    UIÉ{      junoy   é&∆      a.download.jsonz    Ωÿ\Î      setIndexedArgs{     ◊Ü      UPLOADED|   ¯W|
+      <tr id = "}     ¶·€      "><td><img src="~   ÜÏoà      " />&nbsp;&nbsp;&nbsp;&nbsp;   ˘É.      </td>Ä      ?>∆z      <td><img style = "cursor:pointer" title = "remove" src = "img/remove-icon.png" onclick = "deleteUploadedDMSDocument(this,'Å     ”ö∂      ')" /></td>Ç    ∏ë¯      </tr>É      Z_íˆ<      " />&nbsp;&nbsp;&nbsp;&nbsp;<a href = "javascript:void(0);">Ñ   f⁄≥au      </a></td><td><img style = "cursor:pointer" title = "remove" src = "img/remove-icon.png" onclick = "deleteUploadedCV('Ö      çµ,W      ')" />&nbsp;&nbsp;&nbsp;&nbsp<img src = "img/unsaved.png" title = "Unsaved"/></td></tr>Ü    Á«Ä      </table>á   ª¬,      #uploadedDocListà   ‘„X      htmlâ   ^nò»      No document uploaded!!!ä    ä$Æ˜      getAllUserRootFolderã   ï•À	      typeArrayå      Ç*’ø
+      parentTypeç     R ‚4X      getDocumentCategoriesForHome.json?categoryPath=undefined&typeArray=undefined&parentType=é   Æ M      &root=undefinedè    Ñ–ˇ
+      beforeSendê     ?Î9{      .ulDMSCourseFileAttachmentTreeë     Q…!      <div class="preview-large"></div>í      ƒ#ó      .preview-largeì     JûHI      loading-largeî      Dï»á      completeï   }8      getAllUserRootFolderforHomeñ    :_¬z      getFilesForCourseFileAttachmentó    ì˛ßÃ#      getAllUserDocumentByCategoryId.jsonò    ∂”      categoryId=ô    …Ùπ      .divUserFileListö   B*      getCategoryPathWithIdõ      pÒ1«      documentCategoryIdú     ˆÜ•Ä*      getCategoryPathWithIdAjax.json?categoryId=ù     é˙      getTextDocumentWithAttachmentû      ‡√'      getTextDocumentAjax.json?d__documentId=ü    qm+Ô      startCommonAjaxSpinner†     Ü*F      stopCommonAjaxSpinner°      ˛Q1      console¢    =X˚      log£    ã—µ*      No Data Found!!!§   #ùKX      getAttachmentListAjax•      ∏˝%      getAttachmentList.json?d__documentId=¶      ‘:      #tblAttachementListß    D≥yÔ#      <div class = "preview-large"></div>®    ∂7ê       showDocumentAttachmentList©     V˙Nw      tableId™    ¬Jj~      isOwner´    ¥ÿ;é      TEXT¨   Zô|      downloadLinkTmpIcon≠    çÏa#      <i class = "icon-download-alt"></i>Æ    /Ü‰˘r      </td><td><i style = "cursor:pointer" title = "remove" class = "icon-remove-sign" onclick = "removeAttachmentAjax('Ø     ä…®∂      ','∞    ‡0˙b       ')" ></i>&nbsp;&nbsp;&nbsp;&nbsp±   ¯ÅÊÛ
+      </td></tr>≤     gJÊ       </td><td>&nbsp;&nbsp;&nbsp;&nbsp≥   }Lb±l      <div class="alert alert-info" style="padding:2px"><strong style="color:red">No attachments!!!</strong></div>¥   1Ôf       boiler√     ´A)K      #uploadDocumentƒ    ÛWÄπ      reset≈      èá∆      shareStatus∆    øØîù      removeUploadedDocumentById«     ,ªˆ&      docId»      E»xz      jConfirm…   {{g2       Do you want to Remove Document ?    NXa      ConfirmÀ    E˚î˜)      removeUploadedDocumentById.json?d__docId=Ã      ê»      getUploadedDocumentByIdÕ    Ù¡r…&      getUploadedDocumentById.json?d__docId=Œ     k˝=À     <form id = "uploadDocument" action="uploadDocument.json" method="POST" enctype="multipart/form-data"><table class = "table tblUploadDoc"><tr><td><div class="span6"><div class="span2"><div class="preview"></div></div><div class="span4"><div class="btn btn-info" style = "width:150px;height:20px;"><span class="uploadButtonLabel"> Upload file</span><input  type="file" style = "margin-top:-22px;margin-left:5px;opacity:0;" name="fileData" id="txtUploadDocument-œ    ﬂÓm-      "></div></div></div></td></tr></table></form>–      wpºô      UploadDocument/this.init—   ˝ùb      UploadDocument/this.init/<“     çÌÉ      UploadDocument/this.init/</<’   RP’      UploadDocument/this.getDocument÷    û-#>!      UploadDocument/this.getDocument/<Ÿ      ≠¯:¡       UploadDocument/this.showDocument⁄   Ñj¡6      UploadDocument/this.setData€    4§…`(      UploadDocument/this.getAllUserRootFolder‡   ¡2?4/      UploadDocument/this.getAllUserRootFolderforHomeÂ    Ï}Zﬂ3      UploadDocument/this.getFilesForCourseFileAttachmentÍ    gDä5)      UploadDocument/this.getCategoryPathWithIdÌ      GıjÑ1      UploadDocument/this.getTextDocumentWithAttachmentÚ      F±)      UploadDocument/this.getAttachmentListAjax˜      XÆR~.      UploadDocument/this.showDocumentAttachmentList¯     À“á      removeUploadedDocumentById/<     1     9   1              Ô%,â                                                                                                                                                                        	                
+           	      
+           
+      
+                                                                                                                                                                                                                                                                                                                                                                 !                                                   $                  $           !      $           "      '                 $           #                $      *           %      *           &      *           '      *           (      *                            )                  *      1                            +                 ,      4           -      5           .                 /      7           0      ≥Oåc            P  P  P  P  P  P  –'  –V  –∆  –Ã  –                 P  P  P  `ã  `á  `               P  P  `ã  `á  `         e                   `ã  `á  `               +  P  `ã  `á  `            4  5  ?  A  ã                4  PH  P  `ã  `á  `          e `               P  P             ⁄ `“              S  T  i  U                           e              j    k  S  p  i  r  ^  K  c  s    w           e               2               ã  å    P                                             S                               ã  å    P                                             S                                   P                                             S                               õ    P             S           e                               ^    P                                             S           e                               ^    P                                             S                           e              S  ©  ^  ™  p  i  r  s  w  ¨                      ¥           e                ã                «  P  P             r                              «    P               Ø¬0∞IÙ$KEÆ˙ö   #      .  {  1  ¯  2  3  G                          J  Q     R  h          J  Q  è  î  R  h         J  Q  è  î  R  h     #    J  Q  2  è  î  R  h        J  Q     R  h     #     J  è  î  Q     R  h     #   J     Q  è  î  R  h        J  Q  R        J  Q  R      u                                                       	      
+            r      r          á&’™ç!´!1   º     Åì¬¨º   v                         ⁄   ∑   :       ﬂ∑   	       ﬂ∑
+   ª   Ä„  Å   
+   ﬂ∑   ª   Ä„  Å      ﬂ∑   	       ﬂ∑   9       ﬂ•Ee+eKeì eì e+e;Ä ø@Ä ,PÄÄÄ‘  ;Sô˚‘  <                       ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ¡      L   ﬂ¡      L   ﬂ¡      L   ﬂ¡      L   ﬂ¡      L   ﬂª   J   Œ   ﬂª	   Œ   ﬂ   Œ   ﬂ¡   m
+   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ¡   m   L   ﬂ•ï `ê `ê `ê `ê `ê `ê `+`+`ê@l`ê@Ä  ©`ê@Ä  ˆ`ê `ê@Ä `ê@Ä  `ê@Ä 4`ê@Ä E`ê@Ä a`ê@Ä y`ê0Ä îPÄÄ4  ∞2  )  '             M     $Ω  Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ¡    ö    ó   ª       w ﬂ ¢ô∑  ó   ´¡   ¡   J   L   ﬂ¡   J   Œ  ﬂ¡   ¡   J   L   ﬂ¡   ¡   J   L   ﬂ¡   ¡   J   L   ﬂ¡   ¡   J   L   ﬂ¡   J    ùÉ   ó   ﬂ¡   J      ùh   ó   ﬂ¡   J    ùQ   ó   ﬂ¡   J      ù6   ó   ﬂ¡   J   	   ù   ó   ﬂ¡   J   
+   ó    ö   ó!   ª       w ﬂ¢ó#   ¡   J    ù   ó&   ﬂª    ¡   J   s ó)   ö   ó*   ª   J   Œ  ﬂô   ó,   ¡   J   Œ  ﬂó-   ¡   J    ù   ó0   ﬂ¡   J      ó2   ö   ó3   ∑          ﬂô   ó5   ∑   ¡   J       ﬂó8   ¡   J    öq   ó;   ¡   J      ú   ó?   ﬂ¡   J      óB   ö    óC   ª       w ﬂ¢ô   óE   ¡   J   Œ  ﬂóF   ô+   óF    §≠∞±   ﬂ±   ﬂª    æ   w ﬂ§“•“óH   ª    ¡   J   ¡   J   m   w ﬂ•ß `,`P$`Aa;!`ï `ê `ï `ï `ï `ï `
+≤ 8‚ 	`P$`AaF`
+ì 
+ˇˇˇ˙Pí `ö `ï@`
+¨ `ö `ö@`
+,	`ú &† `P$`AaK"`¢@%+`ˇˇˇˇP$`AaI*`
+
+ˇˇˇ‡PDaPÄ4  $     ‚     ˇˇˇˇ    ˛                 T   Ü  ú   ÔQú   R                         ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂª       s ·J   ‰ª   w ﬂª    ª   s ·J   ‰m   w ﬂ•ï `P
+ˇˇˇ˚P$`ˇˇˇˇP
+ˇˇˇ˙PD5PÄÄÄË   _¡S(Ë   ü                         ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ   ¡  J   &   &¡  J   &   &Œ   ﬂª   Ä¡   9      <	   
+   <   `Í<   ¡  <   9   <   m   <   m   <   „  Å ﬂ•ï `ë ó `%**(**J#ND2PÄÿ  “KÃ˛»  ı        	       9      ﬁÕ  ﬂª       ¡   &s ·J   ‰      w ﬂª   ·J   ‰º ·J   ‰s  ·J   ‰s  ¡  s ˇù   ó   ﬂ¡     ó   ö"  ó   ª    	   s ·J
+   ‰   s ·J   ‰   w ﬂ9   Õ   ﬂæ   ¡  J   L   ﬂæ   ¡  L   ﬂ¡  J    öì   ó   ¡  J   ·J   ‰æ  s ö   ó"   ¢ó"   ª   ^ò$   _`õJ   ó%   Õ  ª   ·J   ‰æ  s ö   ó)   æ   æ  ª   æ  KNﬂó,   ﬂô≥ˇˇˇó,   aó,   æ  ·J   ‰æ   w ﬂ¢ôZ   ó.   ª       ¡  ·J   ‰   s &   &w ﬂª       ¡   &s ·J   ‰   w ﬂ¢ó9   •&`ˇˇˇ˚Pî PD`
+
+
+P
+Pˇˇˇ’P´ `PPP$`*`î `/`
+,`
+ë ˇˇˇ˚P.
+`AF`ò ˇˇˇÙ$`ˇˇˇÒP-`ô@	ë@`ˇˇˇ¯P$`A; `=ë 	P
+ˇˇˇπP$`ˇˇˇ˚PP$`AVÿ        #  R   ¥  a∑õî    '                    $Ω  Œ   ﬂΩ Œ   ﬂ‹Œ   ﬂﬁŒ   ﬂ5Œ   ﬂ∫       ∫   &s ·J   ‰   w ﬂ´∫       ¡   &   &z Ëh   Œ   ﬂ∫    	   s ·J
+   ‰   s ·J   ‰   w ﬂ¡   KJ      ö%   ó   ∫    ¡   KJ   w ﬂô   ó   ¡   KJ   ßó   ô(   ó    §≠–   ≥   ﬂ∫    ¡   w ﬂ—ó   •ß `ˇˇˇ˚PP!`ˇˇˇ˜P.`PPP$`ú 	`	ˇˇˇˇP 	`ü@
++`ˇˇˇˇPJP¥  §     ˛      ˇˇˇˇ        L   •   X   {Q_X   &                        Ω  Œ   ﬂΩ Œ   ﬂª   Äm   „  Å ¢•í `	ˇˇˇÙPC9QÄ®  Cµ›˚à    	                   $Ω  Œ   ﬂ¡   ùB   ó   ﬂ¡     ù,   ó   ﬂ¡     ù   ó   ﬂ¡     ó   ö   ó   º     w ﬂ¢ó	   ´∑   ¡      ﬂª   ·J   ‰9   	   ¡  &<
+      <   ¡   <   m   <   m   <   w ﬂô3   ó    §≠∞±   ﬂ±   ﬂª    æ   w ﬂº  æ   w ﬂ“ó   •I`”@`	P$`A76	!`ê `%/+*'J.JPë@3+`ˇˇˇˇP$`ˇˇˇˇPJ7PÄ®  ò     ‚   &   ˇˇˇˇ        v   d      8`  V                I      ª   Ä„  Å  Õ   ﬂÕ  ﬂò   æ  º  J   öÂ  ó   ª   Ä„  Å  Õ  ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   ·J   ‰s  L	   ﬂæ  º  æ  KJ   ·J   ‰s  L   ﬂæ  º  æ  KJ
+   L
+   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ  º  æ  KJ   L   ﬂæ   ·J   ‰æ  w ﬂæ  0(Õ  ﬂô˛ˇˇóC   ∑   º      ﬂ¡   ö   óG   ¡   æ   w ﬂóH   ¡    æ   w ﬂ•@`í  `fì `í `ó `ó `ó@	`ò -P)`ò %P)`ó `ó `ó `ó `ó `ó `ó `ó `ó `+`ó `ó `ó `ˇˇˇ˚PD*`ï@`.
+`
+,`	ˇˇˇˇP)`ˇˇˇˇP$PÄ             ¯  (   j»€(                               •@ÄÄÄ@  ë1ï   ∫                h      $Õ   ﬂº   ö    ó   ª       w ﬂ ¢ôé  ó   ´º  J      ù   ó   ﬂº  J    ó	   ög   ó
+   º  J      ö   ó   ª       w ﬂ¢ó   º  J    ö   ó   ª       w ﬂ¢ó   ô…  ó   º  J   Õ  ﬂæ  J   ö{  ó   	   Õ  ﬂÕ  ﬂò   æ  æ  J   öÕ  ó   æ  æ  KJ
+   ·J   ‰s  Õ  ﬂæ  æ  KJ   Õ  ﬂæ  æ  KJ    ö   ó%   æ  æ  KJ   ô   ó'   æ  æ  KJ   ó)   Õ  ﬂæ  æ  KJ   Õ  ﬂ   æ  &Õ  ﬂæ  æ  KJ   Õ	  ﬂ∑   ª   æ	  K    ﬂæ  õ§   ó3   ª   J   J   ·J   ‰æ     ª    æ  s æ  s Õ
+  ﬂæ     æ  &   &ª   &   &æ
+  &   &&.Õ  ﬂæ     æ  &   &&.Õ  ﬂæ     &.Õ  ﬂôG   óF   æ     æ  &   &ª   &    &æ  &!   &æ  &"   &&.Õ  ﬂóP   æ  0(Õ  ﬂô$˛ˇˇóR   æ  #   &.Õ  ﬂº  J    ö,   óV   ª$    %   s ·J&   ‰æ  w ﬂô0   óZ   ª$    '   º  J   &s ·J&   ‰æ  w ﬂó`   ô1   ó`   ª$    '   º  J   &s ·J&   ‰(   w ﬂóf   ô+   óf    §≠∞±  ﬂ±  ﬂª*    æ  w ﬂ§“•“óh   •@`&`,`P$`AK;A`° 9ë 	`ò `P$`AKF	`,`P$`AKê0 `-
+`ï `* `fî !`ï P(`ì `º `ì@`J `ì `ï `. `ñ .	ˇˇˇÌP(ˇˇˇ≥P(	`)&&,ò 
+`)í@-	`ö 	`)&&&í@+`ï@:`ê `,`P
+ˇˇˇ˚PN>`	ˇˇˇ˘P
+"ˇˇˇ˚Pì `	ˇˇˇ˘PPñ@D+`ˇˇˇˇP$`AKYÄ@     )   ñ     ˇˇˇˇ    ≤                ˜   ·          1   ]  8   4@û8                            ∑   º      ﬂ• `.PÄÄ§   >˘~c§   e   	                     Ω Œ   ﬂª   ·J   ‰9      º &   &<      <   m	   <
+   m   <   m   <   m   <   w ﬂ•)`%_/*JJJJPDPà   7z0ôà   L                  
+        ª       s ·J   ‰   w ﬂª       s ·J   ‰   s ·J   ‰   w ﬂ• `P#P$`P#PP$PÄÄÄ`   Lï˛«`   .                          ª       s ·J   ‰   s ·J   ‰   w ﬂ• `P#PP$PÄÄ@   ÔmÇ@                            ¡    º  w ﬂ• `	ˇˇˇˇP$PÄÄÄ$   ;2'Ó$                               • §   >˘~c§   e   	                     Ω Œ   ﬂª   ·J   ‰9      º &   &<      <   m	   <
+   m   <   m   <   m   <   w ﬂ•)`%_/*JJJJPDPà   7z0ôà   L                  
+        ª       s ·J   ‰   w ﬂª       s ·J   ‰   s ·J   ‰   w ﬂ• `P#P$`P#PP$PÄÄÄ`   Lï˛«`   .                          ª       s ·J   ‰   s ·J   ‰   w ﬂ• `P#PP$PÄÄ@   ÔmÇ@                            ¡    º  w ﬂ• `	ˇˇˇˇP$PÄÄÄ$   ;2'Ó$                               • ¨   ÁaP¨   i   	                     Ω Œ   ﬂª   ·J   ‰9      <      <      º  &<	   m
+   <   m   <   m   <   m   <   w ﬂ•)`%**)J	JJJPDPÄÄà   sˇ≤¨à   L                  
+        ª       s ·J   ‰   w ﬂª       s ·J   ‰   s ·J   ‰   w ﬂ• `PP$`PPP$PÄÄÄ`   I≈CH`   .                          ª       s ·J   ‰   s ·J   ‰   w ﬂ• `PPP$PÄÄ@   ÔmÇ@                            ¡    º  w ﬂ• `	ˇˇˇˇP$PÄÄÄ$   ;2'Ó$                               • å   ÿn…å   Q   	                     Ω Œ   ﬂª   ·J   ‰9      º  &<      <   <   m	   <
+   m   <   w ﬂ•)`%1)*&JJPDPå   ã ôl   -                       $´¡    º  w ﬂô   ó    §≠∞±   ﬂ±   ﬂ“ó   •!	`	ˇˇˇˇPë ë@PÄÄå   |            ˇˇˇˇ              (   #B°(                               •@ÄÄÄ®   º:Qµ®   e   	                     Ω Œ   ﬂª   ·J   ‰9      º  &<   m   <   m   <	   
+   <   <   m   <   m   <   w ﬂ•)`%.)JJ	*&JJPDPÄÄ4   ›Ö¨4                             ª    w  ﬂ• `*PÄÄ4   ›Ö¨4                             ª    w  ﬂ• `*PÄÄå  “`Ä0l                        $º  J   ö„   ó   ´º  Kº  KJ    ö#   ó   º  KJ   ·J   ‰s  ô   ó      ó   L   ﬂº  Kº  KJ    ö#   ó   º  KJ   ·J   ‰s  ô   ó      ó   L   ﬂô-   ó    §≠∞±   ﬂ±   ﬂª   ·J   ‰æ   w ﬂ“ó   ¡    º  Kw ﬂô   ó   ª	    
+   w ﬂó   • `î!
+`1ù !Pù 
+`/ù  P™ `ˇˇˇ¸P*	`	ˇˇˇˇP 	`PI
+På  |     ¥       ˇˇˇˇ           ó   (   #B°(                               •@ÄÄÄÙ   ˙?“[‘   Ñ   	                   $Ω Œ   ﬂ´ª   ·J   ‰9      º  &<   <      <   m	   <
+   m   <   m   <   m   <   w ﬂô   ó    §≠∞±   ﬂ±   ﬂ“ó   •!`%,)&*J
+JJJPë@ë@PÄÙ   ‰      r      ˇˇˇˇ        
+   `   t   8≈Õzt   =                          ª       s ·J   ‰   w ﬂª       s ·J   ‰   w ﬂ• `PP$`PP$PÄL   Ó\)HL                             ª       s ·J   ‰   w ﬂ• `PP$P@   ÔmÇ@                            ¡    º  w ﬂ• `	ˇˇˇˇP$PÄÄÄ(   #B°(                               •@ÄÄÄh  ãˇX  p                N         Õ   ﬂº  J   ö/  ó   Õ  ﬂò   æ  º  J   ö¶  ó   º  æ  KJ   ·J   ‰s  Õ  ﬂ   º &   &æ  &Õ  ﬂª   J   J	   ·J
+   ‰º    ª    æ  s æ  s Õ  ﬂª   J   J	   ·J
+   ‰º    ª    æ  s    s Õ  ﬂº  æ  KJ   Õ  ﬂ∑   ª   æ  K    ﬂº  ù   ó#   ﬂº ó#   öb   ó$   æ      æ  &   &ª   &   &æ  &   &æ  &   &æ  &   &æ  &   &&.Õ   ﬂôG   ó2   æ      æ  &   &ª   &   &æ  &   &æ  &   &&.Õ   ﬂó<   æ  0(Õ  ﬂôL˛ˇˇó>   º  ö,   ó@   ª       s ·J   ‰æ   w ﬂô+   óD   ª       º &s ·J   ‰æ   w ﬂóI   ô,   óI   ª       º &s ·J   ‰   w ﬂóN   • `*	`î  `fì !`î P(`
+*`ñ .ˇˇˇÌP(ˇˇˇ≥P(#`ñ .ˇˇˇÌPˇˇˇ€P(`í `ï `ü 	`$ê (Ä  Ü7ú 	`$ê (3ó@*`ï@
+`,`P
+ˇˇˇ˚PN`ˇˇˇ˚P
+ˇˇˇ˚Pì `ˇˇˇ˚PPIPh         $   π    †`Ù   é                       $   º  &   &º &   &Õ   ﬂª       º  &s ·J   ‰æ   w ﬂª       s ·J   ‰w  ﬂ´º  w  ﬂô'   ó    §≠∞±  ﬂ±  ﬂª
+    æ  w ﬂ“ó   • `Ew
+O`ˇˇˇ˚P
+ˇˇˇ˚P$`P
+P!`ï +`ˇˇˇˇP:P    	   n      ˇˇˇˇ        Y         ¨Òı   ù                        ﬁÕ   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂæ   J	   ﬂæ   J
+   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂæ   J   ﬂ•&`*`*`*`*`*`*`*`*`*`*`*`*`*`*`PÄÄÄ`   Ω,ÛQ`   ,                        Ω  Œ   ﬂΩ Œ   ﬂª          m   w ﬂ•í `ê 6ˇˇˇ“P4PÄÄÄå   ‡Jâfå   N                         º  öC   ó   ª   ·J   ‰9      ¡   &<      <   m   <	   w ﬂó   • ` `%0+*JPIPÄÄÄ@   &ÁI√@                            ¡    º  w ﬂ• `	ˇˇˇˇP$PÄÄÄx   Jüîøx   A   	              	       Ω Œ   ﬂª   ·J   ‰9      º  &<      <   m   <	   w ﬂ•)`%-)*JP4PÄÄ@   ·@                            ¡    º  w ﬂ• `	ˇˇˇˇP$PÄÄÄ3ıÿ  `$  #  6  7  8  "  9  :  ;  ∞   <  =  >    @    @  6     ı   B    C  >  D  E  F    `$  #  +  F  7  †   (  )  ;  ∞   <  I  >  J  1    K  L    `    `,    -    ê   -     @/  .  0  {  1  ¯    @2    p3    pG    `$  (    "  )  *    p  `              ê   ê  t       (      !  "  #    $  u  %    `&  '    p  `Ä  I  V    W  X  {  Z  Y  [  \  ]  _  ^  `  K  a  b  5  0  c  d  e  f  g      `
+  `ê   ê  t  N    $  O    @P  J  B  Q     	  pR  
+  ph    `&  	  `ª    p  `  l    ê   m  n  o  I  q  {  "  ^  K  c  t  0  u  v  x  D  y  z  {  ì   |  }  ~    Ä  Å  Ç  É  Ñ  Ö  Ü  $  á  à  #  â    `&    `    `$  ê  à  ë  ∞   í  =  ì    `$  ê  ∞   í  I  ì    `  `  `$  O    @ç  é  J  B  Q    pè    pî    pR    ph    `$  ê  à  ë  ∞   í  =  ì    `$  ê  ∞   í  I  ì    `  `  `$  O    @ç  é  J  B  Q    pè    pî    pR    ph    `$  ô  à  ë  ∞   í  =  ì    `$  ô  ∞   í  I  ì    `  `  `$  O    @ó  J  B  Q  ò  2    pè    pî    pR    ph  !  `"  `#  `   `$  O    @ú  J  B  Q       pR    ph  %  `ü  &  `†  '  `I  e  Z  ê   d  (  `°  ¢    £  )  `$  `$  O    @û  J     pè  !  pî  B  Q     "  pR  #  ph  +  `$  ¶  à  ß  í  =  ì  ,  `$  í  I  ì  -  `.  `*  `$  O  	  @•  J     B  Q  %  pè  &  pî  '  pR  (  ph  /  `0  `ê   I  {  "  t  -  x  D  y  z  ´  ì   ≠  0  u  v  |  }  ~  Æ  Ø  ∞  ±  ≤  $  ¶  à  #  ≥    `ê                      p    pM    pi    pB    pä    pï    pñ    pö    pù  $  p§  )  p®  1  `Œ  -  œ  $  #  à  √  ƒ  2  `&  3  `^    X  e  Y  [  \  ≈  a  d  5  0  c  b  {  6  `5  `$  O  
+  @À  J  B  Q  .  pR  4  `»  …     -  p8  `7  `$  O    @Õ  J  B  Q  0  pR     `  p*  p+  p,  p/  p     @  ê     Ä          @ˇXÑ¯                ¢              M      –        E      —        1      “               3              G        ò      ’        Ñ      ÷        h      R        É      h        õ   +   Ÿ        ∆      ⁄        ⁄      €        »   	   è        —      î        ÿ      R        Ÿ      h        ˝      ‡        Î   	   è        Ù      î        ˚      R        ¸      h              Â          	   è             î             R             h        5     Í        2     R        4     h        R     Ì        B     è        D     î        F     R        Q     h        r     Ú        c     è        k     î        p     R        q     h        Ñ     ˜        ¬     '        Õ     V        Ë     ∆        ﬁ  
+   ¯        ›     R        Ó  
+   Ã        Ì     R        ùH©¿      ïp      ïp                Ç.?  z6  (  z6                Ç.@  ü  8  ü               Ç.´  ô  £  ô  @   6           Ç.  ì  ˙  ì  B               	  „  	  „  J             É.ˇ  Ü  ˜  Ü  e             Äæ  &  ∂  &  y             ÄÚ  !  Í  !  z               í  √  ä  √  â               ÿ  „  –  „  ®                n  ñ   f  ñ   ∂               ±   ÷   ©   ÷               Ä!  †#  ˝   †#    )            È!  ®"  ·!  ®"                 ¬"  .#  ∫"  .#                 F#  p#  >#  p#                Ü#  ë#  ~#  ë#               Ä÷#  q&  Œ#  q&    0            ∫$  y%  ≤$  y%                 ì%  ˇ%  ã%  ˇ%  "               &  A&  &  A&  %              W&  b&  O&  b&  (             Ä´&  ‰(  £&  ‰(  -  4            W'  ˙'  O'  ˙'  2               (  r(  (  r(  6               ä(  ¥(  Ç(  ¥(  9               (  ’(  ¬(  ’(  <             Ä)  O*  )  O*  A  *            Ã)  *  ƒ)  *  F              4*  @*  ,*  @*  L             Äá*  z-  *  z-  R  2            +  3+  ˛*  3+  U               M+  y+  E+  y+  X               ª+  I-  ≥+  I-  ]              _-  k-  W-  k-  h             Ä™-  ‹/  ¢-  ‹/  n  *            \.  Î.  T.  Î.  t               /  J/  ˝.  J/  x               b/  å/  Z/  å/  {              ¢/  Æ/  ö/  Æ/  ~               0  w6  0  w6  Ü  /            ë6  :  |6  :  £             ]:  p;  H:  p;  »             Äó;  ≠<  t;  ≠<  ‹  $           Ë;  ©<  ‡;  ©<  ›  @            s<  õ<  k<  õ<  ‰            Ä–<  s=  ∞<  s=  Ì  !            H=  l=  @=  l=  Ò            5°›√Æ‡l"Ùì      g¯ﬁ˚g¯ﬁ˚H≈tg¯Âp   T    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/scripts/dms/dms.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|8b297d6c-5226-ddb2-001f-25c4f8abbe99|
+Accept-Ranges: bytes
+ETag: W/"28821-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 28821
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|8b297d6c-5226-ddb2-001f-25c4f8abbe99|
+Accept-Ranges: bytes
+ETag: W/"28821-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 28821
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=91
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 412 net-response-time-onstop 441 alt-data 1;28821,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  KÙ

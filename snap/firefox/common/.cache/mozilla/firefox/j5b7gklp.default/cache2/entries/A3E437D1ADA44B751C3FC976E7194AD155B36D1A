@@ -1,0 +1,2208 @@
+var searchKeyword = new Array();
+var globalArray = new Array();
+var globalMyArrArray = new Array();
+var countAnnouncement=0;
+
+
+$('document').ready(function(){
+	$('#replayToStudentMessageModal').modal({
+		keyboard:false,
+		show:false
+	}).css({
+		width:'700px',
+		'margin-left':function(){
+			return -($(this).width()/2);
+		},
+	});
+
+	$('#annScroll').slimScroll({
+		position: 'right',
+		height: '500px',
+		wheelStep: 2
+	});
+});
+function typeAhead(){
+	$('document').ready(function(){
+		$('#searchBox').typeahead({
+			source:searchKeyword
+		});
+	});
+}
+//getUnreadMessageAndAnnouncementForStudent();
+function viewAnnouncement(divId){
+	getUnreadAnnouncement();
+	getUnreadStudentMessage();
+	$("#viewAnnouncementAll").html('');
+	$("#viewAnnouncement").html('');
+	var boiler='<div>'+
+	'<br><div id="autoComplete"></div><div id="announcementList">'+
+	'</div><div id="paging"></div>';
+	$("#"+divId).html(boiler);
+
+	$.ajax({
+		url:'getStudentAnnouncement.json',
+		dataType:'json',
+		async:false,
+		beforeSend:function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			if(jArray.length>0){
+				globalArray = jArray;
+
+				var searchBoiler='<table class="table table-bordered">' +
+				'<tr>'+
+				'<td>'+
+				'<span id="searchDiv">'+
+				'&nbsp;&nbsp;<input type="text" id="searchBox" placeholder="Search By Keyword" data-provide="typeahead"/>'+
+				'</span>'+
+				'&nbsp;&nbsp;<a class="btn" style="vertical-align: top;" onclick="showAnnouncement(\'search\', 0);">Search</a><span id="cartBtn" class="pull-right"></span>'+
+				'&nbsp;&nbsp;<a class="btn" style="vertical-align: top;" onclick="showAnnouncement(\'no\', 0); ">Clear</a><span id="cartBtn" class="pull-right"></span>'+
+				'</td>'+
+				'</tr>'+
+				'</table>';
+				$("#autoComplete").html(searchBoiler);
+
+				var myArr = new Array();
+				for(var j=0;j<globalArray.length;j++)
+				{
+					myArr.push(decodeURIComponent(globalArray[j]["heading"]));
+				}
+
+				$.each(myArr, function(i, el){
+					if($.inArray(el, searchKeyword) === -1) searchKeyword.push(el);
+				});
+
+				typeAhead();
+				/*	$("#searchBox").keyup(function(e) {
+							showAnnouncement('search', 0);
+						});
+						$("#searchBox").click(function(e) {
+							showAnnouncement('search', 0);
+						});*/
+
+				showAnnouncement('no', 0);
+			}
+			else{
+				$('#announcementList').html('<div class = "alert alert-info">No announcements</div>');
+
+			}
+		},
+		error:function(){
+
+		}
+	});
+
+
+}
+
+function searchAnnouncement(divId,filterFlag){
+
+	var SearchWord=$("#txtSearchWord").val();
+	viewAnnouncementNew(divId,SearchWord,filterFlag,'');
+}
+
+
+function viewAnnouncementNew(divId,searchKeyword,filterFlag,flag){
+	//alert(flag);
+	$("#divalumpost").hide();
+	$("#"+divId).show();
+	$('#announcementDetails').html('');
+	getUnreadAnnouncement();
+	getUnreadStudentMessage();
+	$.ajax({
+		url:'getStudentAnnouncement.json',
+		dataType:'json',
+		data:{SearchWord:searchKeyword,filterFlag:filterFlag},
+		async:false,
+		beforeSend:function() {
+			$("#"+divId).html('<div id="divPostLoading" style="text-align: center;width: 100%;"><i class="fa fa-spinner fa-pulse fa-fw fa-4x" style="color:#0b4971"></i></div>');
+			
+		},
+		complete: function() {
+
+		},
+		success:function(jArray){
+
+			var boilerNew='';
+			var annBody = '';
+			var allchecked = '';
+			var unreadchecked = '';
+			var todaysDate = new Date();
+			var cnt = jArray.length;
+			$("#announcementCount").text(cnt);
+			$("#countAnnouncement").text(cnt);
+			if(filterFlag=='unread')unreadchecked='checked';else allchecked='checked';
+			
+			if(flag == '')
+			{
+			boilerNew='<div class="row-fluid" style="margin-left:5px;">'+
+			'<div class="span4">'+
+			'<div class="switch-toggle well">'+
+			'<input id="Unread" name="view" '+unreadchecked+' type="radio"><label for="Unread" onclick="viewAnnouncementNew(\''+divId+'\',\''+searchKeyword+'\',\'unread\',\'\')">Unread</label>'+
+			'<input id="All" name="view" '+allchecked+' type="radio"><label for="All" onclick="viewAnnouncementNew(\''+divId+'\',\''+searchKeyword+'\',\'all\',\'\')">All</label><a class="btn btn-success"></a></div></div>'+
+
+			'<div class="span2">'+'<p style="margin-bottom:10px;font-size:13px;text-align:left;">Showing '+cnt+' results</p></div>'+
+
+			'<div class="span6" style="text-align:right;margin-top:-5px;">'+
+			'<input type=text id="txtSearchWord" value="'+searchKeyword+'" placeholder="Search Announcement" style="margin:5px;border-radius:5px;">'+
+			'<input type="button" class="btn btn-primary" value="Search" onclick="searchAnnouncement(\''+divId+'\',\''+filterFlag+'\')"></div>'+
+			//'</div>'+
+			'</div>';
+			}
+			//--------new---------
+			if(jArray.length>0){				
+				boilerNew+='<div id="announcementContainer"><section><div class="container" style="width:98%;">';
+				for(var j=0;j<jArray.length;j++)
+				{
+					if(jArray[j]["readStatus"]==false)
+					{
+						var createdDate =new Date(jArray[j]["createdDate"]);
+						if(todaysDate.getFullYear() == createdDate.getFullYear() && todaysDate.getMonth() == createdDate.getMonth()  && todaysDate.getDate() == createdDate.getDate() )
+						{
+							boilerNew+= '<div class="collapse-card" style="background-color:#dfeffc;" id="div'+jArray[j]["announcementId"]+'" >';
+						}
+						else
+						{
+							boilerNew+= '<div class="collapse-card" style="background-color:#F3F3F3;" id="div'+jArray[j]["announcementId"]+'" >';
+						}
+					}
+					else
+					{
+						boilerNew+= '<div class="collapse-card" id="div'+jArray[j]["announcementId"]+'" >';
+					}
+
+					boilerNew+= '<div class="title"  onclick="viewAnnouncementDetailNew(\''+jArray[j]["announcementId"]+'\')">';
+					boilerNew+= '<img src="getEmployeeProfileImageById.json?id='+jArray[j]["employeeId"]+'" style="border-radius:20px;float:left;border:0.5px solid lightgray;" height=40>';
+					boilerNew+= '<span>On '+jArray[j]["createdDate"]+' by <b>'+jArray[j]["employeeName"]+'</b></span>';
+					try{
+						boilerNew+= '<strong>'+decodeURIComponent(jArray[j]["heading"])+'</strong>';
+					}catch(e){
+						boilerNew+= '<strong>'+jArray[j]["heading"]+'</strong>';
+					}
+					boilerNew+= '</div>';
+					boilerNew+= '<div class="body"><div id="announcementBody-'+jArray[j]["announcementId"]+'"><div style="width:100%; text-align:center;"><img src="img/ajax.gif"></div></div>';
+
+					boilerNew+= '<h1 style="font-size: 18px; padding-bottom: 10px; margin-bottom: 10px; line-height: 22px; border-bottom: 1px solid #E5E5E5;"></h1>';
+					boilerNew+= '<div class="footer" style="float:right;margin-bottom:10px;">';
+					boilerNew+= '<a title="Move to Trash" onclick="removeStudentAnnouncement(\''+jArray[j]["announcementId"]+'\',\'div\',\''+jArray[j]["isPermanent"]+'\'),setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')"><img src="img/trash.png"></a>';
+					boilerNew+= '</div><br></div></div>';
+				}
+				boilerNew+='</div></section></div>';
+			}
+			else
+			{
+				boilerNew+='<h4 style="text-align:center;font-size:14px;padding:5px;">No new Announcements</h4>';
+			}
+			$("#"+divId).html(boilerNew);
+			$('.collapse-card .title').paperCollapse({});
+			$('#announcementContainer').slimScroll({
+				position: 'right',
+				height: '450px',
+				width: '100%',
+				scrollBy: '10px',
+				railVisible: true,
+				wheelStep: 6,
+				alwaysVisible: true
+			});
+			//-------------end--------
+
+			/*for(var j=0;j<jArray.length;j++)
+				{
+
+				annBody = $('#body1').html(jArray[j]["announcementBody"] ).text();
+
+				if(jArray[j]["status"]==false){
+					boilerNew+= '<div style="background-color: #DDDDE5; padding: 5px; font-size: 11px; border: 1px solid #D5D5D5; border-radius: 2px; margin-bottom: 10px;" id="div'+jArray[j]["studentAnnouncmentId"]+'" >'+
+					'<div style="" onclick="viewAnnouncementDetailNew(\''+jArray[j]["announcementId"]+'\'), setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')" style="cursor: pointer;">';
+					boilerNew+= '&nbsp;&nbsp;&nbsp;<span class="pull-right" id="new'+jArray[j]["announcementId"]+'"><img src="images/Icon_new.png"></span>'+
+						'<p style="padding-bottom: 5px; border-bottom: 1px solid #F0F0F0; margin-bottom: 5px;" id="subject'+j+'"><strong>';
+						//' '+decodeURIComponent(jArray[j]["heading"])+' '+
+						try{
+							boilerNew+= decodeURIComponent(jArray[j]["heading"]);
+						}catch(e){
+							boilerNew+= jArray[j]["heading"];
+						}
+						boilerNew+='</strong></p>';
+				}
+				else{
+					boilerNew+= '<div style="background-color: #FFF; padding: 5px; font-size: 11px; border: 1px solid #D5D5D5; border-radius: 2px; margin-bottom: 10px;" id="div'+jArray[j]["studentAnnouncmentId"]+'" >'+
+					'<div style="" onclick="viewAnnouncementDetailNew(\''+jArray[j]["announcementId"]+'\'), setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')" style="cursor: pointer;">';
+					//boilerNew+= '&nbsp;&nbsp;&nbsp;<span class="label label-info" id="new'+jArray[j]["announcementId"]+'">New</span>';
+					boilerNew+= '<p style="padding-bottom: 5px; border-bottom: 1px solid #F0F0F0; margin-bottom: 5px;" id="subject'+j+'"><strong>';
+					//' '+decodeURIComponent(jArray[j]["heading"])+' '+
+					try{
+						boilerNew+= decodeURIComponent(jArray[j]["heading"]);
+					}catch(e){
+						boilerNew+= jArray[j]["heading"];
+					}
+					boilerNew+=' </strong></p>';
+
+				}
+				//boilerNew+= '<p style="color: #A0A0A0; padding-bottom: 5px; border-bottom: 1px solid #F0F0F0; margin-bottom: 5px;">'+annBody+'</p>'+
+				boilerNew+= '<p style="color: #555; padding-bottom: 5px; border-bottom: 1px solid #F0F0F0; margin-bottom: 5px;">On '+jArray[j]["createdDate"]+' by '+jArray[j]["employeeName"]+'</p>'+
+				'</div>'+
+				'<p><a style="color: #1D719F;" onclick="setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')"><span class="icon-envelope"></span> Mark read</a> '+
+				'<a style="color: #AF0000;" onclick="removeStudentAnnouncement(\''+jArray[j]["announcementId"]+'\',\'div\',\''+jArray[j]["isPermanent"]+'\'),setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')"><span class="icon-trash"></span> Move to trash</a></p>'+
+				'</div>';
+			}
+			//alert(boiler);
+			$("#listAnn").html(boilerNew);*/
+		},
+		error:function(){
+			return;
+		}
+	});
+
+
+}
+
+
+function viewAnnouncementDetailNew(announcementId){
+	if(!$('#announcementBody-'+announcementId).hasClass("loaded")){
+		setReadAnnouncement(announcementId);
+		//alert(!$('#announcementBody-'+announcementId).hasClass("loaded"));
+		$('#member'+announcementId).html('').hide();
+		if(announId != announcementId)
+			aCount=0;
+
+		if(aCount == 0){
+			aCount++;
+			announId=announcementId;
+
+			viewDetailsOfAnnouncementNew(announcementId,function(announcementArray){
+				var isCreator = false;
+				//alert('announcementArray: '+announcementArray.length);
+				if(announcementArray.length > 0){
+					var annoucementObj = announcementArray[0];
+
+					if(annoucementObj.createdByEmployeeId == annoucementObj.viewerEmployeeId){
+						isCreator = true;
+					}
+
+					var boiler = '';
+					getDocumentCategoryByAnnoucementId(announcementId,function(categoryId){
+						var uploaddocument = new UploadDocument();
+						if(categoryId != 'null' && categoryId != undefined){
+							uploaddocument.getDocument(categoryId,function(jArray){
+								if(jArray.length > 0){
+									showAnnouncementAttachment(jArray,'announcementAttachment-'+announcementId,isCreator);
+								} else {
+									boiler = '<div class = "alert alert-info">No attachments</div>';
+									$('#announcementAttachment-'+announcementId).html(boiler);
+								}
+							});
+						} else {
+							boiler = '<div class = "alert alert-info">No attachments</div>';
+							$('#announcementAttachment-'+announcementId).html(boiler);
+						}
+					});
+				}
+
+			});
+
+		}
+	}
+}
+
+
+function viewDetailsOfAnnouncementNew(announcementId,callback){
+	//alert("gfdfg"+announcementId);
+	$.ajax({
+		url:'getAnnouncementByAnnouncementId.json?announcementId='+announcementId,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			/*startCommonAjaxSpinner();
+*/
+		},
+		complete: function() {
+			/*stopCommonAjaxSpinner();*/
+		},
+		success:function(jArray){
+			var accordianBoiler='';
+			//alert(+jArray[0]["heading"]);
+			body='';
+			for(var i=0;i<jArray.length;i++)
+			{
+
+				body=jArray[i]["announcementBody"];
+				accordianBoiler+= '<div style="background-color: #FFF; border: 1px solid #D5D5D5; border-radius: 2px; padding: 20px; height: auto; overflow-y: auto; ">';
+
+					accordianBoiler += '<div style="padding-bottom: 20px; border-bottom: 1px solid #E5E5E5; margin-bottom: 20px;">';
+				//''+decodeURIComponent(jArray[i]["announcementBody"])+''+
+				try{
+					accordianBoiler+= decodeURIComponent(jArray[i]["announcementBody"]);
+				}catch(e){
+					accordianBoiler+= jArray[i]["announcementBody"];
+				}
+				accordianBoiler+='</div>';
+				if(jArray[i]["hasPoll"]=='true'|| jArray[i]["hasPoll"]==true){
+					if(jArray[i]["hasCustomOption"]=="true" || jArray[i]["hasCustomOption"]==true){
+						accordianBoiler +='<strong style="font-size:10pt"> Cast your Vote:</strong>'+
+						'<div class = "well" align="left"><strong style="font-size:10pt">'+jArray[i]["pollQuestion"]+'</strong>'+
+						'<ul style="list-style-type: none;">';
+						var customOptionJArray = jArray[i]["customOptionJArray"];											
+						for(var j=0;j<customOptionJArray.length;j++)
+							accordianBoiler +='<li><input id="rd_'+customOptionJArray[j]["OptionId"]+'_'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="'+customOptionJArray[j]["OptionId"]+'">'+customOptionJArray[j]["OptionName"]+'</li>';
+
+						accordianBoiler += '<li>&nbsp;</li>'+
+						'<li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent(\'Custom\','+announcementId+')"/></li>'+
+						'</ul>'+
+						'<div id="voteAlertMsg'+announcementId+'"></div>'+
+						'</div>';
+					}else if(jArray[i]["hasCustomOption"]==undefined || jArray[i]["hasCustomOption"]=="false" || jArray[i]["hasCustomOption"]==false){
+						accordianBoiler +='<strong style="font-size:10pt"> Cast your Vote:</strong>'+
+						'<div class = "well" align="left"><strong style="font-size:10pt">'+jArray[i]["pollQuestion"]+'</strong>'+
+						'<ul style="list-style-type: none;">'+
+						'<li><input id="rd_yes'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="yes">Yes</li>'+
+						'<li><input id="rd_no'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="no">No</li>'+
+						'<li><input id="rd_maybe'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="maybe">Maybe</li>'+
+						'<li><input id="rd_remindmelater'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="remindmelater">Remind me later</li>'+
+						'<li><input id="rd_ignore'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="ignore">Ignore</li>'+
+						'<li>&nbsp;</li>'+
+						'<li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent(\'Default\','+announcementId+')"/></li>'+
+						'</ul>'+
+						'<div id="voteAlertMsg'+announcementId+'"></div>'+
+						'</div>';
+					}
+				}
+				accordianBoiler +='<p style="padding-bottom: 20px; font-size: 11px; margin-bottom: 10px; border-bottom: 1px solid #E5E5E5;"id="announcementAttachment-'+announcementId+'"><img src="img/loading-small.gif"><a style="color: #1D719F;"></a> </p>'+				
+				/*'<p style="padding-bottom: 10px; font-size: 11px;">'+
+				'<a style="color: #AF0000;" onclick="removeAnnouncement(\''+jArray[i]["studentAnnouncmentId"]+'\',\'announcementDetails\',\''+jArray[i]["isPermanent"]+'\'),setReadAnnouncement(\''+jArray[i]["announcementId"]+'\')"><span class="icon-trash"></span> Move to trash</a>'+
+				'<span style="float: right;">'+
+					'<a style="color: #1D719F;" onclick="forwardAnnouncement(\''+jArray[i]["announcementId"]+'\',\''+jArray[i]["heading"]+'\')">Forward <span class="icon-chevron-right"></span></a>'+
+				'</span>'+
+				'</p>'+*/
+
+				'</div>';
+			}
+			//alert(boiler);
+			$("#announcementBody-"+announcementId).html(accordianBoiler);
+			$("#announcementBody-"+announcementId).addClass("loaded");
+			
+			//$("#announcementDetails").html(accordianBoiler);
+
+
+			$("input:radio[name=pollAnswer"+jArray[0]["employeeAnnouncementDetailId"]+"][value=" + jArray[0]["PollAnswer"] + "]").attr('checked', 'checked');
+			callback(jArray);	
+		},
+		error:function(){
+			return;
+		}
+	});
+
+	//getUnreadMessageAndAnnouncementForStudent();
+}
+
+
+function removeAnnouncement(employeeAnnouncementDetailId,div,isPermanent) 
+{
+	if(isPermanent!="PERMANENT")
+	{
+		$.ajax({
+			url:'removeAnnouncement.json?employeeAnnouncementDetailId='+employeeAnnouncementDetailId,
+			dataType:'json',
+			async:false,
+			beforeSend: function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray)
+			{
+				$('#div'+employeeAnnouncementDetailId).fadeOut(1200);
+				$('#announcementDetails').html('');
+			},
+			error:function(){
+
+			}
+		});
+	}
+	else
+		jAlert("The sender has not allow you to delete this announcement..","Warning");
+}
+
+
+
+
+function showAnnouncement(isHistory,index){
+	aCount=0;
+	var boiler = '';
+	var flag = true;
+	if(isHistory!='search')
+	{
+		$("#searchBox").val("");
+		globalMyArrArray = globalArray;
+	}
+	else
+	{
+		var keyword = $("#searchBox").val();//.toUpperCase();
+		var myArr = new Array();
+		flag = false;
+		for(var j=0;j<globalArray.length;j++)
+		{
+			if(keyword!="")
+			{
+				if(keyword==globalArray[j]["heading"])
+				{
+					myArr.push(globalArray[j]);
+					flag = true;
+				}
+			}
+		}
+		globalMyArrArray = myArr;
+		if(keyword=="")
+			$("#announcementList").html('<br/><div class="alert alert-error"><button type="button" class="close" data-dismiss="alert">√ó</button><strong>Sorry !</strong> Please enter some keyword.</div>');
+		else if(flag==false)
+			$("#announcementList").html('<br/><div class="alert alert-error"><button type="button" class="close" data-dismiss="alert">√ó</button><strong>Sorry !</strong> No Result found.</div>');
+	}
+	if(flag==true)
+	{
+		var j = '';
+		if((globalMyArrArray.length-index)<10)
+			j = globalMyArrArray.length;
+		else
+			j = index+10;
+		for(var i=index;i<j;i++)
+		{
+			if(i==globalMyArrArray.length)
+			{
+				break;
+			}
+
+
+			if(globalArray[i]["readStatus"]==false){
+				boiler+=
+					'<h3 id="h3'+globalMyArrArray[i]["announcementId"]+'">'+
+					//'<a href="#" id ="a'+jArray[i]["documentId"]+'"  onclick="displayDocumentDetail(\''+jArray[i]["documentId"]+'\')">'+
+					'<a href="#" id ="a'+globalMyArrArray[i]["announcementId"]+'" onclick="viewAnnouncementDetail(\''+globalMyArrArray[i]["announcementId"]+'\'),setReadAnnouncement(\''+globalMyArrArray[i]["announcementId"]+'\')">';
+				try{
+					boiler+=''+decodeURIComponent(globalMyArrArray[i]["heading"])+'';
+				}
+				catch(e){
+					boiler+=''+globalMyArrArray[i]["heading"]+'';
+				}
+				boiler+=' Created on '+globalMyArrArray[i]["createdDate"]+' (Created By:-'+globalMyArrArray[i]["employeeName"]+')&nbsp;&nbsp;&nbsp;<span class="label label-info" id="new_'+globalMyArrArray[i]["announcementId"]+'">New</span>'+
+				'</a></h3>'+
+				'<div id="div'+globalMyArrArray[i]["announcementId"]+'" align="center"></div>';
+
+			}
+			else{
+				boiler+=
+					'<h3 id="h3'+globalMyArrArray[i]["announcementId"]+'">'+
+					//'<a href="#" id ="a'+jArray[i]["documentId"]+'"  onclick="displayDocumentDetail(\''+jArray[i]["documentId"]+'\')">'+
+					'<a href="#" id ="a'+globalMyArrArray[i]["announcementId"]+'" onclick="viewAnnouncementDetail(\''+globalMyArrArray[i]["announcementId"]+'\')">';
+				//''+decodeURIComponent(globalMyArrArray[i]["heading"])+''+
+				try{
+					boiler+=''+decodeURIComponent(globalMyArrArray[i]["heading"])+'';
+				}
+				catch(e){
+					boiler+=''+globalMyArrArray[i]["heading"]+'';
+				}
+				boiler+=' Created on '+globalMyArrArray[i]["createdDate"]+' (Created By:-'+globalMyArrArray[i]["employeeName"]+')'+
+				'</a></h3>'+
+				'<div id="div'+globalMyArrArray[i]["announcementId"]+'" align="center"></div>';
+				/*boiler+='<div id="accordian"class="accordion-group">'+
+							'<div class="accordion-heading">'+
+
+							'<a class="accordion-toggle" data-toggle="collapse" data-parent="#viewAnnouncement" href="#collapse'+i+'"onclick="viewAnnouncementDetail(\''+globalArray[i]["announcementId"]+'\')">'+globalArray[i]["heading"]+' Created on '+globalArray[i]["createdDate"]+' (Created By:-'+globalArray[i]["employeeName"]+')'+
+							'</a>'+
+							'</div>'+
+							'<div id="collapse'+i+'" class="accordion-body collapse">'+
+								'<div class="accordion-inner">'+
+								'<div id="div'+globalArray[i]["announcementId"]+'" class="mini-layout fluid"  style="height:450px"></div>'+	
+								'</div>'+
+							'</div>'+
+						'</div>';*/
+			}
+			$("#announcementList").html(boiler);
+			$('#announcementList').accordion('destroy');
+			$('#announcementList').accordion({ header: "h3",
+				autoHeight: false, collapsible: true, active:false
+
+			});
+
+			if(globalMyArrArray.length>10)
+			{
+				var totPages=(globalMyArrArray.length/10)+1;
+				if(globalMyArrArray.length%10==0)
+					totPages--;
+				var pagerBoiler='<div class="pagination"><ul><li id="pagePrev"><a id="prevLink" onclick="showAnnouncement(\''+isHistory+'\', '+(index-10)+')"><<</a></li>';
+				for(var j=1;j<=totPages;j++)
+					pagerBoiler+='<li id="page'+j+'"><a href="#" onclick="showAnnouncement(\''+isHistory+'\', '+((j*10)-10)+')">'+j+'</a></li>';
+				pagerBoiler+='<li id="pageNext"><a id="nextLink" onclick="showAnnouncement(\''+isHistory+'\', '+(index+10)+')">>></a></li></ul></div>';
+				$("#paging").html(pagerBoiler);
+			}
+			if(index==0)
+			{
+				$('#prevLink').attr('onclick','').unbind('click');
+				$('#pagePrev').addClass('disabled');
+			}
+			if((globalMyArrArray.length-index)<10)
+			{
+				$('#nextLink').attr('onclick','').unbind('click');
+				$('#pageNext').addClass('disabled');
+			}
+			var temp=(index+10)/10;
+			$('#page'+temp).addClass('active');
+		}
+	}
+}
+function viewDetailsOfAnnouncement(announcementId,callback){
+	var accordianBoiler='';
+	$.ajax({
+		url:'getAnnouncementByAnnouncementId.json?announcementId='+announcementId,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+
+			//alert(jArray.length);
+			$('#div'+announcementId).html('');
+			for(var i=0;i<jArray.length;i++){
+				//style="margin-left:20%;margin-right:20%;width:60%;"
+				accordianBoiler +=	'<div class="well">'+
+				'<h3 style="background-color:#1EA6D7">';
+				try{
+					accordianBoiler +=''+decodeURIComponent(jArray[i]["heading"])+'';
+				}
+				catch(e){
+					accordianBoiler +=''+jArray[i]["heading"]+'';
+				}
+				accordianBoiler +='</h3><br>'+
+				'<span style="float:left;font-size:10pt"><strong>Created By:</strong>'+jArray[i]["employeeName"]+'</span>'+
+				'<span style="float:right;font-size:10pt"><strong>Date:</strong>'+jArray[i]["createdDate"]+'</span><br><br>';
+				if(jArray[i]["isForwarded"]){
+					accordianBoiler+='<span style="float:left;font-size:10pt"><strong>Created By :</strong> '+jArray[i]["ForwardedByEmployeeName"]+'</span>'+
+					'<span style="float:right;font-size:10pt"><strong>Date : </strong>'+jArray[i]["forwardedDate"]+'</span><br><br>';
+				}
+				accordianBoiler+='<div class = "well" align="left"><span style="font-size:10pt">';
+				//''+jArray[i]["announcementBody"]+''+
+				try{
+					accordianBoiler +=''+decodeURIComponent(jArray[i]["announcementBody"])+'';
+				}
+				catch(e){
+					accordianBoiler +=''+jArray[i]["announcementBody"]+'';
+				}
+				accordianBoiler +='</span></div>';
+				if(jArray[i]["hasPoll"]=='true'|| jArray[i]["hasPoll"]==true){
+					if(jArray[i]["hasCustomOption"]=="true" || jArray[i]["hasCustomOption"]==true){
+						accordianBoiler +='<strong style="font-size:10pt"> Cast your Vote:</strong>'+
+						'<div class = "well" align="left"><strong style="font-size:10pt">'+jArray[i]["pollQuestion"]+'</strong>'+
+						'<ul style="list-style-type: none;">';
+						var customOptionJArray = jArray[i]["customOptionJArray"];											
+						for(var j=0;j<customOptionJArray.length;j++)
+							accordianBoiler +='<li><input id="rd_'+customOptionJArray[j]["OptionId"]+'_'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="'+customOptionJArray[j]["OptionId"]+'">'+customOptionJArray[j]["OptionName"]+'</li>';
+
+						accordianBoiler += '<li>&nbsp;</li>'+
+						'<li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent(\'Custom\','+announcementId+')"/></li>'+
+						'</ul>'+
+						'<div id="voteAlertMsg'+announcementId+'"></div>'+
+						'</div>';
+					}else if(jArray[i]["hasCustomOption"]==undefined || jArray[i]["hasCustomOption"]=="false" || jArray[i]["hasCustomOption"]==false){
+						accordianBoiler +='<strong style="font-size:10pt"> Cast your Vote:</strong>'+
+						'<div class = "well" align="left"><strong style="font-size:10pt">'+jArray[i]["pollQuestion"]+'</strong>'+
+						'<ul style="list-style-type: none;">'+
+						'<li><input id="rd_yes'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="yes">Yes</li>'+
+						'<li><input id="rd_no'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="no">No</li>'+
+						'<li><input id="rd_maybe'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="maybe">Maybe</li>'+
+						'<li><input id="rd_remindmelater'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="remindmelater">Remind me later</li>'+
+						'<li><input id="rd_ignore'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="ignore">Ignore</li>'+
+						'<li>&nbsp;</li>'+
+						'<li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent(\'Default\','+announcementId+')"/></li>'+
+						'</ul>'+
+						'<div id="voteAlertMsg'+announcementId+'"></div>'+
+						'</div>';
+					}
+				}
+				accordianBoiler +='<strong style="font-size:10pt"> Attachments:</strong>'+
+				'<div class = "well" id = "announcementAttachment-'+announcementId+'"></div>'+
+				'</div>';
+
+
+			}
+			accordianBoiler +='</table>';
+			$('#div'+announcementId).html(accordianBoiler);
+
+			$("input:radio[name=pollAnswer"+announcementId+"][value=" + jArray[0]["PollAnswer"] + "]").attr('checked', 'checked');
+
+			//$('#announcementAttachment').html('');
+			callback();
+
+		},
+		error:function(){
+		}
+	});
+}
+
+function voteForAnnouncementPollStudent(optionsType,announcementId){
+	if(optionsType=="Default"){
+		var pollAnswer=	$("input:radio[name=pollAnswer"+announcementId+"]:checked").val();
+		$.ajax({
+			url:'voteForAnnouncementPollStudent.json?announcementId='+announcementId+'&pollAnswer='+pollAnswer+'&optionsType='+optionsType,
+			dataType:'json',
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(){
+				var boiler = '<div class="alert alert-info">Successfully Saved</div>';
+
+				$('#voteAlertMsg'+announcementId).html(boiler);
+				setTimeout("$('#voteAlertMsg"+announcementId+"').html('')",3000);
+			},
+			error:function(){
+				jAlert("Something went wrong, Please try after some time","Error");
+			}
+		});
+	}
+	else{
+		var pollAnswer=	$("input:radio[name=pollAnswer"+announcementId+"]:checked").val();
+		$.ajax({
+			url:'voteForAnnouncementPollStudent.json?announcementId='+announcementId+'&pollAnswer='+pollAnswer+'&optionsType='+optionsType,
+			dataType:'json',
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(){
+				var boiler = '<div class="alert alert-info">Successfully Saved</div>';
+
+				$('#voteAlertMsg'+announcementId).html(boiler);
+				setTimeout("$('#voteAlertMsg"+announcementId+"').html('')",3000);
+			},
+			error:function(){
+				jAlert("Something went wrong, Please try after some time","Error");
+			}
+		});	
+	}
+}
+
+var announId='';
+var aCount=0;
+function viewAnnouncementDetail(announcementId){
+	if(announId != announcementId){
+		aCount=0;
+	}
+
+	if(aCount == 0){
+		aCount++;
+		announId=announcementId;
+		viewDetailsOfAnnouncement(announcementId,function(){
+			var boiler = '';
+			getDocumentCategoryByAnnoucementId(announcementId,function(categoryId){
+				var uploaddocument = new UploadStudentDocument();
+				if(categoryId != 'null' && categoryId != undefined){
+					uploaddocument.getDocument(categoryId,function(jArray){
+						if(jArray.length > 0){
+							showAnnouncementAttachment(jArray,'announcementAttachment-'+announcementId);
+						} else {
+							boiler = '<div class = "alert alert-info">No attachments</div>';
+							$('#announcementAttachment-'+announcementId+'').html(boiler);
+						}
+					});
+				} else {
+					boiler = '<div class = "alert alert-info">No attachments</div>';
+					$('#announcementAttachment-'+announcementId+'').html(boiler);
+				}
+			});
+		});
+	}
+}
+
+
+function getUnreadAnnouncement(){
+//	var instituteCourseId = $('#departmentCmb').val().split("-")[0];
+	var hdnUserRole = $('#hdnUserRole').val();
+		var url = 'getUnreadStudentAnnouncement.json';
+		if(hdnUserRole == "student" || hdnUserRole == "Student"){
+			url = 'stu_getUnreadStudentAnnouncement.json';
+	}
+	$.ajax({
+		url:url,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+		
+		},
+		complete: function() {
+			
+		},
+		success:function(jArray)
+		{
+			if(jArray.length>0){
+				$("#countAnnouncement").html(jArray[0]["count"]);
+				$("#announcementCount").html(jArray[0]["count"]);
+			}
+			else
+				$("#countAnnouncement").html('0');
+		},
+	});
+}
+
+
+function setReadAnnouncement(announcementId){
+
+	if(!$('#announcementBody-'+announcementId).hasClass("loaded")) {
+
+		$('#new'+announcementId).hide();
+		if($("#countAnnouncement").text()!=0 || $("#announcementCount").text()!=0)
+		{
+			$.ajax({
+				url:'setReadAnnouncement.json?announcementId='+announcementId,
+				dataType:'json',
+				async:false,
+				beforeSend: function() {
+					startCommonAjaxSpinner();
+				},
+				complete: function() {
+					stopCommonAjaxSpinner();
+				},
+				success:function(jArray){
+					$('#new_'+announcementId).remove();
+					getUnreadAnnouncement();
+					
+					
+				},
+			});
+		}
+	}
+}
+
+
+function removeStudentAnnouncement(studentAnnouncmentId,div,isPermanent) 
+{
+	if(isPermanent!="PERMANENT")
+	{
+		$.ajax({
+			url:'removeStudentAnnouncement.json?studentAnnouncmentId='+studentAnnouncmentId,
+			dataType:'json',
+			async:false,
+			beforeSend: function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray){
+
+				$('#div'+studentAnnouncmentId).fadeOut(1200);
+				$('#announcementDetails').html('');
+
+			},
+			error:function(){
+
+			}
+		});
+	}
+	else
+		jAlert("The sender has not allowed you to delete this announcement..","Warning");
+}
+
+
+function getStudentMessage(){
+
+	$('#message').val('');
+	$.ajax({
+		url:'getStudentMessage.json',
+		dataType:'json',
+		async:false,
+
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			var subcnt=1;
+			var j=jArray.length;
+			var boiler='';
+			boiler+='<table id="dMtbl1" cellpadding="0" cellspacing="0" border="1" class="table table-striped table-bordered table-condensed" style="width: 100%"><thead>'+
+			'<tr><th>Sr No.</th><th>Date</th><th>Time</th><th>Message</th>'+
+			'<th>Sent By</th><th>Reply</th><th style="display:none">employeeMessageId</th></tr></thead><tbody>';
+
+			for( var i=0; i<j; i++)
+			{
+				var studentMessageId = jArray[i]["studentMessageId"];
+				if(jArray[i]["status"]==false){
+					boiler+='<tr id="'+studentMessageId+'" style="font-weight:bold">';
+				}
+				else{
+					boiler+='<tr id="'+studentMessageId+'">';
+				}
+
+				boiler+='<td>'+subcnt+'</td>'+
+				'<td>'+jArray[i]["date"]+'</td>'+
+				'<td>'+jArray[i]["time"].split(".")[0]+'</td>'+
+				'<td>'+jArray[i]["message"]+'</td>'+
+				//'<td align="center"><input type="button" value="Message" class="viewMessage" onclick="showMessage(\''+jArray[i]["message"]+'\')"></td>'+
+				'<td>'+jArray[i]["sentBy"]+'</td>'+
+				'<td style="text-align:center">'+
+				'<input type="button" value="Reply" class="btn btn-inverse btn-mini  " onclick="sendEmployeeMessage(\''+jArray[i]["employeeId"]+'\' ,\''+jArray[i]["sentBy"]+'\')"></td>'+
+				'<td style="display:none">'+studentMessageId+'</td></tr>';
+				subcnt++;
+			}
+			boiler+='</tbody></table><br /><div id="divMeetingForCoordinator"></div>';
+			$("#message").html(boiler);
+
+
+			$('#dMtbl1').dataTable( {
+				"sDom": "<'row'<'margin-left-22'l><'pull-right'f>r>t<'row'<'margin-left-22'i><'pull-right'p>>",
+				"sPaginationType": "bootstrap",
+				"oLanguage": {
+					"sLengthMenu": "_MENU_ records per page"
+				}
+			} );
+
+		},
+	});
+	if($("#countMessage").text()!=0){
+		setReadStudentMessage();
+	}
+}
+
+function sendEmployeeMessage(employeeId,empName)
+{
+	$('#studName').html('');
+	$('#replayDiv').html('');
+	$('#replayToStudentMessageModal').modal('show');
+	$('#studName').html("Reply To : "+empName);
+
+	var boiler ='<table class="table table-bordered"><thead>'+
+	'<tr><th>Reply Message</th></tr></thead>'+
+	'<tr><td><textarea id="replyStudent" style="width:650px"></textarea></td></tr>'+
+	'<tr><td><div align="center">'+
+	'<input type="button" class="btn btn-inverse btn-mini" value="Send Reply" onclick="sendReplayToEmployee(\''+employeeId+'\')"></div></td></tr>'+
+	'</table>'+
+	'</div>';
+	$('#replayDiv').html(boiler);
+}
+
+function sendReplayToEmployee(employeeId)
+{
+	var description = $('#replyStudent').val();
+	$.ajax({      
+		url:'sendReplayToEmployee.json',
+		dataType:'text',
+		type:'POST',
+		data:{employeeId:employeeId,description:description.toString()},
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(type)
+		{	
+			$('#replayToStudentMessageModal').modal('hide');
+			jAlert("Successfully Send Message","Success");
+		},
+		error:function(){
+			alert("Error");
+		}
+	});
+
+}
+
+
+function getUnreadStudentMessage(){
+	
+//	var instituteCourseId = $('#departmentCmb').val().split("-")[0];
+	$.ajax({ 
+		url:'getUnreadStudentMessage.json',
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			/*startCommonAjaxSpinner();*/
+		},
+		complete: function() {
+			/*stopCommonAjaxSpinner();*/
+		},
+		success:function(jArray){
+				$("#countMessage").html(jArray[0]["count"]);
+		},
+	});
+}
+
+
+function setReadStudentMessage(){
+	$.ajax({      
+		url:'setReadStudentMessage.json',
+		dataType:'text',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(type){	
+
+			getUnreadStudentMessage();
+		},
+		error:function(){
+			return;
+		}
+	});
+}
+
+function getUnreadStudentMessageByStudent(){
+	var stud = $('#sonDaugtherName').val();
+	$.ajax({
+		url:'getUnreadStudentMessageByStudent.json?stud='+stud,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+				$("#countMessage").html(jArray[0]["studMessagecount"]);
+		},
+	});
+}        HE x ˇˇ     20250331133932-8l+E øTV9A   https://erp.cmrit.ac.in/studentMPW/scripts/studentAnnouncement.js      nâ  var searchKeyword = new Array();
+var globalArray = new Array();
+var globalMyArrArray = new Array();
+var countAnnouncement=0;
+
+
+$('document').ready(function(){
+	$('#replayToStudentMessageModal').modal({
+		keyboard:false,
+		show:false
+	}).css({
+		width:'700px',
+		'margin-left':function(){
+			return -($(this).width()/2);
+		},
+	});
+
+	$('#annScroll').slimScroll({
+		position: 'right',
+		height: '500px',
+		wheelStep: 2
+	});
+});
+function typeAhead(){
+	$('document').ready(function(){
+		$('#searchBox').typeahead({
+			source:searchKeyword
+		});
+	});
+}
+//getUnreadMessageAndAnnouncementForStudent();
+function viewAnnouncement(divId){
+	getUnreadAnnouncement();
+	getUnreadStudentMessage();
+	$("#viewAnnouncementAll").html('');
+	$("#viewAnnouncement").html('');
+	var boiler='<div>'+
+	'<br><div id="autoComplete"></div><div id="announcementList">'+
+	'</div><div id="paging"></div>';
+	$("#"+divId).html(boiler);
+
+	$.ajax({
+		url:'getStudentAnnouncement.json',
+		dataType:'json',
+		async:false,
+		beforeSend:function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			if(jArray.length>0){
+				globalArray = jArray;
+
+				var searchBoiler='<table class="table table-bordered">' +
+				'<tr>'+
+				'<td>'+
+				'<span id="searchDiv">'+
+				'&nbsp;&nbsp;<input type="text" id="searchBox" placeholder="Search By Keyword" data-provide="typeahead"/>'+
+				'</span>'+
+				'&nbsp;&nbsp;<a class="btn" style="vertical-align: top;" onclick="showAnnouncement(\'search\', 0);">Search</a><span id="cartBtn" class="pull-right"></span>'+
+				'&nbsp;&nbsp;<a class="btn" style="vertical-align: top;" onclick="showAnnouncement(\'no\', 0); ">Clear</a><span id="cartBtn" class="pull-right"></span>'+
+				'</td>'+
+				'</tr>'+
+				'</table>';
+				$("#autoComplete").html(searchBoiler);
+
+				var myArr = new Array();
+				for(var j=0;j<globalArray.length;j++)
+				{
+					myArr.push(decodeURIComponent(globalArray[j]["heading"]));
+				}
+
+				$.each(myArr, function(i, el){
+					if($.inArray(el, searchKeyword) === -1) searchKeyword.push(el);
+				});
+
+				typeAhead();
+				/*	$("#searchBox").keyup(function(e) {
+							showAnnouncement('search', 0);
+						});
+						$("#searchBox").click(function(e) {
+							showAnnouncement('search', 0);
+						});*/
+
+				showAnnouncement('no', 0);
+			}
+			else{
+				$('#announcementList').html('<div class = "alert alert-info">No announcements</div>');
+
+			}
+		},
+		error:function(){
+
+		}
+	});
+
+
+}
+
+function searchAnnouncement(divId,filterFlag){
+
+	var SearchWord=$("#txtSearchWord").val();
+	viewAnnouncementNew(divId,SearchWord,filterFlag,'');
+}
+
+
+function viewAnnouncementNew(divId,searchKeyword,filterFlag,flag){
+	//alert(flag);
+	$("#divalumpost").hide();
+	$("#"+divId).show();
+	$('#announcementDetails').html('');
+	getUnreadAnnouncement();
+	getUnreadStudentMessage();
+	$.ajax({
+		url:'getStudentAnnouncement.json',
+		dataType:'json',
+		data:{SearchWord:searchKeyword,filterFlag:filterFlag},
+		async:false,
+		beforeSend:function() {
+			$("#"+divId).html('<div id="divPostLoading" style="text-align: center;width: 100%;"><i class="fa fa-spinner fa-pulse fa-fw fa-4x" style="color:#0b4971"></i></div>');
+			
+		},
+		complete: function() {
+
+		},
+		success:function(jArray){
+
+			var boilerNew='';
+			var annBody = '';
+			var allchecked = '';
+			var unreadchecked = '';
+			var todaysDate = new Date();
+			var cnt = jArray.length;
+			$("#announcementCount").text(cnt);
+			$("#countAnnouncement").text(cnt);
+			if(filterFlag=='unread')unreadchecked='checked';else allchecked='checked';
+			
+			if(flag == '')
+			{
+			boilerNew='<div class="row-fluid" style="margin-left:5px;">'+
+			'<div class="span4">'+
+			'<div class="switch-toggle well">'+
+			'<input id="Unread" name="view" '+unreadchecked+' type="radio"><label for="Unread" onclick="viewAnnouncementNew(\''+divId+'\',\''+searchKeyword+'\',\'unread\',\'\')">Unread</label>'+
+			'<input id="All" name="view" '+allchecked+' type="radio"><label for="All" onclick="viewAnnouncementNew(\''+divId+'\',\''+searchKeyword+'\',\'all\',\'\')">All</label><a class="btn btn-success"></a></div></div>'+
+
+			'<div class="span2">'+'<p style="margin-bottom:10px;font-size:13px;text-align:left;">Showing '+cnt+' results</p></div>'+
+
+			'<div class="span6" style="text-align:right;margin-top:-5px;">'+
+			'<input type=text id="txtSearchWord" value="'+searchKeyword+'" placeholder="Search Announcement" style="margin:5px;border-radius:5px;">'+
+			'<input type="button" class="btn btn-primary" value="Search" onclick="searchAnnouncement(\''+divId+'\',\''+filterFlag+'\')"></div>'+
+			//'</div>'+
+			'</div>';
+			}
+			//--------new---------
+			if(jArray.length>0){				
+				boilerNew+='<div id="announcementContainer"><section><div class="container" style="width:98%;">';
+				for(var j=0;j<jArray.length;j++)
+				{
+					if(jArray[j]["readStatus"]==false)
+					{
+						var createdDate =new Date(jArray[j]["createdDate"]);
+						if(todaysDate.getFullYear() == createdDate.getFullYear() && todaysDate.getMonth() == createdDate.getMonth()  && todaysDate.getDate() == createdDate.getDate() )
+						{
+							boilerNew+= '<div class="collapse-card" style="background-color:#dfeffc;" id="div'+jArray[j]["announcementId"]+'" >';
+						}
+						else
+						{
+							boilerNew+= '<div class="collapse-card" style="background-color:#F3F3F3;" id="div'+jArray[j]["announcementId"]+'" >';
+						}
+					}
+					else
+					{
+						boilerNew+= '<div class="collapse-card" id="div'+jArray[j]["announcementId"]+'" >';
+					}
+
+					boilerNew+= '<div class="title"  onclick="viewAnnouncementDetailNew(\''+jArray[j]["announcementId"]+'\')">';
+					boilerNew+= '<img src="getEmployeeProfileImageById.json?id='+jArray[j]["employeeId"]+'" style="border-radius:20px;float:left;border:0.5px solid lightgray;" height=40>';
+					boilerNew+= '<span>On '+jArray[j]["createdDate"]+' by <b>'+jArray[j]["employeeName"]+'</b></span>';
+					try{
+						boilerNew+= '<strong>'+decodeURIComponent(jArray[j]["heading"])+'</strong>';
+					}catch(e){
+						boilerNew+= '<strong>'+jArray[j]["heading"]+'</strong>';
+					}
+					boilerNew+= '</div>';
+					boilerNew+= '<div class="body"><div id="announcementBody-'+jArray[j]["announcementId"]+'"><div style="width:100%; text-align:center;"><img src="img/ajax.gif"></div></div>';
+
+					boilerNew+= '<h1 style="font-size: 18px; padding-bottom: 10px; margin-bottom: 10px; line-height: 22px; border-bottom: 1px solid #E5E5E5;"></h1>';
+					boilerNew+= '<div class="footer" style="float:right;margin-bottom:10px;">';
+					boilerNew+= '<a title="Move to Trash" onclick="removeStudentAnnouncement(\''+jArray[j]["announcementId"]+'\',\'div\',\''+jArray[j]["isPermanent"]+'\'),setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')"><img src="img/trash.png"></a>';
+					boilerNew+= '</div><br></div></div>';
+				}
+				boilerNew+='</div></section></div>';
+			}
+			else
+			{
+				boilerNew+='<h4 style="text-align:center;font-size:14px;padding:5px;">No new Announcements</h4>';
+			}
+			$("#"+divId).html(boilerNew);
+			$('.collapse-card .title').paperCollapse({});
+			$('#announcementContainer').slimScroll({
+				position: 'right',
+				height: '450px',
+				width: '100%',
+				scrollBy: '10px',
+				railVisible: true,
+				wheelStep: 6,
+				alwaysVisible: true
+			});
+			//-------------end--------
+
+			/*for(var j=0;j<jArray.length;j++)
+				{
+
+				annBody = $('#body1').html(jArray[j]["announcementBody"] ).text();
+
+				if(jArray[j]["status"]==false){
+					boilerNew+= '<div style="background-color: #DDDDE5; padding: 5px; font-size: 11px; border: 1px solid #D5D5D5; border-radius: 2px; margin-bottom: 10px;" id="div'+jArray[j]["studentAnnouncmentId"]+'" >'+
+					'<div style="" onclick="viewAnnouncementDetailNew(\''+jArray[j]["announcementId"]+'\'), setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')" style="cursor: pointer;">';
+					boilerNew+= '&nbsp;&nbsp;&nbsp;<span class="pull-right" id="new'+jArray[j]["announcementId"]+'"><img src="images/Icon_new.png"></span>'+
+						'<p style="padding-bottom: 5px; border-bottom: 1px solid #F0F0F0; margin-bottom: 5px;" id="subject'+j+'"><strong>';
+						//' '+decodeURIComponent(jArray[j]["heading"])+' '+
+						try{
+							boilerNew+= decodeURIComponent(jArray[j]["heading"]);
+						}catch(e){
+							boilerNew+= jArray[j]["heading"];
+						}
+						boilerNew+='</strong></p>';
+				}
+				else{
+					boilerNew+= '<div style="background-color: #FFF; padding: 5px; font-size: 11px; border: 1px solid #D5D5D5; border-radius: 2px; margin-bottom: 10px;" id="div'+jArray[j]["studentAnnouncmentId"]+'" >'+
+					'<div style="" onclick="viewAnnouncementDetailNew(\''+jArray[j]["announcementId"]+'\'), setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')" style="cursor: pointer;">';
+					//boilerNew+= '&nbsp;&nbsp;&nbsp;<span class="label label-info" id="new'+jArray[j]["announcementId"]+'">New</span>';
+					boilerNew+= '<p style="padding-bottom: 5px; border-bottom: 1px solid #F0F0F0; margin-bottom: 5px;" id="subject'+j+'"><strong>';
+					//' '+decodeURIComponent(jArray[j]["heading"])+' '+
+					try{
+						boilerNew+= decodeURIComponent(jArray[j]["heading"]);
+					}catch(e){
+						boilerNew+= jArray[j]["heading"];
+					}
+					boilerNew+=' </strong></p>';
+
+				}
+				//boilerNew+= '<p style="color: #A0A0A0; padding-bottom: 5px; border-bottom: 1px solid #F0F0F0; margin-bottom: 5px;">'+annBody+'</p>'+
+				boilerNew+= '<p style="color: #555; padding-bottom: 5px; border-bottom: 1px solid #F0F0F0; margin-bottom: 5px;">On '+jArray[j]["createdDate"]+' by '+jArray[j]["employeeName"]+'</p>'+
+				'</div>'+
+				'<p><a style="color: #1D719F;" onclick="setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')"><span class="icon-envelope"></span> Mark read</a> '+
+				'<a style="color: #AF0000;" onclick="removeStudentAnnouncement(\''+jArray[j]["announcementId"]+'\',\'div\',\''+jArray[j]["isPermanent"]+'\'),setReadAnnouncement(\''+jArray[j]["announcementId"]+'\')"><span class="icon-trash"></span> Move to trash</a></p>'+
+				'</div>';
+			}
+			//alert(boiler);
+			$("#listAnn").html(boilerNew);*/
+		},
+		error:function(){
+			return;
+		}
+	});
+
+
+}
+
+
+function viewAnnouncementDetailNew(announcementId){
+	if(!$('#announcementBody-'+announcementId).hasClass("loaded")){
+		setReadAnnouncement(announcementId);
+		//alert(!$('#announcementBody-'+announcementId).hasClass("loaded"));
+		$('#member'+announcementId).html('').hide();
+		if(announId != announcementId)
+			aCount=0;
+
+		if(aCount == 0){
+			aCount++;
+			announId=announcementId;
+
+			viewDetailsOfAnnouncementNew(announcementId,function(announcementArray){
+				var isCreator = false;
+				//alert('announcementArray: '+announcementArray.length);
+				if(announcementArray.length > 0){
+					var annoucementObj = announcementArray[0];
+
+					if(annoucementObj.createdByEmployeeId == annoucementObj.viewerEmployeeId){
+						isCreator = true;
+					}
+
+					var boiler = '';
+					getDocumentCategoryByAnnoucementId(announcementId,function(categoryId){
+						var uploaddocument = new UploadDocument();
+						if(categoryId != 'null' && categoryId != undefined){
+							uploaddocument.getDocument(categoryId,function(jArray){
+								if(jArray.length > 0){
+									showAnnouncementAttachment(jArray,'announcementAttachment-'+announcementId,isCreator);
+								} else {
+									boiler = '<div class = "alert alert-info">No attachments</div>';
+									$('#announcementAttachment-'+announcementId).html(boiler);
+								}
+							});
+						} else {
+							boiler = '<div class = "alert alert-info">No attachments</div>';
+							$('#announcementAttachment-'+announcementId).html(boiler);
+						}
+					});
+				}
+
+			});
+
+		}
+	}
+}
+
+
+function viewDetailsOfAnnouncementNew(announcementId,callback){
+	//alert("gfdfg"+announcementId);
+	$.ajax({
+		url:'getAnnouncementByAnnouncementId.json?announcementId='+announcementId,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			/*startCommonAjaxSpinner();
+*/
+		},
+		complete: function() {
+			/*stopCommonAjaxSpinner();*/
+		},
+		success:function(jArray){
+			var accordianBoiler='';
+			//alert(+jArray[0]["heading"]);
+			body='';
+			for(var i=0;i<jArray.length;i++)
+			{
+
+				body=jArray[i]["announcementBody"];
+				accordianBoiler+= '<div style="background-color: #FFF; border: 1px solid #D5D5D5; border-radius: 2px; padding: 20px; height: auto; overflow-y: auto; ">';
+
+					accordianBoiler += '<div style="padding-bottom: 20px; border-bottom: 1px solid #E5E5E5; margin-bottom: 20px;">';
+				//''+decodeURIComponent(jArray[i]["announcementBody"])+''+
+				try{
+					accordianBoiler+= decodeURIComponent(jArray[i]["announcementBody"]);
+				}catch(e){
+					accordianBoiler+= jArray[i]["announcementBody"];
+				}
+				accordianBoiler+='</div>';
+				if(jArray[i]["hasPoll"]=='true'|| jArray[i]["hasPoll"]==true){
+					if(jArray[i]["hasCustomOption"]=="true" || jArray[i]["hasCustomOption"]==true){
+						accordianBoiler +='<strong style="font-size:10pt"> Cast your Vote:</strong>'+
+						'<div class = "well" align="left"><strong style="font-size:10pt">'+jArray[i]["pollQuestion"]+'</strong>'+
+						'<ul style="list-style-type: none;">';
+						var customOptionJArray = jArray[i]["customOptionJArray"];											
+						for(var j=0;j<customOptionJArray.length;j++)
+							accordianBoiler +='<li><input id="rd_'+customOptionJArray[j]["OptionId"]+'_'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="'+customOptionJArray[j]["OptionId"]+'">'+customOptionJArray[j]["OptionName"]+'</li>';
+
+						accordianBoiler += '<li>&nbsp;</li>'+
+						'<li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent(\'Custom\','+announcementId+')"/></li>'+
+						'</ul>'+
+						'<div id="voteAlertMsg'+announcementId+'"></div>'+
+						'</div>';
+					}else if(jArray[i]["hasCustomOption"]==undefined || jArray[i]["hasCustomOption"]=="false" || jArray[i]["hasCustomOption"]==false){
+						accordianBoiler +='<strong style="font-size:10pt"> Cast your Vote:</strong>'+
+						'<div class = "well" align="left"><strong style="font-size:10pt">'+jArray[i]["pollQuestion"]+'</strong>'+
+						'<ul style="list-style-type: none;">'+
+						'<li><input id="rd_yes'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="yes">Yes</li>'+
+						'<li><input id="rd_no'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="no">No</li>'+
+						'<li><input id="rd_maybe'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="maybe">Maybe</li>'+
+						'<li><input id="rd_remindmelater'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="remindmelater">Remind me later</li>'+
+						'<li><input id="rd_ignore'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="ignore">Ignore</li>'+
+						'<li>&nbsp;</li>'+
+						'<li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent(\'Default\','+announcementId+')"/></li>'+
+						'</ul>'+
+						'<div id="voteAlertMsg'+announcementId+'"></div>'+
+						'</div>';
+					}
+				}
+				accordianBoiler +='<p style="padding-bottom: 20px; font-size: 11px; margin-bottom: 10px; border-bottom: 1px solid #E5E5E5;"id="announcementAttachment-'+announcementId+'"><img src="img/loading-small.gif"><a style="color: #1D719F;"></a> </p>'+				
+				/*'<p style="padding-bottom: 10px; font-size: 11px;">'+
+				'<a style="color: #AF0000;" onclick="removeAnnouncement(\''+jArray[i]["studentAnnouncmentId"]+'\',\'announcementDetails\',\''+jArray[i]["isPermanent"]+'\'),setReadAnnouncement(\''+jArray[i]["announcementId"]+'\')"><span class="icon-trash"></span> Move to trash</a>'+
+				'<span style="float: right;">'+
+					'<a style="color: #1D719F;" onclick="forwardAnnouncement(\''+jArray[i]["announcementId"]+'\',\''+jArray[i]["heading"]+'\')">Forward <span class="icon-chevron-right"></span></a>'+
+				'</span>'+
+				'</p>'+*/
+
+				'</div>';
+			}
+			//alert(boiler);
+			$("#announcementBody-"+announcementId).html(accordianBoiler);
+			$("#announcementBody-"+announcementId).addClass("loaded");
+			
+			//$("#announcementDetails").html(accordianBoiler);
+
+
+			$("input:radio[name=pollAnswer"+jArray[0]["employeeAnnouncementDetailId"]+"][value=" + jArray[0]["PollAnswer"] + "]").attr('checked', 'checked');
+			callback(jArray);	
+		},
+		error:function(){
+			return;
+		}
+	});
+
+	//getUnreadMessageAndAnnouncementForStudent();
+}
+
+
+function removeAnnouncement(employeeAnnouncementDetailId,div,isPermanent) 
+{
+	if(isPermanent!="PERMANENT")
+	{
+		$.ajax({
+			url:'removeAnnouncement.json?employeeAnnouncementDetailId='+employeeAnnouncementDetailId,
+			dataType:'json',
+			async:false,
+			beforeSend: function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray)
+			{
+				$('#div'+employeeAnnouncementDetailId).fadeOut(1200);
+				$('#announcementDetails').html('');
+			},
+			error:function(){
+
+			}
+		});
+	}
+	else
+		jAlert("The sender has not allow you to delete this announcement..","Warning");
+}
+
+
+
+
+function showAnnouncement(isHistory,index){
+	aCount=0;
+	var boiler = '';
+	var flag = true;
+	if(isHistory!='search')
+	{
+		$("#searchBox").val("");
+		globalMyArrArray = globalArray;
+	}
+	else
+	{
+		var keyword = $("#searchBox").val();//.toUpperCase();
+		var myArr = new Array();
+		flag = false;
+		for(var j=0;j<globalArray.length;j++)
+		{
+			if(keyword!="")
+			{
+				if(keyword==globalArray[j]["heading"])
+				{
+					myArr.push(globalArray[j]);
+					flag = true;
+				}
+			}
+		}
+		globalMyArrArray = myArr;
+		if(keyword=="")
+			$("#announcementList").html('<br/><div class="alert alert-error"><button type="button" class="close" data-dismiss="alert">√ó</button><strong>Sorry !</strong> Please enter some keyword.</div>');
+		else if(flag==false)
+			$("#announcementList").html('<br/><div class="alert alert-error"><button type="button" class="close" data-dismiss="alert">√ó</button><strong>Sorry !</strong> No Result found.</div>');
+	}
+	if(flag==true)
+	{
+		var j = '';
+		if((globalMyArrArray.length-index)<10)
+			j = globalMyArrArray.length;
+		else
+			j = index+10;
+		for(var i=index;i<j;i++)
+		{
+			if(i==globalMyArrArray.length)
+			{
+				break;
+			}
+
+
+			if(globalArray[i]["readStatus"]==false){
+				boiler+=
+					'<h3 id="h3'+globalMyArrArray[i]["announcementId"]+'">'+
+					//'<a href="#" id ="a'+jArray[i]["documentId"]+'"  onclick="displayDocumentDetail(\''+jArray[i]["documentId"]+'\')">'+
+					'<a href="#" id ="a'+globalMyArrArray[i]["announcementId"]+'" onclick="viewAnnouncementDetail(\''+globalMyArrArray[i]["announcementId"]+'\'),setReadAnnouncement(\''+globalMyArrArray[i]["announcementId"]+'\')">';
+				try{
+					boiler+=''+decodeURIComponent(globalMyArrArray[i]["heading"])+'';
+				}
+				catch(e){
+					boiler+=''+globalMyArrArray[i]["heading"]+'';
+				}
+				boiler+=' Created on '+globalMyArrArray[i]["createdDate"]+' (Created By:-'+globalMyArrArray[i]["employeeName"]+')&nbsp;&nbsp;&nbsp;<span class="label label-info" id="new_'+globalMyArrArray[i]["announcementId"]+'">New</span>'+
+				'</a></h3>'+
+				'<div id="div'+globalMyArrArray[i]["announcementId"]+'" align="center"></div>';
+
+			}
+			else{
+				boiler+=
+					'<h3 id="h3'+globalMyArrArray[i]["announcementId"]+'">'+
+					//'<a href="#" id ="a'+jArray[i]["documentId"]+'"  onclick="displayDocumentDetail(\''+jArray[i]["documentId"]+'\')">'+
+					'<a href="#" id ="a'+globalMyArrArray[i]["announcementId"]+'" onclick="viewAnnouncementDetail(\''+globalMyArrArray[i]["announcementId"]+'\')">';
+				//''+decodeURIComponent(globalMyArrArray[i]["heading"])+''+
+				try{
+					boiler+=''+decodeURIComponent(globalMyArrArray[i]["heading"])+'';
+				}
+				catch(e){
+					boiler+=''+globalMyArrArray[i]["heading"]+'';
+				}
+				boiler+=' Created on '+globalMyArrArray[i]["createdDate"]+' (Created By:-'+globalMyArrArray[i]["employeeName"]+')'+
+				'</a></h3>'+
+				'<div id="div'+globalMyArrArray[i]["announcementId"]+'" align="center"></div>';
+				/*boiler+='<div id="accordian"class="accordion-group">'+
+							'<div class="accordion-heading">'+
+
+							'<a class="accordion-toggle" data-toggle="collapse" data-parent="#viewAnnouncement" href="#collapse'+i+'"onclick="viewAnnouncementDetail(\''+globalArray[i]["announcementId"]+'\')">'+globalArray[i]["heading"]+' Created on '+globalArray[i]["createdDate"]+' (Created By:-'+globalArray[i]["employeeName"]+')'+
+							'</a>'+
+							'</div>'+
+							'<div id="collapse'+i+'" class="accordion-body collapse">'+
+								'<div class="accordion-inner">'+
+								'<div id="div'+globalArray[i]["announcementId"]+'" class="mini-layout fluid"  style="height:450px"></div>'+	
+								'</div>'+
+							'</div>'+
+						'</div>';*/
+			}
+			$("#announcementList").html(boiler);
+			$('#announcementList').accordion('destroy');
+			$('#announcementList').accordion({ header: "h3",
+				autoHeight: false, collapsible: true, active:false
+
+			});
+
+			if(globalMyArrArray.length>10)
+			{
+				var totPages=(globalMyArrArray.length/10)+1;
+				if(globalMyArrArray.length%10==0)
+					totPages--;
+				var pagerBoiler='<div class="pagination"><ul><li id="pagePrev"><a id="prevLink" onclick="showAnnouncement(\''+isHistory+'\', '+(index-10)+')"><<</a></li>';
+				for(var j=1;j<=totPages;j++)
+					pagerBoiler+='<li id="page'+j+'"><a href="#" onclick="showAnnouncement(\''+isHistory+'\', '+((j*10)-10)+')">'+j+'</a></li>';
+				pagerBoiler+='<li id="pageNext"><a id="nextLink" onclick="showAnnouncement(\''+isHistory+'\', '+(index+10)+')">>></a></li></ul></div>';
+				$("#paging").html(pagerBoiler);
+			}
+			if(index==0)
+			{
+				$('#prevLink').attr('onclick','').unbind('click');
+				$('#pagePrev').addClass('disabled');
+			}
+			if((globalMyArrArray.length-index)<10)
+			{
+				$('#nextLink').attr('onclick','').unbind('click');
+				$('#pageNext').addClass('disabled');
+			}
+			var temp=(index+10)/10;
+			$('#page'+temp).addClass('active');
+		}
+	}
+}
+function viewDetailsOfAnnouncement(announcementId,callback){
+	var accordianBoiler='';
+	$.ajax({
+		url:'getAnnouncementByAnnouncementId.json?announcementId='+announcementId,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+
+			//alert(jArray.length);
+			$('#div'+announcementId).html('');
+			for(var i=0;i<jArray.length;i++){
+				//style="margin-left:20%;margin-right:20%;width:60%;"
+				accordianBoiler +=	'<div class="well">'+
+				'<h3 style="background-color:#1EA6D7">';
+				try{
+					accordianBoiler +=''+decodeURIComponent(jArray[i]["heading"])+'';
+				}
+				catch(e){
+					accordianBoiler +=''+jArray[i]["heading"]+'';
+				}
+				accordianBoiler +='</h3><br>'+
+				'<span style="float:left;font-size:10pt"><strong>Created By:</strong>'+jArray[i]["employeeName"]+'</span>'+
+				'<span style="float:right;font-size:10pt"><strong>Date:</strong>'+jArray[i]["createdDate"]+'</span><br><br>';
+				if(jArray[i]["isForwarded"]){
+					accordianBoiler+='<span style="float:left;font-size:10pt"><strong>Created By :</strong> '+jArray[i]["ForwardedByEmployeeName"]+'</span>'+
+					'<span style="float:right;font-size:10pt"><strong>Date : </strong>'+jArray[i]["forwardedDate"]+'</span><br><br>';
+				}
+				accordianBoiler+='<div class = "well" align="left"><span style="font-size:10pt">';
+				//''+jArray[i]["announcementBody"]+''+
+				try{
+					accordianBoiler +=''+decodeURIComponent(jArray[i]["announcementBody"])+'';
+				}
+				catch(e){
+					accordianBoiler +=''+jArray[i]["announcementBody"]+'';
+				}
+				accordianBoiler +='</span></div>';
+				if(jArray[i]["hasPoll"]=='true'|| jArray[i]["hasPoll"]==true){
+					if(jArray[i]["hasCustomOption"]=="true" || jArray[i]["hasCustomOption"]==true){
+						accordianBoiler +='<strong style="font-size:10pt"> Cast your Vote:</strong>'+
+						'<div class = "well" align="left"><strong style="font-size:10pt">'+jArray[i]["pollQuestion"]+'</strong>'+
+						'<ul style="list-style-type: none;">';
+						var customOptionJArray = jArray[i]["customOptionJArray"];											
+						for(var j=0;j<customOptionJArray.length;j++)
+							accordianBoiler +='<li><input id="rd_'+customOptionJArray[j]["OptionId"]+'_'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="'+customOptionJArray[j]["OptionId"]+'">'+customOptionJArray[j]["OptionName"]+'</li>';
+
+						accordianBoiler += '<li>&nbsp;</li>'+
+						'<li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent(\'Custom\','+announcementId+')"/></li>'+
+						'</ul>'+
+						'<div id="voteAlertMsg'+announcementId+'"></div>'+
+						'</div>';
+					}else if(jArray[i]["hasCustomOption"]==undefined || jArray[i]["hasCustomOption"]=="false" || jArray[i]["hasCustomOption"]==false){
+						accordianBoiler +='<strong style="font-size:10pt"> Cast your Vote:</strong>'+
+						'<div class = "well" align="left"><strong style="font-size:10pt">'+jArray[i]["pollQuestion"]+'</strong>'+
+						'<ul style="list-style-type: none;">'+
+						'<li><input id="rd_yes'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="yes">Yes</li>'+
+						'<li><input id="rd_no'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="no">No</li>'+
+						'<li><input id="rd_maybe'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="maybe">Maybe</li>'+
+						'<li><input id="rd_remindmelater'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="remindmelater">Remind me later</li>'+
+						'<li><input id="rd_ignore'+announcementId+'" type="radio" name="pollAnswer'+announcementId+'" value="ignore">Ignore</li>'+
+						'<li>&nbsp;</li>'+
+						'<li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent(\'Default\','+announcementId+')"/></li>'+
+						'</ul>'+
+						'<div id="voteAlertMsg'+announcementId+'"></div>'+
+						'</div>';
+					}
+				}
+				accordianBoiler +='<strong style="font-size:10pt"> Attachments:</strong>'+
+				'<div class = "well" id = "announcementAttachment-'+announcementId+'"></div>'+
+				'</div>';
+
+
+			}
+			accordianBoiler +='</table>';
+			$('#div'+announcementId).html(accordianBoiler);
+
+			$("input:radio[name=pollAnswer"+announcementId+"][value=" + jArray[0]["PollAnswer"] + "]").attr('checked', 'checked');
+
+			//$('#announcementAttachment').html('');
+			callback();
+
+		},
+		error:function(){
+		}
+	});
+}
+
+function voteForAnnouncementPollStudent(optionsType,announcementId){
+	if(optionsType=="Default"){
+		var pollAnswer=	$("input:radio[name=pollAnswer"+announcementId+"]:checked").val();
+		$.ajax({
+			url:'voteForAnnouncementPollStudent.json?announcementId='+announcementId+'&pollAnswer='+pollAnswer+'&optionsType='+optionsType,
+			dataType:'json',
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(){
+				var boiler = '<div class="alert alert-info">Successfully Saved</div>';
+
+				$('#voteAlertMsg'+announcementId).html(boiler);
+				setTimeout("$('#voteAlertMsg"+announcementId+"').html('')",3000);
+			},
+			error:function(){
+				jAlert("Something went wrong, Please try after some time","Error");
+			}
+		});
+	}
+	else{
+		var pollAnswer=	$("input:radio[name=pollAnswer"+announcementId+"]:checked").val();
+		$.ajax({
+			url:'voteForAnnouncementPollStudent.json?announcementId='+announcementId+'&pollAnswer='+pollAnswer+'&optionsType='+optionsType,
+			dataType:'json',
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(){
+				var boiler = '<div class="alert alert-info">Successfully Saved</div>';
+
+				$('#voteAlertMsg'+announcementId).html(boiler);
+				setTimeout("$('#voteAlertMsg"+announcementId+"').html('')",3000);
+			},
+			error:function(){
+				jAlert("Something went wrong, Please try after some time","Error");
+			}
+		});	
+	}
+}
+
+var announId='';
+var aCount=0;
+function viewAnnouncementDetail(announcementId){
+	if(announId != announcementId){
+		aCount=0;
+	}
+
+	if(aCount == 0){
+		aCount++;
+		announId=announcementId;
+		viewDetailsOfAnnouncement(announcementId,function(){
+			var boiler = '';
+			getDocumentCategoryByAnnoucementId(announcementId,function(categoryId){
+				var uploaddocument = new UploadStudentDocument();
+				if(categoryId != 'null' && categoryId != undefined){
+					uploaddocument.getDocument(categoryId,function(jArray){
+						if(jArray.length > 0){
+							showAnnouncementAttachment(jArray,'announcementAttachment-'+announcementId);
+						} else {
+							boiler = '<div class = "alert alert-info">No attachments</div>';
+							$('#announcementAttachment-'+announcementId+'').html(boiler);
+						}
+					});
+				} else {
+					boiler = '<div class = "alert alert-info">No attachments</div>';
+					$('#announcementAttachment-'+announcementId+'').html(boiler);
+				}
+			});
+		});
+	}
+}
+
+
+function getUnreadAnnouncement(){
+//	var instituteCourseId = $('#departmentCmb').val().split("-")[0];
+	var hdnUserRole = $('#hdnUserRole').val();
+		var url = 'getUnreadStudentAnnouncement.json';
+		if(hdnUserRole == "student" || hdnUserRole == "Student"){
+			url = 'stu_getUnreadStudentAnnouncement.json';
+	}
+	$.ajax({
+		url:url,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+		
+		},
+		complete: function() {
+			
+		},
+		success:function(jArray)
+		{
+			if(jArray.length>0){
+				$("#countAnnouncement").html(jArray[0]["count"]);
+				$("#announcementCount").html(jArray[0]["count"]);
+			}
+			else
+				$("#countAnnouncement").html('0');
+		},
+	});
+}
+
+
+function setReadAnnouncement(announcementId){
+
+	if(!$('#announcementBody-'+announcementId).hasClass("loaded")) {
+
+		$('#new'+announcementId).hide();
+		if($("#countAnnouncement").text()!=0 || $("#announcementCount").text()!=0)
+		{
+			$.ajax({
+				url:'setReadAnnouncement.json?announcementId='+announcementId,
+				dataType:'json',
+				async:false,
+				beforeSend: function() {
+					startCommonAjaxSpinner();
+				},
+				complete: function() {
+					stopCommonAjaxSpinner();
+				},
+				success:function(jArray){
+					$('#new_'+announcementId).remove();
+					getUnreadAnnouncement();
+					
+					
+				},
+			});
+		}
+	}
+}
+
+
+function removeStudentAnnouncement(studentAnnouncmentId,div,isPermanent) 
+{
+	if(isPermanent!="PERMANENT")
+	{
+		$.ajax({
+			url:'removeStudentAnnouncement.json?studentAnnouncmentId='+studentAnnouncmentId,
+			dataType:'json',
+			async:false,
+			beforeSend: function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray){
+
+				$('#div'+studentAnnouncmentId).fadeOut(1200);
+				$('#announcementDetails').html('');
+
+			},
+			error:function(){
+
+			}
+		});
+	}
+	else
+		jAlert("The sender has not allowed you to delete this announcement..","Warning");
+}
+
+
+function getStudentMessage(){
+
+	$('#message').val('');
+	$.ajax({
+		url:'getStudentMessage.json',
+		dataType:'json',
+		async:false,
+
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			var subcnt=1;
+			var j=jArray.length;
+			var boiler='';
+			boiler+='<table id="dMtbl1" cellpadding="0" cellspacing="0" border="1" class="table table-striped table-bordered table-condensed" style="width: 100%"><thead>'+
+			'<tr><th>Sr No.</th><th>Date</th><th>Time</th><th>Message</th>'+
+			'<th>Sent By</th><th>Reply</th><th style="display:none">employeeMessageId</th></tr></thead><tbody>';
+
+			for( var i=0; i<j; i++)
+			{
+				var studentMessageId = jArray[i]["studentMessageId"];
+				if(jArray[i]["status"]==false){
+					boiler+='<tr id="'+studentMessageId+'" style="font-weight:bold">';
+				}
+				else{
+					boiler+='<tr id="'+studentMessageId+'">';
+				}
+
+				boiler+='<td>'+subcnt+'</td>'+
+				'<td>'+jArray[i]["date"]+'</td>'+
+				'<td>'+jArray[i]["time"].split(".")[0]+'</td>'+
+				'<td>'+jArray[i]["message"]+'</td>'+
+				//'<td align="center"><input type="button" value="Message" class="viewMessage" onclick="showMessage(\''+jArray[i]["message"]+'\')"></td>'+
+				'<td>'+jArray[i]["sentBy"]+'</td>'+
+				'<td style="text-align:center">'+
+				'<input type="button" value="Reply" class="btn btn-inverse btn-mini  " onclick="sendEmployeeMessage(\''+jArray[i]["employeeId"]+'\' ,\''+jArray[i]["sentBy"]+'\')"></td>'+
+				'<td style="display:none">'+studentMessageId+'</td></tr>';
+				subcnt++;
+			}
+			boiler+='</tbody></table><br /><div id="divMeetingForCoordinator"></div>';
+			$("#message").html(boiler);
+
+
+			$('#dMtbl1').dataTable( {
+				"sDom": "<'row'<'margin-left-22'l><'pull-right'f>r>t<'row'<'margin-left-22'i><'pull-right'p>>",
+				"sPaginationType": "bootstrap",
+				"oLanguage": {
+					"sLengthMenu": "_MENU_ records per page"
+				}
+			} );
+
+		},
+	});
+	if($("#countMessage").text()!=0){
+		setReadStudentMessage();
+	}
+}
+
+function sendEmployeeMessage(employeeId,empName)
+{
+	$('#studName').html('');
+	$('#replayDiv').html('');
+	$('#replayToStudentMessageModal').modal('show');
+	$('#studName').html("Reply To : "+empName);
+
+	var boiler ='<table class="table table-bordered"><thead>'+
+	'<tr><th>Reply Message</th></tr></thead>'+
+	'<tr><td><textarea id="replyStudent" style="width:650px"></textarea></td></tr>'+
+	'<tr><td><div align="center">'+
+	'<input type="button" class="btn btn-inverse btn-mini" value="Send Reply" onclick="sendReplayToEmployee(\''+employeeId+'\')"></div></td></tr>'+
+	'</table>'+
+	'</div>';
+	$('#replayDiv').html(boiler);
+}
+
+function sendReplayToEmployee(employeeId)
+{
+	var description = $('#replyStudent').val();
+	$.ajax({      
+		url:'sendReplayToEmployee.json',
+		dataType:'text',
+		type:'POST',
+		data:{employeeId:employeeId,description:description.toString()},
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(type)
+		{	
+			$('#replayToStudentMessageModal').modal('hide');
+			jAlert("Successfully Send Message","Success");
+		},
+		error:function(){
+			alert("Error");
+		}
+	});
+
+}
+
+
+function getUnreadStudentMessage(){
+	
+//	var instituteCourseId = $('#departmentCmb').val().split("-")[0];
+	$.ajax({ 
+		url:'getUnreadStudentMessage.json',
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			/*startCommonAjaxSpinner();*/
+		},
+		complete: function() {
+			/*stopCommonAjaxSpinner();*/
+		},
+		success:function(jArray){
+				$("#countMessage").html(jArray[0]["count"]);
+		},
+	});
+}
+
+
+function setReadStudentMessage(){
+	$.ajax({      
+		url:'setReadStudentMessage.json',
+		dataType:'text',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(type){	
+
+			getUnreadStudentMessage();
+		},
+		error:function(){
+			return;
+		}
+	});
+}
+
+function getUnreadStudentMessageByStudent(){
+	var stud = $('#sonDaugtherName').val();
+	$.ajax({
+		url:'getUnreadStudentMessageByStudent.json?stud='+stud,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+				$("#countMessage").html(jArray[0]["studMessagecount"]);
+		},
+	});
+}”ò¿Ÿ–  T        rE›      searchKeyword      >Â!      globalArray    êù˝      globalMyArrArray   U3d      countAnnouncement      ∏OÄ      document   ¢Ñ
+      ready      ≥XVî      #replayToStudentMessageModal    ∫˚      modal      a@      keyboard	   HáíK      show
+   >ü      css    ÎƒJ˚      width      Õ       700px      Ú(:…      margin-left    è˛≥ó
+      #annScroll     S£≈]
+      slimScroll     »Åí      position    ë∏.      right      ∑…≈      height     ëπê.      500px      ¿!Œd	      wheelStep      NcL	      typeAhead      Hà∫È
+      #searchBox     ¢¸ˇ∫	      typeahead      ≠WÇ<      viewAnnouncement   ŒRÉ      divId      ∏àÀ¶      getUnreadAnnouncement      ˘‹QA      getUnreadStudentMessage    °i$+      #viewAnnouncementAll   ‘„X      html   36wÓ      #viewAnnouncement      1Ôf       boiler#     æd»ê      ajax$   µCÀb      getStudentAnnouncement.json%    DoÄw      dataType&   Ñ–ˇ
+      beforeSend'     qm+Ô      startCommonAjaxSpinner(     Dï»á      complete)   Ü*F      stopCommonAjaxSpinner*      …©\9      success+    ı≤z      jArray,     r•ËÎ      searchBoiler/   ¨˜í      <td>7   Á«Ä      </table>8    7L—      #autoComplete9      /fJú      myArr:      Ñu2      push;   c˝)/      heading<    ∞≠ÿG      inArray=    Í =r      showAnnouncement>   ’é7      #announcementList?      ∫óBÆ6      <div class = "alert alert-info">No announcements</div>@     ˛tuW      errorA      Øé'1      searchAnnouncementB     Õ∂•o
+      filterFlagC     4ø¨é
+      SearchWordD     ˛ºc      #txtSearchWordE     &⁄õ      valF    ë±>J      viewAnnouncementNewG    Ä≠•ù      flagH   (¸-ï      #divalumpostI   üvÙ}      hideJ   9´ó      #announcementDetailsK   6ó(Å      dataL   é„è      <div id="divPostLoading" style="text-align: center;width: 100%;"><i class="fa fa-spinner fa-pulse fa-fw fa-4x" style="color:#0b4971"></i></div>M    Q±Î	      boilerNewN      ºœ’î      annBodyO    B¿™©
+      allcheckedP     +G]À      unreadcheckedQ      Uåg'
+      todaysDateR     ê©ò∆      cntS    ∂iÑ'      #announcementCountT     à3¿µ      textU   Àsq5      #countAnnouncementV     [C-/      unreadW     »:0ó      checked\    »ë•@       type="radio"><label for="Unread" onclick="viewAnnouncementNew(']   ä…®∂      ','`    lú¨v=       type="radio"><label for="All" onclick="viewAnnouncementNew('j      ©è^      </div>k     Œ◊ëùS      <div id="announcementContainer"><section><div class="container" style="width:98%;">l    Q v
+      readStatusm     F"£J      createdDaten    %k‚5      getFullYearo    "ü      getMonthp   ∂≠      getDateq    ˜lD      <div class="collapse-card" style="background-color:#dfeffc;" id="divr   g¬¬™      announcementIds     çäç      " >t    ª™ãD      <div class="collapse-card" style="background-color:#F3F3F3;" id="divu   –éu"      <div class="collapse-card" id="divv     ï] 8      <div class="title"  onclick="viewAnnouncementDetailNew('w   K„ñÖ      ')">x   rı
+.      <img src="getEmployeeProfileImageById.json?id=y     GZS'
+      employeeIdz     l.#P      " style="border-radius:20px;float:left;border:0.5px solid lightgray;" height=40>{   ˇ9RÉ	      <span>On |      GÒz       by <b>}    æ\-a      employeeName~   ôâ       </b></span>    H é≤      <strong>Ä   ìÜr	      </strong>Å      Nû∏,      <div class="body"><div id="announcementBody-Ç   ¡íK¢R      "><div style="width:100%; text-align:center;"><img src="img/ajax.gif"></div></div>É     ı∏÷√Ç      <h1 style="font-size: 18px; padding-bottom: 10px; margin-bottom: 10px; line-height: 22px; border-bottom: 1px solid #E5E5E5;"></h1>Ñ     n•˜œ<      <div class="footer" style="float:right;margin-bottom:10px;">Ö   çîè=      <a title="Move to Trash" onclick="removeStudentAnnouncement('Ü      (Ãò 	      ','div','á      {CŸ{      isPermanentà    »gú      '),setReadAnnouncement('â   õÔ›!      ')"><img src="img/trash.png"></a>ä      ÙÖG      </div><br></div></div>ã     ÿÌ      </div></section></div>å     ¥95DS      <h4 style="text-align:center;font-size:14px;padding:5px;">No new Announcements</h4>ç    „”Nﬂ      .collapse-card .titleé      ¯6m      paperCollapseè      7í^Z      #announcementContainerê     ˘¶P      450pxë      ª?y      100%í   4o0      scrollByì   –£¥      10pxî   v0_R      railVisibleï    Ê≥«      alwaysVisibleñ      ≤÷¡ã      viewAnnouncementDetailNewó      d∑ó›      #announcementBody-ò     7ÑÉz      hasClassô   ƒM      loadedö     ˘ﬁËö      setReadAnnouncementõ    ∑?“T      #memberú    #€ˇ©      announIdù   ‘Á©p      aCountû     V™∏å      viewDetailsOfAnnouncementNewü   Ü3ú°      announcementArray†      ¬P	      isCreator°      S£\-      annoucementObj¢     ¶0…m      createdByEmployeeId£    0ÜÇ      viewerEmployeeId§   à{ò"      getDocumentCategoryByAnnoucementId•     ¢∑ÿ
+      categoryId¶     º±ø_      uploaddocumentß     kT      UploadDocument®     Z¡ñ	      getDocument©    ⁄ó•£      showAnnouncementAttachment™     ‘©ºY      announcementAttachment-´    ≤*~Ç4      <div class = "alert alert-info">No attachments</div>¨   4LlÓ      #announcementAttachment-≠   Ë€˘      callbackÆ   T K4      getAnnouncementByAnnouncementId.json?announcementId=Ø   :Ùô°      accordianBoiler∞    òh;      body±   '˛Xb      announcementBody≤   6æ¿8Ñ      <div style="background-color: #FFF; border: 1px solid #D5D5D5; border-radius: 2px; padding: 20px; height: auto; overflow-y: auto; ">≥   üüqßZ      <div style="padding-bottom: 20px; border-bottom: 1px solid #E5E5E5; margin-bottom: 20px;">¥     "ã      hasPollµ    
+G?r      hasCustomOption∏    œÇLﬂ      pollQuestion∫    &Õh      customOptionJArrayª     ø[÷      <li><input id="rd_º     Ù˝°À      OptionIdΩ   v! ∫      " type="radio" name="pollAnsweræ    ïumG	      " value="ø      +®¢      ">¿     ï∆Æø
+      OptionName¡     ˜Ó’∂      </li>”      êÌ<˝É      <p style="padding-bottom: 20px; font-size: 11px; margin-bottom: 10px; border-bottom: 1px solid #E5E5E5;"id="announcementAttachment-’    Bå|      addClass÷   +$eΩ      input:radio[name=pollAnswer◊    5ÿóÄ      employeeAnnouncementDetailIdÿ    Î      ][value=Ÿ   q&÷ã
+      PollAnswer⁄     A¢Ωê      attr€   ‰Üﬂ)      removeAnnouncement‹     ú≥ÊŸ      div›    •ÅNq	      PERMANENTﬁ      ËL¯5      removeAnnouncement.json?employeeAnnouncementDetailId=ﬂ      ˇ d      #div‡   –cH:      fadeOut·    Òp^      jAlert‚     Â›æ:      The sender has not allow you to delete this announcement..„     pÍﬁ˛      Warning‰    h€°	      isHistoryÂ      ≈      keywordÊ    ◊Èä†      <br/><div class="alert alert-error"><button type="button" class="close" data-dismiss="alert">◊</button><strong>Sorry !</strong> Please enter some keyword.</div>Á   ]±∑]ñ      <br/><div class="alert alert-error"><button type="button" class="close" data-dismiss="alert">◊</button><strong>Sorry !</strong> No Result found.</div>Ë     k≤¯∆
+      <h3 id="h3Í     …óœi#      " onclick="viewAnnouncementDetail('Î    .®Òg       Created on Ï   Ñ÷Ê       (Created By:-Ì     >¢#ó:      )&nbsp;&nbsp;&nbsp;<span class="label label-info" id="new_Ò     Ñ %      " align="center"></div>Ú    ∏˝Y	      accordionÛ      ŒÛ˝      destroyÙ    kàˇ      headerı     Ìs¶
+      autoHeightˆ     /Í•æ      collapsible˜    å®Px      active¯     z
+…g      totPages˘   À…µ      pagerBoiler˙    ∂O„Z      <div class="pagination"><ul><li id="pagePrev"><a id="prevLink" onclick="showAnnouncement('˚     µ6Oë      ', ¸    £ºƒ*      )"><<</a></li>˝     …∫Ñ      <li id="page˛   ¨ÿ<⁄)      "><a href="#" onclick="showAnnouncement('ˇ      €p'      )">    #—\≥	      </a></li>     ≠∆ú\>      <li id="pageNext"><a id="nextLink" onclick="showAnnouncement('    Ô~Ò      )">>></a></li></ul></div>     0‘_¡      #paging   R‚ g	      #prevLink     EﬁS      onclick   ı˛«Æ      unbind    ü™‚X      click     ÍT±î	      #pagePrev	     ûzÉw      disabled
+  \œü	      #nextLink     ?}/î	      #pageNext     ˝«∆
+      temp  Ÿ≠      #page     …˜©      viewDetailsOfAnnouncement     w_Ôà      </span><br><br>   ¿ê@>      isForwarded   0ËsF      <span style="float:left;font-size:10pt"><strong>Created By :</strong>     ±N)´      ForwardedByEmployeeName   ˆÅ≥ø      forwardedDate     Y"®A>      <div class = "well" align="left"><span style="font-size:10pt">    ®ƒl      </span></div>     L¬≠      voteForAnnouncementPollStudent    1ê©      optionsType    *#æ      Default!   Í£Úç
+      pollAnswer"    >ú—	      ]:checked#     f=Àã3      voteForAnnouncementPollStudent.json?announcementId=$   ]’]Ì      &pollAnswer=%  4Í§Œ      &optionsType=&     ∂[H«6      <div class="alert alert-info">Successfully Saved</div>'    ±≈∑¶      #voteAlertMsg(     3AtŸ
+      setTimeout)    ˛F`Ç      $('#voteAlertMsg*  ≈–ò      ').html('')+   gàı◊0      Something went wrong, Please try after some time,  ˛π¿      viewAnnouncementDetail-    .x≠      UploadStudentDocument.     Àuˆi      hdnUserRole/   _lh∫      #hdnUserRole0  ¯8ë!      getUnreadStudentAnnouncement.json1     ˇÿö˘      student2   „%>(      Student3   -/0á%      stu_getUnreadStudentAnnouncement.json4     \öˇœ      #new5  ∂˜Ä(      setReadAnnouncement.json?announcementId=6  X,q      #new_7     *N∑∆      remove8    #xª      removeStudentAnnouncement9     Ã)–      studentAnnouncmentId:  £ç>94      removeStudentAnnouncement.json?studentAnnouncmentId=;  Íπ°ˇ<      The sender has not allowed you to delete this announcement..<  @$	      getStudentMessage=     w@Â7      #message>  
+Âˆ<      getStudentMessage.json?    /ª¥;      subcntC    9¿oà      studentMessageIdD  Ô„\9      <tr id="E  êHK#      " style="font-weight:bold">F   ∏·-ò      sentByI    ¡Zô      ' ,'L  ¯ÅÊÛ
+      </td></tr>M    ?ry?      </tbody></table><br /><div id="divMeetingForCoordinator"></div>N   -aËœ      #dMtbl1O   ¸”8	      dataTableP     y&ﬁy      sDomQ  ì¸T      <'row'<'margin-left-22'l><'pull-right'f>r>t<'row'<'margin-left-22'i><'pull-right'p>>R  ¨∑il      sPaginationTypeS   }~h	      bootstrapT     TmÕ¸	      oLanguageU     ì!.®      sLengthMenuV   Rv8¬      _MENU_ records per pageW   7°Ÿ3      #countMessageX     I[à      setReadStudentMessageY     âYD      sendEmployeeMessageZ   ]‹äƒ      empName[   \È{	      #studName\     x—v
+      #replayDiv]    ç{Ï'      Reply To : d   &6ø      sendReplayToEmployeee  Ñàö      descriptionf   –≠      #replyStudentg     *î‘2      sendReplayToEmployee.jsonh     ﬂ:      POSTi  ‚gÏÀ      Successfully Send Messagej     ·V      Successk   “Ô¢Z      alertl     ’3›      getUnreadStudentMessage.jsonm  s{      setReadStudentMessage.jsonn    W…~       getUnreadStudentMessageByStudento  Ê„ø      studp  ≤iØô      #sonDaugtherNameq  Ìá±Ÿ+      getUnreadStudentMessageByStudent.json?stud=r   ¯A)      studMessagecounts  Tf≤
+^      <div><br><div id="autoComplete"></div><div id="announcementList"></div><div id="paging"></div>t    H~qÓ     <table class="table table-bordered"><tr><td><span id="searchDiv">&nbsp;&nbsp;<input type="text" id="searchBox" placeholder="Search By Keyword" data-provide="typeahead"/></span>&nbsp;&nbsp;<a class="btn" style="vertical-align: top;" onclick="showAnnouncement('search', 0);">Search</a><span id="cartBtn" class="pull-right"></span>&nbsp;&nbsp;<a class="btn" style="vertical-align: top;" onclick="showAnnouncement('no', 0); ">Clear</a><span id="cartBtn" class="pull-right"></span></td></tr></table>u    †˝ø[Ç      <div class="row-fluid" style="margin-left:5px;"><div class="span4"><div class="switch-toggle well"><input id="Unread" name="view" v    l(à(:      ','unread','')">Unread</label><input id="All" name="view" w    +Æú      ','all','')">All</label><a class="btn btn-success"></a></div></div><div class="span2"><p style="margin-bottom:10px;font-size:13px;text-align:left;">Showing x  4üµYz       results</p></div><div class="span6" style="text-align:right;margin-top:-5px;"><input type=text id="txtSearchWord" value="y    )’Ú‚£      " placeholder="Search Announcement" style="margin:5px;border-radius:5px;"><input type="button" class="btn btn-primary" value="Search" onclick="searchAnnouncement('z   ÑÒ˜      ')"></div></div>{  KÚ∫x      <strong style="font-size:10pt"> Cast your Vote:</strong><div class = "well" align="left"><strong style="font-size:10pt">|  Ô)GÒ,      </strong><ul style="list-style-type: none;">}  ü§»–î      <li>&nbsp;</li><li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent('Custom',~  ¡;◊>#      )"/></li></ul><div id="voteAlertMsg   v£ù      "></div></div>Ä    Ö≠6–A      </strong><ul style="list-style-type: none;"><li><input id="rd_yesÅ     ˆÎ*      " value="yes">Yes</li><li><input id="rd_noÇ    ˆ˘Úê+      " value="no">No</li><li><input id="rd_maybeÉ   ∞èiè9      " value="maybe">Maybe</li><li><input id="rd_remindmelaterÑ     ‰◊L™D      " value="remindmelater">Remind me later</li><li><input id="rd_ignoreÖ   ñí<±      " value="ignore">Ignore</li><li>&nbsp;</li><li><input type="button" class="btn btn-inverse btn-mini" id="btnVote" value="Vote" onClick="voteForAnnouncementPollStudent('Default',Ü     √‘SM      "><img src="img/loading-small.gif"><a style="color: #1D719F;"></a> </p></div>á      ÚÏê      "><a href="#" id ="aà  ÃÊ+!      ">New</span></a></h3><div id="divâ     òHÃ∞      )</a></h3><div id="divä    õPó¢7      <div class="well"><h3 style="background-color:#1EA6D7">ã   ÊWœ~M      </h3><br><span style="float:left;font-size:10pt"><strong>Created By:</strong>å     ı≤ΩF      </span><span style="float:right;font-size:10pt"><strong>Date:</strong>ç    4—ªH      </span><span style="float:right;font-size:10pt"><strong>Date : </strong>é  	ˇ f      <strong style="font-size:10pt"> Attachments:</strong><div class = "well" id = "announcementAttachment-è    k…ÿ2     <table id="dMtbl1" cellpadding="0" cellspacing="0" border="1" class="table table-striped table-bordered table-condensed" style="width: 100%"><thead><tr><th>Sr No.</th><th>Date</th><th>Time</th><th>Message</th><th>Sent By</th><th>Reply</th><th style="display:none">employeeMessageId</th></tr></thead><tbody>ê    é˛H	      </td><td>ë     &íòüá      </td><td style="text-align:center"><input type="button" value="Reply" class="btn btn-inverse btn-mini  " onclick="sendEmployeeMessage('í   Sn{"      ')"></td><td style="display:none">ì    |JJN#     <table class="table table-bordered"><thead><tr><th>Reply Message</th></tr></thead><tr><td><textarea id="replyStudent" style="width:650px"></textarea></td></tr><tr><td><div align="center"><input type="button" class="btn btn-inverse btn-mini" value="Send Reply" onclick="sendReplayToEmployee('î   ±Q‰C"      ')"></div></td></tr></table></div>ï    å§      typeAhead/<ô   ÿ¬Ng      viewAnnouncement/success/<ü    EI†˜      viewAnnouncementDetailNew/<†    1Ωu      viewAnnouncementDetailNew/</<°     ¨7ö†      viewAnnouncementDetailNew/</</<≤   ﬁ…L¨      viewAnnouncementDetail/<≥  Uº9o      viewAnnouncementDetail/</<¥    FÈU[      viewAnnouncementDetail/</</<     V     \   V              Ô%,â                                                                                                                                        	                 
+                                         
+                 
+                 
+                                 
+                                                                                                                                                                                                                                                                                                   	                	                               "           !      "           "      "           #      %                %                "           $                 %      )           &      )           '      )           (      )           )      )           *      )           +      )           ,      )           -                 .      2          /      3           0      4           1                  2      6           3      6           4      6           5                 6      :           7      :           8      :           9                 :      >           ;      >           <      >           =      >           >                  ?      C           @      C           A      C           B                  C                  D      H           E      H           F      H           G      H           H                  I      M           J      M           K      M           L                  M      Q           N      Q           O      Q           P      Q           Q                  R      V           S      V           T      V           U                        Z                 ≥Oåc         ö  êX ê  û  ê  ê=  êñ  ê ê8 ê  ê   ê  ê   d êù    ê, êA  ên êY ê  F  ê< ê€  êú                                                                                              +  ,  9  j               i  ï                               B  C                 P   PB  PG  P                                	            +  M  N  O  P  Q  R  j  m     	      e                               r  P            ü  †  P°    P            •  ¶               +               r  P≠  P                                            +  Ø  i  ∫  j           e                               ◊  P‹  á                                               +                     	         ‰      G  Â  9  j  i  ¯  ˘      
+      e     
+      e               r  P≠  PØ  P                                            +  i  ∫  j           e           e                               r  P!                                                                                                                                              r  P                 P            •  ¶               +                . J                                               +               r  P                                             +               9 P‹  á                                               +                                                                              +  ? j    i  C             y  Z               y  e                                              0                                                                               +                                                               0                                o                                              +                                ã   Ø¬0∞IÙ$KEÆ˙ö         ˚     #     J  %     &  (  *  @     (   J  %  K     &  (  *  @     
+      C  B             #         í  î    ï     #   J  %     &  (  *  @     #   J  %     &  (  *  @        Ù  ı  ˆ  ˜     #      J  %     &  (  *  @     #   J  %     &  (  *  @     #   J  %     &  (  *  @        J  %     &  (  *         J  %     &  (  *     #    J  %     &  (  *  @        J  %     &  (  *         P R T       U 	   -     J  %  0  K     &  (  *  @     
+     y  e        J  %     &  (  *     #    J  %     &  (  *  @        J  %     &  (  *     
+      	     
+                     á&’™ç!´!V   ‰    aƒ\‰   î                         ⁄   ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑       ﬂª       s ·J   ‰m   w ﬂ∑          ﬂ∑         ﬂ•
+`ì eì eì e7`P
+ˇˇˇ˙PDÄ πe+eGÄ ⁄PÄ‹   Ã$“‹   á                          ª       s ·J   ‰9   <   <   s ·J   ‰9   	   <
+   m   <   w ﬂª       s ·J   ‰9      <      <   <   w ﬂ• `P
+'%&F$PJ	%*JPD`P
+%**GP4PÄÄÄX   «Á´X   #                        ﬁÕ   ﬂª    æ   s ·J   ‰s  +¢•&` ˇˇˇ˛P
+P'QÄT   Ó.√T                             ª       s ·J   ‰m   w ﬂ• `P
+ˇˇˇ˙P4PÄÄÄ\   ˙¶ƒ≥\   )                          ª       s ·J   ‰9   ª   <   w ﬂ• `P
+%JPDPD  ]ÇD  ”                         ª    w  ﬂª    w  ﬂª       s ·J   ‰   w ﬂª       s ·J   ‰   w ﬂ   Õ   ﬂª    	   º  &s ·J   ‰æ   w ﬂª   ·J
+   ‰9      <      <   <   m   <   m   <   m   <   m   <   w ﬂ• `*`*`PP$`PP$`J`ˇˇˇ˚P
+ˇˇˇ˚PD
+`%**&JJJ>J
+P4DPÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ¿  ©I¨t∞           	       $      º  J   öÍ   ó   ∑   º      ﬂ   Õ   ﬂª       s ·J   ‰æ   w ﬂª   Ä„  Å  Õ  ﬂÕ  ﬂò   æ  ª   J   öA   ó   æ  ·J   ‰ª	    ª   æ  KJ
+   s w ﬂæ  0(Õ  ﬂôØˇˇˇó   ª   ·J   ‰æ  m   w ﬂª    w  ﬂª       w ﬂô(   ó    ª       s ·J   ‰   w ﬂó$   • `î `N`J`P
+ˇˇˇ˚PD`í 	 `fï `ˇˇˇÌPˇˇˇ˚PD&`ï@`ˇˇˇÙPD`J#`P>% `PPI)PÄÄÄ¿         a   V   |   “ö.5|   =                  	       ª   ·J   ‰º ª   s ˇö   ó   ª   ·J   ‰º w ﬂó	   • 	`
+ˇˇˇÙPê #`ˇˇˇ˚P)PÄÄ(   )Ò(                               •@ÄÄÄt   ;Ôxìt   7                        ª       s ·J   ‰s  Õ   ﬂª    º  æ   º    w ﬂ•@`P
+P(`ˇˇˇÓPPÄx  Áº”"x    $              $       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂª       s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂª       s ·J   ‰   w ﬂª	    w  ﬂª
+    w  ﬂª   ·J   ‰9      <      <   9   ¡   <   ¡   <   <   <   m   <   m   <   m   <   m   <   w ﬂ•§@`P
+P$`ˇˇˇ˚P
+P$`PP$`*`*`%**
+/&JJJÄ  íJP4Ä  òP\   _Ÿ_\   %                          ª       ¡   &s ·J   ‰   w ﬂ• `ˇˇˇ˚PPDPÄÄ(   )Ò(                               •@ÄÄÄ  
+õã1ÿ  V      	          ¢      $   Õ   ﬂ   Õ  ﬂ   Õ  ﬂ   Õ  ﬂª   Ä„  Å  Õ  ﬂº  J   Õ  ﬂª       s ·J   ‰æ  w ﬂª       s ·J   ‰æ  w ﬂ¡      ö   ó   	   Õ  ﬂô   ó   	   Õ  ﬂó   ¡      öâ   ó   
+   æ  &   &¡   &   &¡   &   &æ  &   &¡   &   &¡   &   &æ  &   &¡   &   &¡   &   &¡   &   &Õ   ﬂó#   º  J   öE  ó&   æ      &.Õ   ﬂÕ  ﬂò'   æ  º  J   ö¯  ó*   º  æ  KJ   ö  ó.   ª   Äº  æ  KJ   „  Å Õ  ﬂæ  ·J   ‰s  æ  ·J   ‰s  úP   ó8   ﬂæ  ·J   ‰s  æ  ·J   ‰s  ú(   ó>   ﬂæ  ·J   ‰s  æ  ·J   ‰s  óC   ö3   óD   æ      º  æ  KJ   &   &&.Õ   ﬂô.   óI   æ      º  æ  KJ   &   &&.Õ   ﬂóN   ô.   óN   æ      º  æ  KJ   &   &&.Õ   ﬂóS   æ      º  æ  KJ   &   &&.Õ   ﬂæ       º  æ  KJ!   &"   &&.Õ   ﬂæ   #   º  æ  KJ   &$   &º  æ  KJ%   &&   &&.Õ   ﬂ´æ   '   ª(    º  æ  KJ)   s &*   &&.Õ   ﬂô=   óm    §≠∞±  ﬂ±  ﬂæ   '   º  æ  KJ)   &*   &&.Õ   ﬂ“ór   æ   ,   &.Õ   ﬂæ   -   º  æ  KJ   &.   &&.Õ   ﬂæ   /   &.Õ   ﬂæ   0   &.Õ   ﬂæ   1   º  æ  KJ   &2   &º  æ  KJ3   &4   &º  æ  KJ   &5   &&.Õ   ﬂæ   6   &.Õ   ﬂæ  0(Õ  ﬂô˙¸ˇˇóä   æ   7   &.Õ   ﬂô   óã   æ   8   &.Õ   ﬂóå   ª    9   ¡   &s ·J:   ‰æ   w ﬂª    ;   s ·J<   ‰9=   w ﬂª    >   s ·J?   ‰9@   A   <B   C   <D   E   <F   G   <H   <I   <J   <K   w ﬂ•@`*`*`*`*`í `-`P
+ˇˇˇ˚P$`P
+ˇˇˇ˚P$`ï `î `O`ï `E&R,#LLcK2,añ@`î `ê 	 `fì 	`ô `	ë ˇˇˇ˜(
+`PPö PPö PPì `	S•0) `	S™0. `	1†@2`	Hõ `	=õ `	î #õ!`	ˇˇˇÌPû +`	°@:`ê `	;õ@=`ê `ê `	Mî ,î 6õ `ê@!`ï@B`ö0E `ï@H`ˇˇˇ˚P
+ˇˇˇ˚P$`P
+(ˇˇˇÚP$`P
+&%****&'FJ PD~P  Ë  +   í  0   ˇˇˇˇ        X  2          |    ,   BHU,                               ¢• `!QÄÄ`  ;	`  Ê   	              !       Ω  Œ   ﬂª       ¡   &s ·J   ‰   s õ¥   ó   ª    ¡   w ﬂª       ¡   &s ·J   ‰   s ·J	   ‰w  ﬂª
+   ¡   ö   ó   ∑       ﬂó   ª   ö@   ó   ∑   ª   0(    ﬂ∑
+   ¡    
+   ﬂª    ¡   m   w ﬂó!   •)`ˇˇˇÈP'P-`ˇˇˇˇPD`
+ˇˇˇıPP
+	P$`ê `ë@`ë `í `ê@`ˇˇˇP9-PÄÄ¿   `û´¢¿   s                        Œ   ﬂº  J   ö\   ó   º  KÕ   ﬂæ   J   æ   J   ö   ó   Œ   ﬂó      Œ   ﬂª    ¡  m   w ﬂó   • `G`î `J	`	&î `L
+`+`#ˇˇˇPIPÄÄË   Ú£∫mË   ê                        ª   Ä„  Å  Õ   ﬂº     ú   ó   ﬂº   ó   ö&   ó   æ   ·J   ‰º  m   w ﬂô9   ó	      Œ   ﬂª       ¡  &s ·J   ‰¡   w ﬂó   • `í 
+`ó &ë `ˇˇˇÈP> `+`ˇˇˇ‰P
+1ˇˇˇ˚PIPÄƒ   •Ó#ƒ   p                         º  J   ö,   ó   ª    º     ¡  &¡   w ﬂô9   ó      Œ   ﬂª       ¡  &s ·J   ‰¡   w ﬂó   • `î 
+`ˇˇˇœP 
+`+
+`ˇˇˇ‰P
+1ˇˇˇ˚PIPÄ¥   ;≠´n¥   p                        Ω  Œ   ﬂΩ Œ   ﬂª   ·J   ‰9      ¡   &<      <   <   m	   <
+   m   <   m   <   m   <   w ﬂ•í@`%;+*&J
+JJQJP4WPÄÄ(   ˆEÜÜ(                               •@ÄÄÄ(   )Ò(                               •@ÄÄÄ†  œ˚`  7         
+       ã      $   Õ   ﬂ∑          ﬂÕ  ﬂò   æ  º  J   öe  ó   ∑   º  æ  KJ       ﬂæ      &.Õ   ﬂæ      &.Õ   ﬂ´æ   ª    º  æ  KJ   s &.Õ   ﬂô1   ó    §≠∞±  ﬂ±  ﬂæ   º  æ  KJ   &.Õ   ﬂ“ó   æ   	   &.Õ   ﬂº  æ  KJ
+      ù   ó   ﬂº  æ  KJ
+   ó   öX  ó   º  æ  KJ      ù   ó    ﬂº  æ  KJ   ó#   ö  ó$   æ      º  æ  KJ   &   &&.Õ   ﬂº  æ  KJ   Õ  ﬂÕ  ﬂò+   æ  æ  J   öÅ   ó.   æ      æ  æ  KJ   &   &¡   &   &¡   &   &æ  æ  KJ   &   &æ  æ  KJ   &   &&.Õ   ﬂæ  0(Õ  ﬂôpˇˇˇóA   æ      ¡   &   &¡   &   &&.Õ   ﬂô  óF   º  æ  KJ    ù8   óJ   ﬂº  æ  KJ      ù   óN   ﬂº  æ  KJ   óQ   öæ   óR   æ      º  æ  KJ   &   &¡   &   &¡   &   &¡   &   &¡   &   &¡   &   &¡   &    &¡   &   &¡   &!   &¡   &   &¡   &"   &¡   &   &¡   &   &&.Õ   ﬂóo   æ   #   ¡   &$   &&.Õ   ﬂæ  0(Õ  ﬂôç¸ˇˇót   ª%    &   ¡   &s ·J'   ‰æ   w ﬂª%    &   ¡   &s ·J(   ‰)   w ﬂª%    *   º  KJ+   &,   &º  KJ-   &.   &s ·J/   ‰0   0   w ﬂ¡    º  w ﬂ• `J`ê  `fì@`ò `ê@
+`ê0!`
+%ˇˇˇÌPó +`û@`ê `º 	`º `)Jõ@ `í  `fî `	'ï &1ï 'ú@/`ï@`)Ä  ëLù@ `… `)Jî@$1,1,!1,)1,"1L*Ä  íL,ò@0`	Ä  òì@ `ï@;`ˇˇˇÍP
++ˇˇˇ˚P$`ˇˇˇÍP&PDA`ë 7ë ˇˇˇ™Pî uP$`	ˇˇˇˇP$P†  p     §   $   ˇˇˇˇ        v   &          ë  ï              x  ,   BHU,                               ¢• `!QÄÄÏ   œvUﬁÏ   ù   	                     Ω  Œ   ﬂº    öl   ó   ª   ·J   ‰9      ¡   &<      <   <	   m
+   <   m   <   m   <   m   <   w ﬂô   ó   ª          w ﬂó   • `ì `%<+*&JJJJPN`ê PPÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄÄ   d≠ıôÄ   A                  	       ª       ¡   &s ·J   ‰∞w ﬂª       s ·J   ‰   w ﬂ• `ˇˇˇ¯P&P$`PP$PÄ(   ¯‘l∆(                               •@ÄÄÄ
+  ã1Û§	  ï      
+               $∑       ﬂ   Õ   ﬂÕ  ﬂº     ö=   ó   ª       s ·J   ‰   w ﬂ∑   ª       ﬂôH  ó   ª       s ·J   ‰s  Õ  ﬂª	   Ä„  Å  Õ  ﬂÕ  ﬂÕ  ﬂò   æ  ª   J
+   öp   ó   æ     öG   ó   æ  ª   æ  KJ   ö)   ó   æ  ·J   ‰ª   æ  Kw ﬂÕ  ﬂó    æ  0(Õ  ﬂôÄˇˇˇó"   ∑   æ      ﬂæ     ö-   ó&   ª       s ·J   ‰   w ﬂô8   ó*   æ  ö(   ó,   ª       s ·J   ‰   w ﬂó0   æ  öﬂ  ó2      Õ  ﬂª   J
+   º '
+ö   ó7   ª   J
+   Õ  ﬂô   ó9   º 
+&Õ  ﬂó:   º Õ  ﬂò:   æ  æ  öp  ó<   æ  ª   J
+   ö   ó@   ôM  ó@   ª   æ  KJ   öS  óE   æ      ª   æ  KJ   &   &ª   æ  KJ   &   &ª   æ  KJ   &   &ª   æ  KJ   &   &&.Õ   ﬂ´æ      ª    ª   æ  KJ   s &   &&.Õ   ﬂô?   ób    §≠∞±	  ﬂ±	  ﬂæ      ª   æ  KJ   &   &&.Õ   ﬂ“óh   æ      ª   æ  KJ   &   &ª   æ  KJ   &   &ª   æ  KJ   &   &ª   æ  KJ   &    &&.Õ   ﬂô"  ó}   æ      ª   æ  KJ   &   &ª   æ  KJ   &   &ª   æ  KJ   &   &&.Õ   ﬂ´æ      ª    ª   æ  KJ   s &   &&.Õ   ﬂô?   óï    §≠∞±	  ﬂ±	  ﬂæ      ª   æ  KJ   &   &&.Õ   ﬂ“óõ   æ      ª   æ  KJ   &   &ª   æ  KJ   &"   &ª   æ  KJ   &    &&.Õ   ﬂó´   ª       s ·J   ‰æ   w ﬂª       s ·J#   ‰$   w ﬂª       s ·J#   ‰9%   &   <'   <(   <)   <*   w ﬂª   J
+   
+ö!  ó¿   ª   J
+   
++&Õ  ﬂª   J
+   
+,ö   ó…   æ  0)Õ  ﬂóÀ   +   º  &,   &º 
+'&-   &Õ  ﬂÕ  ﬂò–   æ  æ  ö[   ó“   æ  .   æ  &/   &º  &,   &æ  
+*
+'&0   &æ  &1   &&.Õ  ﬂæ  0(Õ  ﬂôõˇˇˇóﬂ   æ  2   º  &,   &º 
+&&3   &&.Õ  ﬂª    4   s ·J   ‰æ  w ﬂóÈ   º öZ   óÎ   ª    5   s ·J6   ‰7      s ·J8   ‰9   w ﬂª    :   s ·J;   ‰<   w ﬂóı   ª   J
+   º '
+öZ   ó˙   ª    =   s ·J6   ‰7      s ·J8   ‰9   w ﬂª    >   s ·J;   ‰<   w ﬂó  º 
+&
++Õ  ﬂª    ?   æ  &s ·J;   ‰*   w ﬂæ  0(Õ  ﬂôÜ˙ˇˇó  • `,`*`&`ì `PP$`ö0
+ `P
+P(`í `& `fï `î `	ö `
+ˇˇˇ˚P$`K$`ï@`/`î `PP.`ê `PPI`ê `*`
+ë `ô@%`ê  `f `ï `J.`õ `$õ@2IE∂∫ñ Mñ Cù!`	ˇˇˇÌPû@6+`	£@9`	ñ 4ñ añ@;ß0> `$õ@Bñ Mù0D!`	ˇˇˇÌPû@G+`	£@J`	ñ 4ñ@L¢@Z`P
+ˇˇˇ˚P$`PP$`P
+ *F\PDa`ó `î `ô `ê `^
+í 	 `f/`	/
+ë í@g`ï@i`	O
+î `P
+ˇˇˇ˚PIl` `Pî PP$`PPIq`
+ë `Pî PP$`PPIv`.`ˇˇˇ˜PPD&`ï0zPÄ
+  ƒ	       2   ˇˇˇˇ!   D  2   ˇˇˇˇ       ¢   Ö           –  4             4          ¬  j              ¿   ;ÎÁA¿   {                        Ω  Œ   ﬂΩ Œ   ﬂ   Œ   ﬂª   ·J   ‰9      ¡   &<      <   <	   m
+   <   m   <   m   <   m   <   w ﬂ•í `+`%;+*&J
+JJXJP4[PÄ4   BeQ4                             ª    w  ﬂ• `JPÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄÏ   Ùömå  @         
+       ©      $ª       ¡   &s ·J   ‰   w ﬂÕ   ﬂò   æ   º  J   ö}  ó   ¡      &.Œ   ﬂ´¡      ª    º  æ   KJ   s &   &&.Œ   ﬂô?   ó    §≠∞±  ﬂ±  ﬂ¡      º  æ   KJ   &   &&.Œ   ﬂ“ó   ¡   
+   º  æ   KJ   &   &º  æ   KJ   &   &&.Œ   ﬂº  æ   KJ   öD   ó!   ¡      º  æ   KJ   &   &º  æ   KJ   &   &&.Œ   ﬂó*   ¡      &.Œ   ﬂ´¡      ª    º  æ   KJ   s &   &&.Œ   ﬂô?   ó2    §≠∞±  ﬂ±  ﬂ¡      º  æ   KJ   &   &&.Œ   ﬂ“ó7   ¡      &.Œ   ﬂº  æ   KJ      ù   ó<   ﬂº  æ   KJ   ó?   ö`  ó@   º  æ   KJ      ù   óD   ﬂº  æ   KJ   óG   ö  óH   ¡      º  æ   KJ   &   &&.Œ   ﬂº  æ   KJ   Õ  ﬂÕ  ﬂòO   æ  æ  J   öÉ   óR   ¡      æ  æ  KJ    &!   &¡   &"   &¡   &#   &æ  æ  KJ    &$   &æ  æ  KJ%   &&   &&.Œ   ﬂæ  0(Õ  ﬂônˇˇˇóe   ¡   '   ¡   &(   &¡   &)   &&.Œ   ﬂô  ój   º  æ   KJ    ù8   ón   ﬂº  æ   KJ   *   ù   ór   ﬂº  æ   KJ   óu   ö¿   óv   ¡      º  æ   KJ   &+   &¡   &"   &¡   &,   &¡   &"   &¡   &-   &¡   &"   &¡   &.   &¡   &"   &¡   &/   &¡   &"   &¡   &0   &¡   &(   &¡   &)   &&.Œ   ﬂóì   ¡   1   ¡   &)   &&.Œ   ﬂæ   0(Õ   ﬂôu˚ˇˇóò   ¡   2   &.Œ   ﬂª       ¡   &s ·J   ‰¡   w ﬂª    3   ¡   &4   &º  KJ5   &6   &s ·J7   ‰8   8   w ﬂ¡    w  ﬂ•@`ˇˇˇ¯PP$ `fì@`í0!`
+ˇˇˇÌPü@+`
+¢@`*Lî Gú `ó `
+Zî J°@`í0!`
+ˇˇˇÌPü@+`
+¢@`í `º 	`º `*Jú@# `í  `fî `
+'ï &1ï 'ù@$/`ï@'`*Ä  ëL*û@,`… `*Jî@01,1,!1,)1,"1L6Ä  íL8ô@<`*9î@ `ï@B`í `ˇˇˇ¯P
+ˇˇˇ˚PDE`ë ˇˇˇ≈Pî ZPDH`JJPÏ  ¨  	   ñ   2   ˇˇˇˇ   ¨  2   ˇˇˇˇ        Z   4           p  4          ´  ó          *   ê  $   g$                               • Ï  Å∆/(Ï  b  	             6       Ω Œ   ﬂº     ö™   ó   ª       ¡   &   &s ·J   ‰s  Õ   ﬂª   ·J   ‰9      ¡   &	   &æ   &
+   &º  &<      <   <   m   <   m   <   m   <   m   <   w ﬂô•   ó   ª       ¡   &   &s ·J   ‰s  Õ   ﬂª   ·J   ‰9      ¡   &	   &æ   &
+   &º  &<      <   <   m   <   m   <   m   <   m   <   w ﬂó6   •)`ì `ˇˇˇ·P
+;P(`%:)*&J
+JJJP> `ˇˇˇ·P
+;P(`%:)*&J!J$J*JP9/P4   )òrq4                             ª    w  ﬂ• `*PÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄò   &æòTò   L                 	           Õ   ﬂª       ¡   &s ·J   ‰æ   w ﬂª       ¡   &   &∏w ﬂ• `J`ˇˇˇÔP
+&ˇˇˇ˚P$`ˇˇˇÏP$PÄÄ@   1`BÓ@                             ª          w ﬂ• `ê P$P4   )òrq4                             ª    w  ﬂ• `*PÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄò   &æòTò   L                 	           Õ   ﬂª       ¡   &s ·J   ‰æ   w ﬂª       ¡   &   &∏w ﬂ• `J`ˇˇˇÔP
+&ˇˇˇ˚P$`ˇˇˇÏP$PÄÄ@   1`BÓ@                             ª          w ﬂ• `ê P$Pƒ   ≈mƒƒ   |   	                     Ω  Œ   ﬂª   ¡   ö   ó   ∑       ﬂó   ª   ö@   ó   ∑   ª   0(    ﬂ∑   ¡       ﬂª    ¡   m   w ﬂó   •)`ê `ë@`ë `í `ê `ˇˇˇP9PX   F@fX                                 Œ   ﬂª    ¡  m   w ﬂ• `+`#ˇˇˇPDPÄÄÄ   dCø   ñ                        ª   Ä„  Å  Õ   ﬂº     ú   ó   ﬂº   ó   ö&   ó   æ   ·J   ‰º  m   w ﬂô?   ó	      Œ   ﬂª       ¡  &   &s ·J	   ‰¡   w ﬂó   • `í `ó &ë `ˇˇˇÈP> `+`ˇˇˇ‰P
+4ˇˇˇ˚PIPÄÄÄƒ   4Ë_Îƒ   q                         º  J   ö'   ó   ª    º     ¡  &w ﬂô?   ó      Œ   ﬂª       ¡  &   &s ·J   ‰¡   w ﬂó   • 
+`î `ˇˇˇﬁP `+`ˇˇˇ‰P
+4ˇˇˇ˚PIPÄÄ  ôWÁK  ±                         ª       s ·J   ‰s  Õ   ﬂ   Õ  ﬂæ      ù   ó   ﬂæ      ó   ö   ó      Õ  ﬂó   ª   ·J   ‰9	   æ  <
+      <   <   m   <   m   <   m   <   w ﬂ•@`P
+P(`*`Æ `O`%)*&JJJP4PÄÄÄ(   )Ò(                               •@ÄÄÄ(   )Ò(                               •@ÄÄÄÿ   -ıBÿ   à                         º  J   öU   ó   ª       s ·J   ‰º  KJ   w ﬂª       s ·J   ‰º  KJ   w ﬂô(   ó   ª       s ·J   ‰   w ﬂó   • `î `P
+
+ˇˇˇ˚P$`P
+
+ˇˇˇ˚PN`PP)PÄp  Á1Ùp  ¸   	              %       Ω  Œ   ﬂª       ¡   &s ·J   ‰   s õ    ó   ª       ¡   &s ·J   ‰w  ﬂª       s ·J   ‰s  ù%   ó   ﬂª    	   s ·J   ‰s  ó   ö]   ó   ª   ·J
+   ‰9      ¡   &<      <   <   m   <   m   <   m   <   w ﬂó%   •I`ˇˇˇÈP'PM`ˇˇˇ¯P
+P$`P
+Põ P
+Pî `%/+*&JJJP9PÄÄÄ4   ﬂA›4                             ª    w  ﬂ• `*PÄÄ4   ﬂA›4                             ª    w  ﬂ• `*PÄÄd   ¢72òd   *                         ª       ¡   &s ·J   ‰w  ﬂª    w  ﬂ• `ˇˇˇ˜P
+P$`JPÄÄÏ   Ø2åÏ   ù   	                     Ω  Œ   ﬂº    öl   ó   ª   ·J   ‰9      ¡   &<      <   <	   m
+   <   m   <   m   <   m   <   w ﬂô   ó   ª          w ﬂó   • `ì `%;+*&JJJJPN`ê PPÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄÄ   meÄ   A                  	       ª       ¡   &s ·J   ‰∞w ﬂª       s ·J   ‰   w ﬂ•@`ˇˇˇ¯PP$`PPDP(   ¯‘l∆(                               •@ÄÄÄÙ   l D°Ù   ü                          ª       s ·J   ‰   w ﬂª   ·J   ‰9      <   	   <
+   <   m   <   m   <   m   <   w ﬂª       s ·J   ‰s  ö   ó   ª    w  ﬂó   •@`PP$`%**FJJJPD:`P
+P/`?=PÄÄ4   BeQ4                             ª    w  ﬂ• `JPÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ∏  ’Nêø®  ˇ         
+       C      Õ   ﬂº  J   Õ  ﬂ   Õ  ﬂæ     &.Õ  ﬂÕ  ﬂò   æ  æ  öD  ó   º  æ  KJ   Õ  ﬂº  æ  KJ   ö*   ó
+   æ     æ  &   &&.Õ  ﬂô%   ó   æ     æ  &   &&.Õ  ﬂó   æ  	   æ   &
+   &º  æ  KJ   &
+   &º  æ  KJ   ·J   ‰   s K&
+   &º  æ  KJ   &
+   &º  æ  KJ   &   &º  æ  KJ   &   &º  æ  KJ   &   &æ  &   &&.Õ  ﬂæ   0(Õ   ﬂæ  0(Õ  ﬂô≤˛ˇˇó4   æ     &.Õ  ﬂª       s ·J   ‰æ  w ﬂª       s ·J   ‰9      <      <    9!   "   <#   <$   w ﬂ• `&
+`-`*`ê@	 `f `í `ô `	ú0 `	ó@`	+î ô P,î@î@mî !î !í `K`ï@`ê `P
+ˇˇˇ˚PD!`P
+%**%O!PD)PÄ∏         3   S    Lñc  Æ                        ª       s ·J   ‰   w ﬂª       s ·J   ‰   w ﬂª       s ·J   ‰   w ﬂª       s ·J   ‰	   º &w ﬂ
+   º  &   &Õ   ﬂª       s ·J   ‰æ   w ﬂ• `PP$`PP$`P!P$`P
+ˇˇˇÌPD`EnO`P
+ˇˇˇ˚PPÄ¯   o≥Â¯   §                        ª       s ·J   ‰s  Õ   ﬂª   ·J   ‰9      <      <	   
+   <   9   º  <   æ   ·J   ‰s  <   <   <   m   <   m   <   m   <   m   <   w ﬂ• `P
+P(`%***P-&JJJJP4PÄ4   BeQ4                             ª    w  ﬂ• `JPÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄh   íºò0h   3                         ª       s ·J   ‰   w ﬂª          w ﬂ• `P!P$`ê P$P<   FFÂ<                             ª       w ﬂ• `P$PÄÄå   NÀ@å   N                          ª   ·J   ‰9      <      <   <   m	   <
+   m   <   m   <   w ﬂ•@`%**&J
+JJP4PÄÄ(   )Ò(                               •@ÄÄÄ(   )Ò(                               •@ÄÄÄX   rN:/X   $                         ª       s ·J   ‰º  KJ   w ﬂ• `P
+
+ˇˇˇ˚P$PÄÄò   öå+ò   X                          ª   ·J   ‰9      <      <   <   m	   <
+   m   <   m   <   m   <   w ﬂ• `%**&JJJJP4PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4    Æ4                            ª    w  ﬂ•@`*PÄ,   BHU,                               ¢• `!QÄÄ∏   ∫Ÿ∏   p                         ª       s ·J   ‰s  Õ   ﬂª   ·J   ‰9      æ   &<      <	   <
+   m   <   m   <   m   <   w ﬂ• `P
+P(`%2**&J
+JJP4PÄÄ4   BeQ4                             ª    w  ﬂ• `JPÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄX   rN:/X   $                         ª       s ·J   ‰º  KJ   w ﬂ• `P
+
+ˇˇˇ˚P$PÄÄ3ıÿ  `$         @   ˚    `$        p  `'    `)    `$  <     :    `I    t $  8    Ä  :  l   ;  å   	  p  =  ÿ >  ?    `  `    $      ê     s #  #    @$  J  B  %       p&    p(    p*  
+  p@  	  `$  D  E  F  ê     `$  #    L    `  `ê   É  I  $  S  T  U  V  W  u \  ]  v `  w x y z k  l  m  n  o  p  q  r  s  t  u  v  w  x  y  z  {  |  }  ~    l   ;  Ä    `j  Å  Ç  É  Ñ  Ö  Ü  á  à  â  ä  ã  å  #    ç  é    @è      @    ê    ë    ì  í  î    ï    `
+  `$  H  I  #  	  J    ê       #    @$  J  B  %    @C  B  K       p&    p(    p*    p@    `I  ©  ™  ´  $  ¨      `ß  ê  ®    p´  $  ¨      `I  ¢  £  ê   §    p  `$  ó  ò  ô  ö  õ    ê   I  ú  ù  û    p  `  `  `ê   ∞  I  ±  ≤  ≥  l     `j  ¥  -  µ  { ∏  | ∫  ª  º  _  Ω  æ  ø  ¿  ¡  } ~  ®   Ä Å Ç É Ñ Ö ”  Ü $  ó    ’  ô  ÷  ◊  ÿ  Ÿ  ]  ⁄  W    `  `$  #    @Æ  J  B  %       p&    p(    p*    p@    `'    `)    `$  ﬂ  ‡  J    ê     `  `›  $  #    @ﬁ  J  B  %       p&    p(    p*    p@  ·  ‚  „    `ù  ê   €  $    E      Ä  I  ;  :  >    Ê  Á  l  Ë  r  á Í  à  w  l      `Î  m  Ï  }  Ì  à Ò  !  `â Ú  Û    @C Ù  ı  ˆ  ˜  ˙  ˚  ¸  ˝  ˛  ˇ        ⁄      ’  	 
+   #  `'  $  `)  %  `$  ﬂ    ê   I  ä l   ;  &  `ã }  å m      ç   ±  '  ` ¥  -  µ  { ∏  | ∫  ª  º  _  Ω  æ  ø  ¿  ¡  } ~  ®   Ä Å Ç É Ñ Ö é 7  ÷  ÿ  Ÿ  ]  ⁄  W  (  `"  `ê   $  #  	  @Æ  J  B  %     !  p&  "  p(  #  p*  $  p@  *  `'  +  `)  ,  `& $  '   ( ) * -  `·  + à  .  `'  /  `)  0  `& $  '   ( ) * 1  `·  + à  )  `  $  ÷  " E  #  
+  @# $ % J  B  %     &  p&  '  p(  (  p*  )  p@    @*  p+  p,  p-  p5  `I  ©  ™  ´  $  ¨  ê     4  `- ê  ®  1  p´  $  ¨  ê     3  `ê   §  0  p2  `ú  ù   /  p7  `8  `9  `I  $  U    W   S  0  6  `$  / E  0 1 2 3 #    @J  B  %     3  p&  4  p(  5  p*  ;  `'  <  `)  =  `$  6 7   :  `$  ó  ò  ô  4 I  U  T  S  #    @5 J  B  %     7  p&  8  p(  9  p*  ?  `'  @  `)  A  `$  ﬂ  ‡  J    ê   B  `>  `›  $  #    @: J  B  %     ;  p&  <  p(  =  p*  >  p@  ·  ; „  D  `'  E  `)  F  `I  ê   è C   D E ø  /  ê \     ﬁ  .  ]  F ë y  I í L M $  =   N O   @Q P S R   @V U T C  `$  = E  ê   #    @> J  B  %     @  p&  A  p(  B  p*  W T  X G  `$  [   ê   \     	  ] ì î I  `'  J  `)  K  `$      I  ·  i j L  `k à  H  `$  f E  #    @g J  T  %  h 0    @y  "  e K     E  p&  F  p(  G  p*  H  p@  N  `O  `P  `$  W   W   M  `$  #    @l J  B  %     J  p&  K  p(  L  p*  R  `'  S  `)  T  `  U  `Q  `$  #    @m J  T  %     N  p&  O  p(  P  p*  Q  p@  W  `'  X  `)  Y  `$  W   r V  `$  p E  #    @q J  B  %     S  p&  T  p(  U  p*  [  `$    Z  `$        @  	  
+    @      p        @             `  p  p  p  p  p  p  p  p   p%  p.  p2  p6  p:  p?  pC  pD  pI  pM  pR  p   Ä        $        pú  ê   ù  ˇXÑ^  !              I               F                                  ï       (                    &              (              *              ô       '      @        A      A        ö      F        G      &        L      (        M   L   *        ô      @        –      ñ        …      ü       ¿   	   †       ∏      °            û        ﬁ      &        ﬂ      (        ‡   1   *             @        /     €        #     &        %     (        '     *        .     @        D  @   =        ¬            Ñ     &        Ü     (        à  9   *        ¡     @        Ù            ‘     &        ÷     (        ÿ     *        ‡     @        ‰     &        Ê     (        Ë     *             @        '     ,       #     ≤         
+   ≥         	   ¥       6             ,     &        -     (        .     *        S     ö        J     &        L     (        N     *        v     8       j     &        l     (        n     *        u     @        ¥     <       ã     &        ç     (        è  %   *        …     Y       ‰     d       ’     &        ◊     (        Ÿ     *        ·     @                     ˛     &        ˇ     (              *             X            &             (             *             @        5     n       ,     &        .     (        0     *        ùH©¿      nâ      nâ                 õ   ¶  ì   ¶                   C    C                 ª  "  ©  "                  ‹    ‘                   k  ¶	  R  ¶	                  Ï    ‰    .                '  K    K  1               _  É	  W  É	  4               “  %     %  K               ï	  ù	  ç	  ù	  ^                √	  :
+  ®	  :
+  f             ÄY
+  a'  =
+  a'  m               ª  p  ≥  p  y                Ü  è  ~  è  }                £  4'  õ  4'  Ä               F'  X'  >'  X'  ˇ              ÄÜ'  O-  d'  O-    #          Ä)  C-  )  C-    8           ¢*  5-  ö*  5-    @            Q+  ã,  I+  ã,  "  6          Äw-  ı?  R-  ı?  8  &            C.  m.  ;.  m.  >               É.  ´.  {.  ´.  B               ø.  ô?  ∑.  ô?  E              ´?  Ω?  £?  Ω?  â             Ä@  uB  ¯?  uB  í              	A  0A  A  0A  ö               GA  mA  ?A  mA  ù               ÇA  ˆA  zA  ˆA  †              	B  B  B  B  •               ìB  WU  zB  WU  ±            ÄzU  g  XU  g  ,  #            =V  cV  5V  cV  2               yV  ùV  qV  ùV  6               ±V  ¯f  ©V  ¯f  9              
+g  g  g  g  Ñ             ÄAg  'm  g  'm  â  (            ôh  ¿h  ëh  ¿h  ê               ◊h  ˝h  œh  ˝h  ì               i  ‡i  
+i  ‡i  ñ               Ûi  Cj  Îi  Cj  ú               qk  òk  ik  òk  ß               Øk  ’k  ßk  ’k  ™               Ík  ∏l  ‚k  ∏l  ≠               Àl  m  √l  m  ≥             Ägm  p  Hm  p  º             Än  Èp  n  Èp  ƒ  4            kn  „p  cn  „p  ∆  >            o  @p  o  @p  …  4           q  Ös  Ûp  Ös  €               tr  r  lr  r  Ê               ïr  °r  çr  °r  È               µr  }s  ≠r  }s  Ï            Ä§s  Ìu  às  Ìu  ˘              ˚t  $u  Ût  $u                 <u  du  4u  du                 zu  ‹u  ru  ‹u  
+            Äv  [x  u  [x    #            ˜v  w  Ôv  w                 5w  [w  -w  [w  !               pw  ⁄w  hw  ⁄w  $              Ìw  ˆw  Âw  ˆw  *              xx  AÄ  ^x  AÄ  4               ¯x  y  x  y  <               4y  Xy  ,y  Xy  @               ly  ¯  dy  ¯  C              _Ä  ØÇ  CÄ  ØÇ  s             ŒÇ  ‰Ñ  ±Ç  ‰Ñ  Ñ              «É  ÌÉ  øÉ  ÌÉ  ç               Ñ  'Ñ  ˚É  'Ñ  ë               ;Ñ  ∞Ñ  3Ñ  ∞Ñ  î              ¬Ñ  ‹Ñ  ∫Ñ  ‹Ñ  ô              Ö  {Ü  ÁÑ  {Ü  °  !             ∫Ö  „Ö  ≤Ö  „Ö  ®               ˘Ö  !Ü  ÒÖ  !Ü  ´               5Ü  sÜ  -Ü  sÜ  Æ             úÜ  ’á  ~Ü  ’á  µ               á  1á  á  1á  ∫               Gá  ká  ?á  ká  Ω               á  ™á  wá  ™á  ¿              ºá  Œá  ¥á  Œá  ƒ               à  nâ  ◊á  nâ     *             ©à  œà  °à  œà  –               Âà  	â  ›à  	â  ‘               â  fâ  â  fâ  ◊            5°›Ãu)„eCå∑ö      g¯ﬁÛg¯ﬁÛHøﬁg¯Âp   k    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/studentMPW/scripts/studentAnnouncement.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|07243dc4-3f9f-13ce-001f-25c4f865756d|
+Accept-Ranges: bytes
+ETag: W/"35182-1744298494000"
+Last-Modified: Thu, 10 Apr 2025 15:21:34 GMT
+Content-Type: application/javascript
+Content-Length: 35182
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|07243dc4-3f9f-13ce-001f-25c4f865756d|
+Accept-Ranges: bytes
+ETag: W/"35182-1744298494000"
+Last-Modified: Thu, 10 Apr 2025 15:21:34 GMT
+Content-Type: application/javascript
+Content-Length: 35182
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=92
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 408 net-response-time-onstop 437 alt-data 1;35182,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  Œ“

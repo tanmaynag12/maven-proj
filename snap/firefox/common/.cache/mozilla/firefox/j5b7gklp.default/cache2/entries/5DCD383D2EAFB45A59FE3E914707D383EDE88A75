@@ -1,0 +1,1277 @@
+;(function($){
+/**
+ * jqGrid extension for manipulating Grid Data
+ * Tony Tomov tony@trirand.com
+ * http://trirand.com/blog/ 
+ * Dual licensed under the MIT and GPL licenses:
+ * http://www.opensource.org/licenses/mit-license.php
+ * http://www.gnu.org/licenses/gpl-2.0.html
+**/ 
+//jsHint options
+/*global alert */
+"use strict";
+$.jgrid.inlineEdit = $.jgrid.inlineEdit || {};
+$.jgrid.extend({
+//Editing
+	editRow : function(rowid,keys,oneditfunc,successfunc, url, extraparam, aftersavefunc,errorfunc, afterrestorefunc) {
+		// Compatible mode old versions
+		var settings = {
+			"keys" : keys || false,
+			"oneditfunc" : oneditfunc || null,
+			"successfunc" : successfunc || null,
+			"url" : url || null,
+			"extraparam" : extraparam || {},
+			"aftersavefunc" : aftersavefunc || null,
+			"errorfunc": errorfunc || null,
+			"afterrestorefunc" : afterrestorefunc|| null,
+			"restoreAfterError" : true,
+			"mtype" : "POST"
+		},
+		args = $.makeArray(arguments).slice(1), o;
+
+		if(args[0] && typeof(args[0]) == "object" && !$.isFunction(args[0])) {
+			o = $.extend($.jgrid.inlineEdit, settings, args[0]);
+		} else {
+			o = settings;
+		}
+		// End compatible
+		return this.each(function(){
+			var $t = this, nm, tmp, editable, cnt=0, focus=null, svr={}, ind,cm;
+			if (!$t.grid ) { return; }
+			ind = $($t).jqGrid("getInd",rowid,true);
+			if( ind === false ) {return;}
+			editable = $(ind).attr("editable") || "0";
+			if (editable == "0" && !$(ind).hasClass("not-editable-row")) {
+				cm = $t.p.colModel;
+				$('td[role="gridcell"]',ind).each( function(i) {
+					nm = cm[i].name;
+					var treeg = $t.p.treeGrid===true && nm == $t.p.ExpandColumn;
+					if(treeg) { tmp = $("span:first",this).html();}
+					else {
+						try {
+							tmp =  $.unformat(this,{rowId:rowid, colModel:cm[i]},i);
+						} catch (_) {
+							tmp =  ( cm[i].edittype && cm[i].edittype == 'textarea' ) ? $(this).text() : $(this).html();
+						}
+					}
+					if ( nm != 'cb' && nm != 'subgrid' && nm != 'rn') {
+						if($t.p.autoencode) { tmp = $.jgrid.htmlDecode(tmp); }
+						svr[nm]=tmp;
+						if(cm[i].editable===true) {
+							if(focus===null) { focus = i; }
+							if (treeg) { $("span:first",this).html(""); }
+							else { $(this).html(""); }
+							var opt = $.extend({},cm[i].editoptions || {},{id:rowid+"_"+nm,name:nm});
+							if(!cm[i].edittype) { cm[i].edittype = "text"; }
+							if(tmp == "&nbsp;" || tmp == "&#160;" || (tmp.length==1 && tmp.charCodeAt(0)==160) ) {tmp='';}
+							var elc = $.jgrid.createEl(cm[i].edittype,opt,tmp,true,$.extend({},$.jgrid.ajaxOptions,$t.p.ajaxSelectOptions || {}));
+							$(elc).addClass("editable");
+							if(treeg) { $("span:first",this).append(elc); }
+							else { $(this).append(elc); }
+							//Again IE
+							if(cm[i].edittype == "select" && typeof(cm[i].editoptions)!=="undefined" && cm[i].editoptions.multiple===true  && typeof(cm[i].editoptions.dataUrl)==="undefined" && $.browser.msie) {
+								$(elc).width($(elc).width());
+							}
+							cnt++;
+						}
+					}
+				});
+				if(cnt > 0) {
+					svr.id = rowid; $t.p.savedRow.push(svr);
+					$(ind).attr("editable","1");
+					$("td:eq("+focus+") input",ind).focus();
+					if(o.keys===true) {
+						$(ind).bind("keydown",function(e) {
+							if (e.keyCode === 27) {
+								$($t).jqGrid("restoreRow",rowid, afterrestorefunc);
+								return false;
+							}
+							if (e.keyCode === 13) {
+								var ta = e.target;
+								if(ta.tagName == 'TEXTAREA') { return true; }
+								$($t).jqGrid("saveRow", rowid, o );
+								return false;
+							}
+						});
+					}
+					if( $.isFunction(o.oneditfunc)) { o.oneditfunc.call($t, rowid); }
+				}
+			}
+		});
+	},
+	saveRow : function(rowid, successfunc, url, extraparam, aftersavefunc,errorfunc, afterrestorefunc) {
+		// Compatible mode old versions
+		var settings = {
+			"successfunc" : successfunc || null,
+			"url" : url || null,
+			"extraparam" : extraparam || {},
+			"aftersavefunc" : aftersavefunc || null,
+			"errorfunc": errorfunc || null,
+			"afterrestorefunc" : afterrestorefunc|| null,
+			"restoreAfterError" : true,
+			"mtype" : "POST"
+		},
+		args = $.makeArray(arguments).slice(1), o;
+
+		if(args[0] && typeof(args[0]) == "object" && !$.isFunction(args[0])) {
+			o = $.extend($.jgrid.inlineEdit, settings, args[0]);
+		} else {
+			o = settings;
+		}
+		// End compatible
+		var success = false;
+		var $t = this[0], nm, tmp={}, tmp2={}, tmp3= {}, editable, fr, cv, ind;
+		if (!$t.grid ) { return success; }
+		ind = $($t).jqGrid("getInd",rowid,true);
+		if(ind === false) {return success;}
+		editable = $(ind).attr("editable");
+		o.url = o.url ? o.url : $t.p.editurl;
+		if (editable==="1") {
+			var cm;
+			$('td[role="gridcell"]',ind).each(function(i) {
+				cm = $t.p.colModel[i];
+				nm = cm.name;
+				if ( nm != 'cb' && nm != 'subgrid' && cm.editable===true && nm != 'rn' && !$(this).hasClass('not-editable-cell')) {
+					switch (cm.edittype) {
+						case "checkbox":
+							var cbv = ["Yes","No"];
+							if(cm.editoptions ) {
+								cbv = cm.editoptions.value.split(":");
+							}
+							tmp[nm]=  $("input",this).is(":checked") ? cbv[0] : cbv[1]; 
+							break;
+						case 'text':
+						case 'password':
+						case 'textarea':
+						case "button" :
+							tmp[nm]=$("input, textarea",this).val();
+							break;
+						case 'select':
+							if(!cm.editoptions.multiple) {
+								tmp[nm] = $("select option:selected",this).val();
+								tmp2[nm] = $("select option:selected", this).text();
+							} else {
+								var sel = $("select",this), selectedText = [];
+								tmp[nm] = $(sel).val();
+								if(tmp[nm]) { tmp[nm]= tmp[nm].join(","); } else { tmp[nm] =""; }
+								$("select option:selected",this).each(
+									function(i,selected){
+										selectedText[i] = $(selected).text();
+									}
+								);
+								tmp2[nm] = selectedText.join(",");
+							}
+							if(cm.formatter && cm.formatter == 'select') { tmp2={}; }
+							break;
+						case 'custom' :
+							try {
+								if(cm.editoptions && $.isFunction(cm.editoptions.custom_value)) {
+									tmp[nm] = cm.editoptions.custom_value.call($t, $(".customelement",this),'get');
+									if (tmp[nm] === undefined) { throw "e2"; }
+								} else { throw "e1"; }
+							} catch (e) {
+								if (e=="e1") { $.jgrid.info_dialog(jQuery.jgrid.errors.errcap,"function 'custom_value' "+$.jgrid.edit.msg.nodefined,jQuery.jgrid.edit.bClose); }
+								if (e=="e2") { $.jgrid.info_dialog(jQuery.jgrid.errors.errcap,"function 'custom_value' "+$.jgrid.edit.msg.novalue,jQuery.jgrid.edit.bClose); }
+								else { $.jgrid.info_dialog(jQuery.jgrid.errors.errcap,e.message,jQuery.jgrid.edit.bClose); }
+							}
+							break;
+					}
+					cv = $.jgrid.checkValues(tmp[nm],i,$t);
+					if(cv[0] === false) {
+						cv[1] = tmp[nm] + " " + cv[1];
+						return false;
+					}
+					if($t.p.autoencode) { tmp[nm] = $.jgrid.htmlEncode(tmp[nm]); }
+					if(o.url !== 'clientArray' && cm.editoptions && cm.editoptions.NullIfEmpty === true) {
+						if(tmp[nm] === "") {
+							tmp3[nm] = 'null';
+						}
+					}
+				}
+			});
+			if (cv[0] === false){
+				try {
+					var positions = $.jgrid.findPos($("#"+$.jgrid.jqID(rowid), $t.grid.bDiv)[0]);
+					$.jgrid.info_dialog($.jgrid.errors.errcap,cv[1],$.jgrid.edit.bClose,{left:positions[0],top:positions[1]});
+				} catch (e) {
+					alert(cv[1]);
+				}
+				return success;
+			}
+			var idname, opers, oper;
+			opers = $t.p.prmNames;
+			oper = opers.oper;
+			idname = opers.id;
+			if(tmp) {
+				tmp[oper] = opers.editoper;
+				tmp[idname] = rowid;
+				if(typeof($t.p.inlineData) == 'undefined') { $t.p.inlineData ={}; }
+				tmp = $.extend({},tmp,$t.p.inlineData,o.extraparam);
+			}
+			if (o.url == 'clientArray') {
+				tmp = $.extend({},tmp, tmp2);
+				if($t.p.autoencode) {
+					$.each(tmp,function(n,v){
+						tmp[n] = $.jgrid.htmlDecode(v);
+					});
+				}
+				var resp = $($t).jqGrid("setRowData",rowid,tmp);
+				$(ind).attr("editable","0");
+				for( var k=0;k<$t.p.savedRow.length;k++) {
+					if( $t.p.savedRow[k].id == rowid) {fr = k; break;}
+				}
+				if(fr >= 0) { $t.p.savedRow.splice(fr,1); }
+				if( $.isFunction(o.aftersavefunc) ) { o.aftersavefunc.call($t, rowid,resp); }
+				success = true;
+				$(ind).unbind("keydown");
+			} else {
+				$("#lui_"+$t.p.id).show();
+				tmp3 = $.extend({},tmp,tmp3);
+				tmp3[idname] = $.jgrid.stripPref($t.p.idPrefix, tmp3[idname]);
+				$.ajax($.extend({
+					url:o.url,
+					data: $.isFunction($t.p.serializeRowData) ? $t.p.serializeRowData.call($t, tmp3) : tmp3,
+					type: o.mtype,
+					async : false, //?!?
+					complete: function(res,stat){
+						$("#lui_"+$t.p.id).hide();
+						if (stat === "success"){
+							var ret = true, sucret;
+							if( $.isFunction(o.successfunc)) { 
+								sucret = o.successfunc.call($t, res);
+								if($.isArray(sucret)) {
+									// expect array - status, data, rowid
+									ret = sucret[0];
+									tmp = sucret[1] ? sucret[1] : tmp;
+								} else {
+									ret = sucret;
+								}
+							}
+							if (ret===true) {
+								if($t.p.autoencode) {
+									$.each(tmp,function(n,v){
+										tmp[n] = $.jgrid.htmlDecode(v);
+									});
+								}
+								tmp = $.extend({},tmp, tmp2);
+								$($t).jqGrid("setRowData",rowid,tmp);
+								$(ind).attr("editable","0");
+								for( var k=0;k<$t.p.savedRow.length;k++) {
+									if( $t.p.savedRow[k].id == rowid) {fr = k; break;}
+								}
+								if(fr >= 0) { $t.p.savedRow.splice(fr,1); }
+								if( $.isFunction(o.aftersavefunc) ) { o.aftersavefunc.call($t, rowid,res); }
+								success = true;
+								$(ind).unbind("keydown");
+							} else {
+								if($.isFunction(o.errorfunc) ) {
+									o.errorfunc.call($t, rowid, res, stat);
+								}
+								if(o.restoreAfterError === true) {
+									$($t).jqGrid("restoreRow",rowid, o.afterrestorefunc);
+								}
+							}
+						}
+					},
+					error:function(res,stat){
+						$("#lui_"+$t.p.id).hide();
+						if($.isFunction(o.errorfunc) ) {
+							o.errorfunc.call($t, rowid, res, stat);
+						} else {
+							try {
+								jQuery.jgrid.info_dialog(jQuery.jgrid.errors.errcap,'<div class="ui-state-error">'+ res.responseText +'</div>', jQuery.jgrid.edit.bClose,{buttonalign:'right'});
+							} catch(e) {
+								alert(res.responseText);
+							}
+						}
+						if(o.restoreAfterError === true) {
+							$($t).jqGrid("restoreRow",rowid, o.afterrestorefunc);
+						}
+					}
+				}, $.jgrid.ajaxOptions, $t.p.ajaxRowOptions || {}));
+			}
+		}
+		return success;
+	},
+	restoreRow : function(rowid, afterrestorefunc) {
+		// Compatible mode old versions
+		var settings = {
+			"afterrestorefunc" : afterrestorefunc|| null
+		},
+		args = $.makeArray(arguments).slice(1), o;
+
+		if(args[0] && typeof(args[0]) == "object" && !$.isFunction(args[0])) {
+			o = $.extend($.jgrid.inlineEdit, settings, args[0]);
+		} else {
+			o = settings;
+		}
+		// End compatible
+
+		return this.each(function(){
+			var $t= this, fr, ind, ares={};
+			if (!$t.grid ) { return; }
+			ind = $($t).jqGrid("getInd",rowid,true);
+			if(ind === false) {return;}
+			for( var k=0;k<$t.p.savedRow.length;k++) {
+				if( $t.p.savedRow[k].id == rowid) {fr = k; break;}
+			}
+			if(fr >= 0) {
+				if($.isFunction($.fn.datepicker)) {
+					try {
+						$("input.hasDatepicker","#"+$.jgrid.jqID(ind.id)).datepicker('hide');
+					} catch (e) {}
+				}
+				$.each($t.p.colModel, function(i,n){
+					if(this.editable === true && this.name in $t.p.savedRow[fr] && !$(this).hasClass('not-editable-cell')) {
+						ares[this.name] = $t.p.savedRow[fr][this.name];
+					}
+				});
+				$($t).jqGrid("setRowData",rowid,ares);
+				$(ind).attr("editable","0").unbind("keydown");
+				$t.p.savedRow.splice(fr,1);
+				if($("#"+$.jgrid.jqID(rowid), "#"+$.jgrid.jqID($t.p.id)).hasClass("jqgrid-new-row")){
+					setTimeout(function(){$($t).jqGrid("delRowData",rowid);},0);
+				}
+			}
+			if ($.isFunction(o.afterrestorefunc))
+			{
+				o.afterrestorefunc.call($t, rowid);
+			}
+		});
+	},
+	addRow : function ( p ) {
+		p = $.extend({
+			rowID : "new_row",
+			initdata : {},
+			position :"first",
+			useDefValues : false,
+			useFormatter : false,
+			addRowParams : {extraparam:{}}
+		},p  || {});
+		return this.each(function(){
+			if (!this.grid ) { return; }
+			var $t = this;
+			if(p.useDefValues === true) {
+				$($t.p.colModel).each(function(i){
+					if( this.edioptions && this.editoptions.defaultValue ) {
+						var opt = this.editoptions.defaultValue,
+						tmp = $.isFunction(opt) ? opt.call($t) : opt;
+						p.initdata[this.name] = tmp;
+					}
+				});
+			}
+			$($t).jqGrid('addRowData', p.rowID, p.initdata, p.position);
+			$("#"+$.jgrid.jqID(p.rowID), "#"+$.jgrid.jqID($t.p.id)).addClass("jqgrid-new-row");
+			if(p.useFormatter) {
+				$("#"+$.jgrid.jqID(p.rowID)+" .ui-inline-edit", "#"+$.jgrid.jqID($t.p.id)).click();
+			} else {
+				var opers = $t.p.prmNames,
+				oper = opers.oper;
+				p.addRowParams.extraparam[oper] = opers.addoper;
+				$($t).jqGrid('editRow', p.rowID, p.addRowParams);
+				$($t).jqGrid('setSelection', p.rowID);
+			}
+		});
+	},
+	inlineNav : function (elem, o) {
+		o = $.extend({
+			edit: true,
+			editicon: "ui-icon-pencil",
+			add: true,
+			addicon:"ui-icon-plus",
+			save: true,
+			saveicon:"ui-icon-disk",
+			cancel: true,
+			cancelicon:"ui-icon-cancel",
+			addParams : {useFormatter : false},
+			editParams : {}
+		}, $.jgrid.nav, o ||{});
+		return this.each(function(){
+			if (!this.grid ) { return; }
+			var $t = this;
+			// detect the formatactions column
+			if(o.addParams.useFormatter === true) {
+				var cm = $t.p.colModel,i;
+				for (i = 0; i<cm.length; i++) {
+					if(cm[i].formatter && cm[i].formatter === "actions" ) {
+						if(cm[i].formatoptions) {
+							var defaults =  {
+								keys:false,
+								onEdit : null,
+								onSuccess: null,
+								afterSave:null,
+								onError: null,
+								afterRestore: null,
+								extraparam: {},
+								url: null
+							},
+							ap = $.extend( defaults, cm[i].formatoptions );
+							o.addParams.addRowParams = {
+								"keys" : ap.keys,
+								"oneditfunc" : ap.onEdit,
+								"successfunc" : ap.onSuccess,
+								"url" : ap.url,
+								"extraparam" : ap.extraparam,
+								"aftersavefunc" : ap.afterSavef,
+								"errorfunc": ap.onError,
+								"afterrestorefunc" : ap.afterRestore
+							};
+						}
+						break;
+					}
+				}
+			}
+			if(o.add) {
+				$($t).jqGrid('navButtonAdd', elem,{
+					caption : o.addtext,
+					title : o.addtitle,
+					buttonicon : o.addicon,
+					id : $t.p.id+"_iladd",
+					onClickButton : function ( e ) {
+						$($t).jqGrid('addRow', o.addParams);
+						if(!o.addParams.useFormatter) {
+							$("#"+$t.p.id+"_ilsave").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_ilcancel").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iladd").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iledit").addClass('ui-state-disabled');
+						}
+					}
+				});
+			}
+			if(o.edit) {
+				$($t).jqGrid('navButtonAdd', elem,{
+					caption : o.edittext,
+					title : o.edittitle,
+					buttonicon : o.editicon,
+					id : $t.p.id+"_iledit",
+					onClickButton : function ( e ) {
+						var sr = $($t).jqGrid('getGridParam','selrow');
+						if(sr) {
+							$($t).jqGrid('editRow', sr, o.editParams);
+							$("#"+$t.p.id+"_ilsave").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_ilcancel").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iladd").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iledit").addClass('ui-state-disabled');
+						} else {
+							$.jgrid.viewModal("#alertmod",{gbox:"#gbox_"+$t.p.id,jqm:true});$("#jqg_alrt").focus();							
+						}
+					}
+				});
+			}
+			if(o.save) {
+				$($t).jqGrid('navButtonAdd', elem,{
+					caption : o.savetext || '',
+					title : o.savetitle || 'Save row',
+					buttonicon : o.saveicon,
+					id : $t.p.id+"_ilsave",
+					onClickButton : function ( e ) {
+						var sr = $($t).jqGrid('getGridParam','selrow');
+						if(sr) {
+							if($("#"+$.jgrid.jqID(sr), "#"+$.jgrid.jqID($t.p.id) ).hasClass("jqgrid-new-row")) {
+								var opers = $t.p.prmNames,
+								oper = opers.oper;
+								if(!o.editParams.extraparam) {
+									o.editParams.extraparam = {};
+								}
+								o.editParams.extraparam[oper] = opers.addoper;
+							}
+							$($t).jqGrid('saveRow', sr, o.editParams);
+							$("#"+$t.p.id+"_ilsave").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_ilcancel").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iladd").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iledit").removeClass('ui-state-disabled');
+						} else {
+							$.jgrid.viewModal("#alertmod",{gbox:"#gbox_"+$t.p.id,jqm:true});$("#jqg_alrt").focus();							
+						}
+					}
+				});
+				$("#"+$t.p.id+"_ilsave").addClass('ui-state-disabled');
+			}
+			if(o.cancel) {
+				$($t).jqGrid('navButtonAdd', elem,{
+					caption : o.canceltext || '',
+					title : o.canceltitle || 'Cancel row editing',
+					buttonicon : o.cancelicon,
+					id : $t.p.id+"_ilcancel",
+					onClickButton : function ( e ) {
+						var sr = $($t).jqGrid('getGridParam','selrow');
+						if(sr) {
+							$($t).jqGrid('restoreRow', sr, o.editParams);
+							$("#"+$t.p.id+"_ilsave").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_ilcancel").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iladd").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iledit").removeClass('ui-state-disabled');
+						} else {
+							$.jgrid.viewModal("#alertmod",{gbox:"#gbox_"+$t.p.id,jqm:true});$("#jqg_alrt").focus();							
+						}
+					}
+				});
+				$("#"+$t.p.id+"_ilcancel").addClass('ui-state-disabled');
+			}
+		});
+	}
+//end inline edit
+});
+})(jQuery);
+        ¥ø  x¥øK@   20250331133932-8lóø  ƒvv,   https://erp.cmrit.ac.in/js/grid.inlinedit.js      F  ;(function($){
+/**
+ * jqGrid extension for manipulating Grid Data
+ * Tony Tomov tony@trirand.com
+ * http://trirand.com/blog/ 
+ * Dual licensed under the MIT and GPL licenses:
+ * http://www.opensource.org/licenses/mit-license.php
+ * http://www.gnu.org/licenses/gpl-2.0.html
+**/ 
+//jsHint options
+/*global alert */
+"use strict";
+$.jgrid.inlineEdit = $.jgrid.inlineEdit || {};
+$.jgrid.extend({
+//Editing
+	editRow : function(rowid,keys,oneditfunc,successfunc, url, extraparam, aftersavefunc,errorfunc, afterrestorefunc) {
+		// Compatible mode old versions
+		var settings = {
+			"keys" : keys || false,
+			"oneditfunc" : oneditfunc || null,
+			"successfunc" : successfunc || null,
+			"url" : url || null,
+			"extraparam" : extraparam || {},
+			"aftersavefunc" : aftersavefunc || null,
+			"errorfunc": errorfunc || null,
+			"afterrestorefunc" : afterrestorefunc|| null,
+			"restoreAfterError" : true,
+			"mtype" : "POST"
+		},
+		args = $.makeArray(arguments).slice(1), o;
+
+		if(args[0] && typeof(args[0]) == "object" && !$.isFunction(args[0])) {
+			o = $.extend($.jgrid.inlineEdit, settings, args[0]);
+		} else {
+			o = settings;
+		}
+		// End compatible
+		return this.each(function(){
+			var $t = this, nm, tmp, editable, cnt=0, focus=null, svr={}, ind,cm;
+			if (!$t.grid ) { return; }
+			ind = $($t).jqGrid("getInd",rowid,true);
+			if( ind === false ) {return;}
+			editable = $(ind).attr("editable") || "0";
+			if (editable == "0" && !$(ind).hasClass("not-editable-row")) {
+				cm = $t.p.colModel;
+				$('td[role="gridcell"]',ind).each( function(i) {
+					nm = cm[i].name;
+					var treeg = $t.p.treeGrid===true && nm == $t.p.ExpandColumn;
+					if(treeg) { tmp = $("span:first",this).html();}
+					else {
+						try {
+							tmp =  $.unformat(this,{rowId:rowid, colModel:cm[i]},i);
+						} catch (_) {
+							tmp =  ( cm[i].edittype && cm[i].edittype == 'textarea' ) ? $(this).text() : $(this).html();
+						}
+					}
+					if ( nm != 'cb' && nm != 'subgrid' && nm != 'rn') {
+						if($t.p.autoencode) { tmp = $.jgrid.htmlDecode(tmp); }
+						svr[nm]=tmp;
+						if(cm[i].editable===true) {
+							if(focus===null) { focus = i; }
+							if (treeg) { $("span:first",this).html(""); }
+							else { $(this).html(""); }
+							var opt = $.extend({},cm[i].editoptions || {},{id:rowid+"_"+nm,name:nm});
+							if(!cm[i].edittype) { cm[i].edittype = "text"; }
+							if(tmp == "&nbsp;" || tmp == "&#160;" || (tmp.length==1 && tmp.charCodeAt(0)==160) ) {tmp='';}
+							var elc = $.jgrid.createEl(cm[i].edittype,opt,tmp,true,$.extend({},$.jgrid.ajaxOptions,$t.p.ajaxSelectOptions || {}));
+							$(elc).addClass("editable");
+							if(treeg) { $("span:first",this).append(elc); }
+							else { $(this).append(elc); }
+							//Again IE
+							if(cm[i].edittype == "select" && typeof(cm[i].editoptions)!=="undefined" && cm[i].editoptions.multiple===true  && typeof(cm[i].editoptions.dataUrl)==="undefined" && $.browser.msie) {
+								$(elc).width($(elc).width());
+							}
+							cnt++;
+						}
+					}
+				});
+				if(cnt > 0) {
+					svr.id = rowid; $t.p.savedRow.push(svr);
+					$(ind).attr("editable","1");
+					$("td:eq("+focus+") input",ind).focus();
+					if(o.keys===true) {
+						$(ind).bind("keydown",function(e) {
+							if (e.keyCode === 27) {
+								$($t).jqGrid("restoreRow",rowid, afterrestorefunc);
+								return false;
+							}
+							if (e.keyCode === 13) {
+								var ta = e.target;
+								if(ta.tagName == 'TEXTAREA') { return true; }
+								$($t).jqGrid("saveRow", rowid, o );
+								return false;
+							}
+						});
+					}
+					if( $.isFunction(o.oneditfunc)) { o.oneditfunc.call($t, rowid); }
+				}
+			}
+		});
+	},
+	saveRow : function(rowid, successfunc, url, extraparam, aftersavefunc,errorfunc, afterrestorefunc) {
+		// Compatible mode old versions
+		var settings = {
+			"successfunc" : successfunc || null,
+			"url" : url || null,
+			"extraparam" : extraparam || {},
+			"aftersavefunc" : aftersavefunc || null,
+			"errorfunc": errorfunc || null,
+			"afterrestorefunc" : afterrestorefunc|| null,
+			"restoreAfterError" : true,
+			"mtype" : "POST"
+		},
+		args = $.makeArray(arguments).slice(1), o;
+
+		if(args[0] && typeof(args[0]) == "object" && !$.isFunction(args[0])) {
+			o = $.extend($.jgrid.inlineEdit, settings, args[0]);
+		} else {
+			o = settings;
+		}
+		// End compatible
+		var success = false;
+		var $t = this[0], nm, tmp={}, tmp2={}, tmp3= {}, editable, fr, cv, ind;
+		if (!$t.grid ) { return success; }
+		ind = $($t).jqGrid("getInd",rowid,true);
+		if(ind === false) {return success;}
+		editable = $(ind).attr("editable");
+		o.url = o.url ? o.url : $t.p.editurl;
+		if (editable==="1") {
+			var cm;
+			$('td[role="gridcell"]',ind).each(function(i) {
+				cm = $t.p.colModel[i];
+				nm = cm.name;
+				if ( nm != 'cb' && nm != 'subgrid' && cm.editable===true && nm != 'rn' && !$(this).hasClass('not-editable-cell')) {
+					switch (cm.edittype) {
+						case "checkbox":
+							var cbv = ["Yes","No"];
+							if(cm.editoptions ) {
+								cbv = cm.editoptions.value.split(":");
+							}
+							tmp[nm]=  $("input",this).is(":checked") ? cbv[0] : cbv[1]; 
+							break;
+						case 'text':
+						case 'password':
+						case 'textarea':
+						case "button" :
+							tmp[nm]=$("input, textarea",this).val();
+							break;
+						case 'select':
+							if(!cm.editoptions.multiple) {
+								tmp[nm] = $("select option:selected",this).val();
+								tmp2[nm] = $("select option:selected", this).text();
+							} else {
+								var sel = $("select",this), selectedText = [];
+								tmp[nm] = $(sel).val();
+								if(tmp[nm]) { tmp[nm]= tmp[nm].join(","); } else { tmp[nm] =""; }
+								$("select option:selected",this).each(
+									function(i,selected){
+										selectedText[i] = $(selected).text();
+									}
+								);
+								tmp2[nm] = selectedText.join(",");
+							}
+							if(cm.formatter && cm.formatter == 'select') { tmp2={}; }
+							break;
+						case 'custom' :
+							try {
+								if(cm.editoptions && $.isFunction(cm.editoptions.custom_value)) {
+									tmp[nm] = cm.editoptions.custom_value.call($t, $(".customelement",this),'get');
+									if (tmp[nm] === undefined) { throw "e2"; }
+								} else { throw "e1"; }
+							} catch (e) {
+								if (e=="e1") { $.jgrid.info_dialog(jQuery.jgrid.errors.errcap,"function 'custom_value' "+$.jgrid.edit.msg.nodefined,jQuery.jgrid.edit.bClose); }
+								if (e=="e2") { $.jgrid.info_dialog(jQuery.jgrid.errors.errcap,"function 'custom_value' "+$.jgrid.edit.msg.novalue,jQuery.jgrid.edit.bClose); }
+								else { $.jgrid.info_dialog(jQuery.jgrid.errors.errcap,e.message,jQuery.jgrid.edit.bClose); }
+							}
+							break;
+					}
+					cv = $.jgrid.checkValues(tmp[nm],i,$t);
+					if(cv[0] === false) {
+						cv[1] = tmp[nm] + " " + cv[1];
+						return false;
+					}
+					if($t.p.autoencode) { tmp[nm] = $.jgrid.htmlEncode(tmp[nm]); }
+					if(o.url !== 'clientArray' && cm.editoptions && cm.editoptions.NullIfEmpty === true) {
+						if(tmp[nm] === "") {
+							tmp3[nm] = 'null';
+						}
+					}
+				}
+			});
+			if (cv[0] === false){
+				try {
+					var positions = $.jgrid.findPos($("#"+$.jgrid.jqID(rowid), $t.grid.bDiv)[0]);
+					$.jgrid.info_dialog($.jgrid.errors.errcap,cv[1],$.jgrid.edit.bClose,{left:positions[0],top:positions[1]});
+				} catch (e) {
+					alert(cv[1]);
+				}
+				return success;
+			}
+			var idname, opers, oper;
+			opers = $t.p.prmNames;
+			oper = opers.oper;
+			idname = opers.id;
+			if(tmp) {
+				tmp[oper] = opers.editoper;
+				tmp[idname] = rowid;
+				if(typeof($t.p.inlineData) == 'undefined') { $t.p.inlineData ={}; }
+				tmp = $.extend({},tmp,$t.p.inlineData,o.extraparam);
+			}
+			if (o.url == 'clientArray') {
+				tmp = $.extend({},tmp, tmp2);
+				if($t.p.autoencode) {
+					$.each(tmp,function(n,v){
+						tmp[n] = $.jgrid.htmlDecode(v);
+					});
+				}
+				var resp = $($t).jqGrid("setRowData",rowid,tmp);
+				$(ind).attr("editable","0");
+				for( var k=0;k<$t.p.savedRow.length;k++) {
+					if( $t.p.savedRow[k].id == rowid) {fr = k; break;}
+				}
+				if(fr >= 0) { $t.p.savedRow.splice(fr,1); }
+				if( $.isFunction(o.aftersavefunc) ) { o.aftersavefunc.call($t, rowid,resp); }
+				success = true;
+				$(ind).unbind("keydown");
+			} else {
+				$("#lui_"+$t.p.id).show();
+				tmp3 = $.extend({},tmp,tmp3);
+				tmp3[idname] = $.jgrid.stripPref($t.p.idPrefix, tmp3[idname]);
+				$.ajax($.extend({
+					url:o.url,
+					data: $.isFunction($t.p.serializeRowData) ? $t.p.serializeRowData.call($t, tmp3) : tmp3,
+					type: o.mtype,
+					async : false, //?!?
+					complete: function(res,stat){
+						$("#lui_"+$t.p.id).hide();
+						if (stat === "success"){
+							var ret = true, sucret;
+							if( $.isFunction(o.successfunc)) { 
+								sucret = o.successfunc.call($t, res);
+								if($.isArray(sucret)) {
+									// expect array - status, data, rowid
+									ret = sucret[0];
+									tmp = sucret[1] ? sucret[1] : tmp;
+								} else {
+									ret = sucret;
+								}
+							}
+							if (ret===true) {
+								if($t.p.autoencode) {
+									$.each(tmp,function(n,v){
+										tmp[n] = $.jgrid.htmlDecode(v);
+									});
+								}
+								tmp = $.extend({},tmp, tmp2);
+								$($t).jqGrid("setRowData",rowid,tmp);
+								$(ind).attr("editable","0");
+								for( var k=0;k<$t.p.savedRow.length;k++) {
+									if( $t.p.savedRow[k].id == rowid) {fr = k; break;}
+								}
+								if(fr >= 0) { $t.p.savedRow.splice(fr,1); }
+								if( $.isFunction(o.aftersavefunc) ) { o.aftersavefunc.call($t, rowid,res); }
+								success = true;
+								$(ind).unbind("keydown");
+							} else {
+								if($.isFunction(o.errorfunc) ) {
+									o.errorfunc.call($t, rowid, res, stat);
+								}
+								if(o.restoreAfterError === true) {
+									$($t).jqGrid("restoreRow",rowid, o.afterrestorefunc);
+								}
+							}
+						}
+					},
+					error:function(res,stat){
+						$("#lui_"+$t.p.id).hide();
+						if($.isFunction(o.errorfunc) ) {
+							o.errorfunc.call($t, rowid, res, stat);
+						} else {
+							try {
+								jQuery.jgrid.info_dialog(jQuery.jgrid.errors.errcap,'<div class="ui-state-error">'+ res.responseText +'</div>', jQuery.jgrid.edit.bClose,{buttonalign:'right'});
+							} catch(e) {
+								alert(res.responseText);
+							}
+						}
+						if(o.restoreAfterError === true) {
+							$($t).jqGrid("restoreRow",rowid, o.afterrestorefunc);
+						}
+					}
+				}, $.jgrid.ajaxOptions, $t.p.ajaxRowOptions || {}));
+			}
+		}
+		return success;
+	},
+	restoreRow : function(rowid, afterrestorefunc) {
+		// Compatible mode old versions
+		var settings = {
+			"afterrestorefunc" : afterrestorefunc|| null
+		},
+		args = $.makeArray(arguments).slice(1), o;
+
+		if(args[0] && typeof(args[0]) == "object" && !$.isFunction(args[0])) {
+			o = $.extend($.jgrid.inlineEdit, settings, args[0]);
+		} else {
+			o = settings;
+		}
+		// End compatible
+
+		return this.each(function(){
+			var $t= this, fr, ind, ares={};
+			if (!$t.grid ) { return; }
+			ind = $($t).jqGrid("getInd",rowid,true);
+			if(ind === false) {return;}
+			for( var k=0;k<$t.p.savedRow.length;k++) {
+				if( $t.p.savedRow[k].id == rowid) {fr = k; break;}
+			}
+			if(fr >= 0) {
+				if($.isFunction($.fn.datepicker)) {
+					try {
+						$("input.hasDatepicker","#"+$.jgrid.jqID(ind.id)).datepicker('hide');
+					} catch (e) {}
+				}
+				$.each($t.p.colModel, function(i,n){
+					if(this.editable === true && this.name in $t.p.savedRow[fr] && !$(this).hasClass('not-editable-cell')) {
+						ares[this.name] = $t.p.savedRow[fr][this.name];
+					}
+				});
+				$($t).jqGrid("setRowData",rowid,ares);
+				$(ind).attr("editable","0").unbind("keydown");
+				$t.p.savedRow.splice(fr,1);
+				if($("#"+$.jgrid.jqID(rowid), "#"+$.jgrid.jqID($t.p.id)).hasClass("jqgrid-new-row")){
+					setTimeout(function(){$($t).jqGrid("delRowData",rowid);},0);
+				}
+			}
+			if ($.isFunction(o.afterrestorefunc))
+			{
+				o.afterrestorefunc.call($t, rowid);
+			}
+		});
+	},
+	addRow : function ( p ) {
+		p = $.extend({
+			rowID : "new_row",
+			initdata : {},
+			position :"first",
+			useDefValues : false,
+			useFormatter : false,
+			addRowParams : {extraparam:{}}
+		},p  || {});
+		return this.each(function(){
+			if (!this.grid ) { return; }
+			var $t = this;
+			if(p.useDefValues === true) {
+				$($t.p.colModel).each(function(i){
+					if( this.edioptions && this.editoptions.defaultValue ) {
+						var opt = this.editoptions.defaultValue,
+						tmp = $.isFunction(opt) ? opt.call($t) : opt;
+						p.initdata[this.name] = tmp;
+					}
+				});
+			}
+			$($t).jqGrid('addRowData', p.rowID, p.initdata, p.position);
+			$("#"+$.jgrid.jqID(p.rowID), "#"+$.jgrid.jqID($t.p.id)).addClass("jqgrid-new-row");
+			if(p.useFormatter) {
+				$("#"+$.jgrid.jqID(p.rowID)+" .ui-inline-edit", "#"+$.jgrid.jqID($t.p.id)).click();
+			} else {
+				var opers = $t.p.prmNames,
+				oper = opers.oper;
+				p.addRowParams.extraparam[oper] = opers.addoper;
+				$($t).jqGrid('editRow', p.rowID, p.addRowParams);
+				$($t).jqGrid('setSelection', p.rowID);
+			}
+		});
+	},
+	inlineNav : function (elem, o) {
+		o = $.extend({
+			edit: true,
+			editicon: "ui-icon-pencil",
+			add: true,
+			addicon:"ui-icon-plus",
+			save: true,
+			saveicon:"ui-icon-disk",
+			cancel: true,
+			cancelicon:"ui-icon-cancel",
+			addParams : {useFormatter : false},
+			editParams : {}
+		}, $.jgrid.nav, o ||{});
+		return this.each(function(){
+			if (!this.grid ) { return; }
+			var $t = this;
+			// detect the formatactions column
+			if(o.addParams.useFormatter === true) {
+				var cm = $t.p.colModel,i;
+				for (i = 0; i<cm.length; i++) {
+					if(cm[i].formatter && cm[i].formatter === "actions" ) {
+						if(cm[i].formatoptions) {
+							var defaults =  {
+								keys:false,
+								onEdit : null,
+								onSuccess: null,
+								afterSave:null,
+								onError: null,
+								afterRestore: null,
+								extraparam: {},
+								url: null
+							},
+							ap = $.extend( defaults, cm[i].formatoptions );
+							o.addParams.addRowParams = {
+								"keys" : ap.keys,
+								"oneditfunc" : ap.onEdit,
+								"successfunc" : ap.onSuccess,
+								"url" : ap.url,
+								"extraparam" : ap.extraparam,
+								"aftersavefunc" : ap.afterSavef,
+								"errorfunc": ap.onError,
+								"afterrestorefunc" : ap.afterRestore
+							};
+						}
+						break;
+					}
+				}
+			}
+			if(o.add) {
+				$($t).jqGrid('navButtonAdd', elem,{
+					caption : o.addtext,
+					title : o.addtitle,
+					buttonicon : o.addicon,
+					id : $t.p.id+"_iladd",
+					onClickButton : function ( e ) {
+						$($t).jqGrid('addRow', o.addParams);
+						if(!o.addParams.useFormatter) {
+							$("#"+$t.p.id+"_ilsave").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_ilcancel").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iladd").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iledit").addClass('ui-state-disabled');
+						}
+					}
+				});
+			}
+			if(o.edit) {
+				$($t).jqGrid('navButtonAdd', elem,{
+					caption : o.edittext,
+					title : o.edittitle,
+					buttonicon : o.editicon,
+					id : $t.p.id+"_iledit",
+					onClickButton : function ( e ) {
+						var sr = $($t).jqGrid('getGridParam','selrow');
+						if(sr) {
+							$($t).jqGrid('editRow', sr, o.editParams);
+							$("#"+$t.p.id+"_ilsave").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_ilcancel").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iladd").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iledit").addClass('ui-state-disabled');
+						} else {
+							$.jgrid.viewModal("#alertmod",{gbox:"#gbox_"+$t.p.id,jqm:true});$("#jqg_alrt").focus();							
+						}
+					}
+				});
+			}
+			if(o.save) {
+				$($t).jqGrid('navButtonAdd', elem,{
+					caption : o.savetext || '',
+					title : o.savetitle || 'Save row',
+					buttonicon : o.saveicon,
+					id : $t.p.id+"_ilsave",
+					onClickButton : function ( e ) {
+						var sr = $($t).jqGrid('getGridParam','selrow');
+						if(sr) {
+							if($("#"+$.jgrid.jqID(sr), "#"+$.jgrid.jqID($t.p.id) ).hasClass("jqgrid-new-row")) {
+								var opers = $t.p.prmNames,
+								oper = opers.oper;
+								if(!o.editParams.extraparam) {
+									o.editParams.extraparam = {};
+								}
+								o.editParams.extraparam[oper] = opers.addoper;
+							}
+							$($t).jqGrid('saveRow', sr, o.editParams);
+							$("#"+$t.p.id+"_ilsave").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_ilcancel").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iladd").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iledit").removeClass('ui-state-disabled');
+						} else {
+							$.jgrid.viewModal("#alertmod",{gbox:"#gbox_"+$t.p.id,jqm:true});$("#jqg_alrt").focus();							
+						}
+					}
+				});
+				$("#"+$t.p.id+"_ilsave").addClass('ui-state-disabled');
+			}
+			if(o.cancel) {
+				$($t).jqGrid('navButtonAdd', elem,{
+					caption : o.canceltext || '',
+					title : o.canceltitle || 'Cancel row editing',
+					buttonicon : o.cancelicon,
+					id : $t.p.id+"_ilcancel",
+					onClickButton : function ( e ) {
+						var sr = $($t).jqGrid('getGridParam','selrow');
+						if(sr) {
+							$($t).jqGrid('restoreRow', sr, o.editParams);
+							$("#"+$t.p.id+"_ilsave").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_ilcancel").addClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iladd").removeClass('ui-state-disabled');
+							$("#"+$t.p.id+"_iledit").removeClass('ui-state-disabled');
+						} else {
+							$.jgrid.viewModal("#alertmod",{gbox:"#gbox_"+$t.p.id,jqm:true});$("#jqg_alrt").focus();							
+						}
+					}
+				});
+				$("#"+$t.p.id+"_ilcancel").addClass('ui-state-disabled');
+			}
+		});
+	}
+//end inline edit
+});
+})(jQuery);
+”ò¿ŸË   Â          πÛä      jgrid      ``€ü
+      inlineEdit     ªl‡Ù      extend     ?+Õ«      editRow    ßH–M      rowid      Ëú∞∫
+      oneditfunc     n˙÷      successfunc    ÷^ö
+      extraparam     8H!´      aftersavefunc	      ‰8Ím	      errorfunc
+      çNL„      afterrestorefunc   —ôKö      settings   ¢åÙ[      restoreAfterError      ´5O‘      mtype      ﬂ:      POST   ‹Ÿú…      args   ÔˇwP	      makeArray      ÿÖ Ã      slice      ãè@i
+      isFunction     Û&eˆ      tmp    ¥Ã˛ò      editable   ê©ò∆      cnt    KÃÌ      focus      ê¸J      svr    /s◊€      ind    ø‘      grid   €Hé|      jqGrid     ˙†4k      getInd     A¢Ωê      attr   7ÑÉz      hasClass   ◊—Å      not-editable-row   ∑}Œo      colModel    U§k      td[role="gridcell"]!    m≥ –      treeg"      (Rì      treeGrid#   1{ÉÜ      ExpandColumn$   1"H&
+      span:first%     ‘„X      html&   QæÛQ      unformat'   ñ°∆`      rowId(      !Cñ<      edittype)   ÷ŸÓ      textarea*   à3¿µ      text+   L48      subgrid,    œø∏“
+      autoencode-     E›·‰
+      htmlDecode.     <]FO      opt/    ≤a‘W      editoptions0    »I·°      &nbsp;1     =hhΩ      &#160;2     (=S:
+      charCodeAt3     ÓËñN      elc4    /õˇ      createEl5   e…’Æ      ajaxOptions6    MŸ      ajaxSelectOptions7      Bå|      addClass8   ‹B-      append9     1<Î      select:     ZÑA)      multiple;   *N‘      dataUrl<    “ßf∞      browser=    5∂™‰      msie>   ÎƒJ˚      width?      •´‰      savedRow@   Ñu2      pushA   ‚      td:eq(B     "ïÁú      ) inputC    ‡Õ      bindD   ù∫”      keydownE    ≠5      keyCodeF    L¿“
+      restoreRowG     ﬁﬁÿ      tagNameH    å«;      TEXTAREAI   xnÜ$      saveRowJ    …©\9      successK    Ïêäz      tmp2L   •
+¬      tmp3M   Úi†      editurlN    {sµn      not-editable-cellO      ÿy*      checkboxP   ´¢ì      cbvQ    7Ã      YesR    ÄÈz      :checkedS   ¯©òﬂ      passwordT   ˙U~      buttonU     í,∂π      input, textareaV    &⁄õ      valW    ü,r\      select option:selectedX     9Ôx      selY    ¡€Z      selectedTextZ   ≈.»œ      selected[   wÄ|p	      formatter\      o®µ2      custom]     "ù      custom_value^   móﬁd      .customelement_     <BL      info_dialog`    >Â/      jQuerya     ±-Û      errcapb     ˜L¬v      function 'custom_value' c   \Ôùï      editd   ˇ?Xã      msge    Ú»∫	      nodefinedf      òÉ‘      bCloseg     ®Ú…„      novalueh    |9ö‡      checkValuesi    ˆ¶µí
+      htmlEncodej     ÍΩãÃ      clientArrayk    
+”¶å      NullIfEmptyl    ë)L	      positionsm      2èó\      findPosn    ÙÑ#      jqIDo   ∂”[W      bDivp   ı]á      leftq   $√Á      topr    “Ô¢Z      alerts      [o¥Y      idnamet     Vë#      opersu      {_‚≠      operv   EXîP      prmNamesw   cÍÇ      editoperx   mP˜
+      inlineDatay     ÊTª      respz    ….ø
+      setRowData{     ˝ÂgÑ      splice|     ı˛«Æ      unbind}     ÁYÏ      #lui_~      HáíK      show   Ä!ÚQ	      stripPrefÄ      Ãœè†      idPrefixÅ   æd»ê      ajaxÇ   6ó(Å      dataÉ   .t§;      serializeRowDataÑ   Dï»á      completeÖ   ª:0      resÜ    #      statá   üvÙ}      hideà   t¥NŒ      retâ    “œA*      sucretä     ¢]¡Ï      isArrayã    ˛tuW      errorå      ); ‘      <div class="ui-state-error">ç   H}ı#      responseTexté   ©è^      </div>è     ö ÖÆ      buttonalignê     ë∏.      rightë      .Î‰o      ajaxRowOptionsí     cPào      aresì   Jñ˛L
+      datepickerî     d[à      input.hasDatepickerï    +ÚWÓ      jqgrid-new-rowñ     3AtŸ
+      setTimeoutó     Õ›x#
+      delRowDataò     ‰a±d      addRowô     ∂ÿµ'      rowIDö      K»ã      new_rowõ    kÉx      initdataú   »Åí      positionù   `~ﬂ      firstû      Îd      useDefValuesü   ÀkÆq      useFormatter†   Ø⁄‰∫      addRowParams°   ì⁄Ÿ
+      edioptions¢     ‹â      defaultValue£   Ã÷øp
+      addRowData§     ”[Â¯       .ui-inline-edit•   ü™‚X      click¶      s,K]      addoperß     fY      setSelection®   Óøh«	      inlineNav©      dö!      elem™   ÊrÕ      editicon´   Iﬂ≤      ui-icon-pencil¨     “f˜Û      addicon≠    fâã      ui-icon-plusÆ   ∂–∞Ë      saveØ   ïó^r      saveicon∞   "Ù7Í      ui-icon-disk±   Ü]πƒ
+      cancelicon≤     f∆∆∑      ui-icon-cancel≥     ≤X¯„	      addParams¥      gêà
+      editParamsµ     ◊‰2      nav∂    B∂˙∆      actions∑    ç™F„      formatoptions∏      ‚<|      onEditπ     MP∑&	      onSuccess∫      »∏°ë	      afterSaveª      ˜QçÀ      onErrorº    ‚™Ï<      afterRestoreΩ   ‘8≈÷
+      afterSavefæ     L–2Ø      navButtonAddø   wì1S      caption¿    %á¥ﬂ      addtext¡    “E      title¬      ^Yk      addtitle√   ÔÁØN
+      buttoniconƒ     ˝;¬y      _iladd≈     SÅ+      onClickButton∆      ‰      _ilsave«    ˆ+      removeClass»    Ü÷®C      ui-state-disabled…      u`y√	      _ilcancel       êq;X      _ileditÀ    Áˇb+      edittextÃ   e•€Ô	      edittitleÕ      ∫O‘`      getGridParamŒ   ïPà      selrowœ     ˜ÁÀ‰	      viewModal–      5q°		      #alertmod—      ≠Åªu      gbox“   bb“#      #gbox_”     ≤D&A      jqm‘    '∞*J	      #jqg_alrt’      W=Û8      savetext÷   %–dr	      savetitle◊      Gq3      Save rowÿ   Úd€Ê
+      canceltextŸ     7‹˛      canceltitle⁄    ß◊E      Cancel row editing€     ﬁ„¢	      editRow/<‹      $a≠Á      editRow/</<›    ≤Ûêc	      saveRow/<ﬁ      –R˛]      saveRow/</<‡    ÜíÎh      saveRow/complete/<‚     9gŸﬁ      restoreRow/<„   ws…      restoreRow/</<‰     5…	‡      addRow/<Â   ˘V¢
+      addRow/</<Ê     A)„      inlineNav/<        Ü                0   Ô%,â                                                              	                                                                                                                                                       	                 
+                                                                                                                                                                                                                                                                                                ≥Oåc                         $ `          	 	   PC      J      	  
+  P    o `   ã   
+              ù`÷`  P    P  P  P  `ã               i  !  .  3  ã            _              e  J               P  J      	  
+  ã   €`o `y  `t  J  P`ù`    P÷`l  L  Ps  k       P  u  K  P              i  P  X  Y  Pã                i  Z           e           e               n  v              Ö  Ü  à  â  k               n  v               Ö  Ü           e                P
+      o `   ã                 ù`€`  í  Pk  ã            e              i  n  ã                               p `ã                 ù`t  u  ã               i  .    ã               ©  Po `ã                 ù` i  n   ô ã                e              e               e   t  u              e   Ø¬0∞IÙ$KEÆ˙ö                  I  F  ò  ®  
+   2     C      J      	  
+                         
+      '                       
+      ç {                     (        J      	  
+                                                 
+     p  q                                         J  Ç  0     Ñ  ã                è                 
+                 ô  õ  ú  û  ü  †                                  
+   2   c  ™     ¨  Æ  Ø  <   ±  ≥  ¥         ü                     (   C  ∏  π  ∫  ª  º    J             (     C      J      	  
+           ø  ¡  √  ç ≈          ø  ¡  √  ç ≈     
+     —  ”         ø  ¡  √  ç ≈             
+    —  ”         ø  ¡  √  ç ≈     
+     —  ”  á&’™ç!´!   D     ˆ/o"D                             m    ª   w ﬂ• `FÄ ˇˇˇˇPPÄÄÿ   ‚∆2ÿ   ä   	                     Ω  Œ   ﬂ¡   J   ¡   J   J   ù   ó   ﬂ9   ó   M   ﬂ¡   J   ·J   ‰9   m   <   m   <	   m
+   <   m   <   m   <   w ﬂ•9`¥`ë EJeJÄ 'JÄ UJÄ wJ	P4Ä PÄ\  #“Û\  ”        
+       +   	    Ω  Œ   ﬂΩ Œ   ﬂ‹Õ  ﬂﬁÕ  ﬂ9   º ù   ó   ﬂó   <   º ù   ó   ﬂó   <   º ù   ó   ﬂó   <   º ù   ó   ﬂó   <   º ù   ó
+   ﬂ9   ó   <   º ù   ó   ﬂó   <   º ù   ó   ﬂó   <	   ¡   ù   ó   ﬂó   <
+   <      <   Õ   ﬂ¡  ·J   ‰æ  s ·J   ‰s Õ  ﬂæ  Kú9   ó   ﬂæ  K   ú!   ó   ﬂ¡  ·J   ‰æ  Ks ó"   ö=   ó#   ¡  ·J   ‰¡  J   J   æ   æ  Ks Œ   ﬂô   ó(   æ   Œ   ﬂó(   æ  ·J   ‰m   s ¢•û@`%ô ô ô ô ù ô ô õ &O
+`ˇˇˇˆPPH`ë ò ˇˇˇıPì `
+ˇˇˇ€Pì `O`ˇˇˇ˚PCUQÄ<  «™…)<  A               6        ﬁÕ  ﬂæ  Œ   ﬂŒ   ﬂŒ   ﬂ9   Œ   ﬂ¡   J   õ   ó    ¢ó   ¡   ¡   s ·J   ‰   ¡  s Õ  ﬂæ  ö   ó    ¢ó   ¡   æ  s ·J   ‰   s ù   ó   ﬂ   ó   Õ   ﬂæ      ú(   ó   ﬂ¡   æ  s ·J   ‰	   s ó   öK  ó   ¡   J
+   J   Œ   ﬂ¡      æ  s ·J   ‰m   w ﬂ¡   ö  ó   ¡   ¡  M   ﬂ¡   J
+   J   ·J   ‰¡   w ﬂ¡   æ  s ·J   ‰      w ﬂ¡      ¡   &   &æ  s ·J   ‰w  ﬂ¡  J   ö,   ó+   ¡   æ  s ·J   ‰   m   w ﬂó/   ¡  ·J   ‰¡  J   s ö)   ó3   ¡  J   ·J   ‰¡   ¡  w ﬂó6   •&`
+`	`
+`+`î `A>F`ˇˇˇ˛PˇˇˇP(`ê `A>F`ˇˇˇ˛PPù `ï ˇˇˇ˛PPì `ï `ˇˇˇÈP
+"ˇˇˇ˙PD)`ë `ê `ñ ˇˇˇ˚P$`ˇˇˇˇPî P$`	ˇˇˇÊP
+P$	`ñ `ˇˇˇˇPˇˇˇÒPI;
+`
+ˇˇˇıP`ë ˇˇˇ˜PI>PÄÄ   Âºf‡  o               ç      $ﬁÕ  ﬂ¡   º  KJ   Œ   ﬂ¡   J   J   ú    ó   ﬂ¡   ¡   J   J   ó	   Õ   ﬂæ   ö1   ó
+   ¡      æ  s ·J   ‰s  Œ   ﬂô‹   ó   ´¡  ·J   ‰æ  9   ¡  <	   ¡   º  K<
+   º  s Œ   ﬂôò   ó    §≠∞±  ﬂ±  ﬂ¡   º  KJ   ú   ó   ﬂ¡   º  KJ      ó   ö&   ó   ¡   æ  s ·J   ‰s  ô!   ó   ¡   æ  s ·J   ‰s  ó    Œ   ﬂ“ó    ¡      ú,   ó"   ﬂ¡      ú   ó$   ﬂ¡      ó%   ö«  ó&   ¡   J   J   ö)   ó)   ¡  J   ·J   ‰¡   s Œ   ﬂó,   ¡   ¡   ¡   Oﬂ¡   º  KJ   ö_  ó1   ¡   ö   ó3   º  Œ   ﬂó3   æ   ö1   ó4   ¡      æ  s ·J   ‰   w ﬂô'   ó7   ¡   æ  s ·J   ‰   w ﬂó:   ¡  ·J   ‰9   ¡   º  KJ   ù   ó?   ﬂ9   ó@   9   ¡     &¡   &<   ¡   <   s Õ  ﬂ¡   º  KJ   õ   óI   ¡   º  K   M   ﬂóK   ¡      ùL   óM   ﬂ¡      ù6   óO   ﬂ¡   J    ú   óR   ﬂ¡   ·J!   ‰s † óU   ö   óV      Œ   ﬂóV   ¡  J   ·J"   ‰¡   º  KJ   æ  ¡   ¡  ·J   ‰9#   ¡  J   J$   ¡   J   J%   ù   óa   ﬂ9&   ób   s s Õ  ﬂ¡   æ  s ·J'   ‰   w ﬂæ   ö0   óh   ¡      æ  s ·J(   ‰æ  w ﬂô&   ók   ¡   æ  s ·J(   ‰æ  w ﬂón   ¡   º  KJ   )   ú   ór   ﬂ¡   º  KJ   *   ú_   ów   ﬂ¡   º  KJ   J+   ú?   ó|   ﬂ¡   º  KJ   J,   *   ú   óÇ   ﬂ¡  J-   J.   óÑ   ö9   óÖ   ¡   æ  s ·J/   ‰¡   æ  s ·J/   ‰s  w ﬂóã   ¡   0(Œ   ﬂóç   •&`î `° ö 	`	`ˇˇˇÒP
+Pì!`
+ˇˇˇ‘Pñ +`¬ >ˇˇˇ˛P
+Pì ˇˇˇ˛P
+Pî@`∆ 
+`ô `ë ˇˇˇıP.`ë 
+`ö `ë `.`	`ˇˇˇÚPP.`ˇˇˇˇPP)`	£ 
+ˇˇˇÕP(`ò `ô `– <Pñ `ê `ë 		§ ˇˇˇ‚PˇˇˇŸP(`ˇˇˇˇPP$`	`ˇˇˇÚP
+ˇˇˇ˘P.`ˇˇˇˇP
+ˇˇˇ˘PI`ü ¿ Q√ 	`ˇˇˇˇP
+ˇˇˇ˛P
+PˇˇˇÛPI`í@ PÄÄ        ÷   ã   ˇˇˇˇ        ê   >   (  ffç(  ∂                        º  J   ö4   ó   ¡   ¡   s ·J   ‰   ¡  ¡  w ﬂ¢ó   º  J   öa   ó	   º  J   Õ   ﬂæ   J      ö   ó   ¢ó   ¡   ¡   s ·J   ‰   ¡  ¡  w ﬂ¢ó   • `ï 	`ˇˇˇˇPˇˇˇÂP$	`AF`ï `-`ô `AF	`ˇˇˇˇPˇˇˇÁP$	`AVÄÄÄƒ
+  n◊T†î
+                 —      $Ω  Œ   ﬂ‹Õ  ﬂﬁÕ   ﬂ9   º ù   ó   ﬂó   <   º ù   ó   ﬂó   <   º ù   ó   ﬂ9   ó   <   º ù   ó	   ﬂó	   <   º ù   ó   ﬂó   <   º ù   ó   ﬂó   <   <	   
+   <   Õ  ﬂ¡  ·J   ‰æ  s ·J   ‰s Õ  ﬂæ  Kú9   ó   ﬂæ  K   ú!   ó   ﬂ¡  ·J   ‰æ  Ks ó   ö=   ó   ¡  ·J   ‰¡  J   J   æ  æ  Ks Œ   ﬂô   ó$   æ  Œ   ﬂó$   Œ   ﬂæ   KŒ   ﬂ9   Œ   ﬂ9   Œ   ﬂ9   Œ   ﬂ¡   J   õ   ó*   ¡   ¢ó*   ¡   ¡   s ·J   ‰   ¡   s Œ 	  ﬂ¡ 	  ö   ó/   ¡   ¢ó/   ¡   ¡ 	  s ·J   ‰   s Õ
+  ﬂ¡   ¡   J   ö   ó4   ¡   J   ô   ó5   ¡   J   J   ó7   M   ﬂæ
+     öt  ó:   ¡      ¡ 	  s ·J   ‰m    w ﬂ¡   KöÒ   óA   ´¡  J   ·J!   ‰¡   "   ¡  J   ·J#   ‰¡   s &¡   J   J$   s Ks Õ  ﬂ¡  J   ·J%   ‰¡  J   J&   J'   ¡   K¡  J   J(   J)   9*   æ  K<+   æ  K<,   w ﬂô*   ó[    §≠∞±  ﬂ±  ﬂª.    ¡   Kw ﬂ“ó^   ¡   ¢ó^   ¡   J   J/   Õ  ﬂæ  J0   Õ	  ﬂæ  J1   Õ  ﬂ¡   ö†   óc   ¡   æ	  æ  J2   Oﬂ¡   æ  ¡   Oﬂ¡   J   J3   4   ö   ók   ¡   J   95   M3   ﬂón   ¡  ·J   ‰96   ¡   ¡   J   J3   ¡   J   s Œ   ﬂót   ¡   J   7   ö·  ów   ¡  ·J   ‰98   ¡   ¡   s Œ   ﬂ¡   J   J9   ö$   ó}   ¡  ·J   ‰¡   m:   w ﬂóÄ   ¡   ¡   s ·J   ‰;   ¡   ¡   s Õ  ﬂ¡   ¡ 	  s ·J   ‰   <   w ﬂÕ  ﬂòÜ   æ  ¡   J   J=   J>   öW   óã   ¡   J   J=   æ  KJ1   ¡   ö   óë   æ  Œ   ﬂô   óë   æ  0(Õ  ﬂôèˇˇˇóì   ¡    ö*   óï   ¡   J   J=   ·J?   ‰¡   w ﬂóô   ¡  ·J   ‰¡   J   s ö-   óù   ¡   J   ·J@   ‰¡   ¡   æ  w ﬂó†   Œ   ﬂ¡   ¡ 	  s ·JA   ‰B   w ﬂôÇ  ó£   ¡   C   ¡   J   J1   &s ·JD   ‰w  ﬂ¡  ·J   ‰9E   ¡   ¡   s Œ   ﬂ¡   æ  ¡  J   ·JF   ‰¡   J   JG   ¡   æ  Ks Oﬂ¡  ·JH   ‰¡  ·J   ‰9I   ¡   J   <   ¡  ·J   ‰¡   J   JJ   s ö2   óΩ   ¡   J   JJ   ·J@   ‰¡   ¡   s ô   ó¡   ¡   ó¡   <K   ¡   J   <L   <M   mN   <O   mP   <Q   ¡  J   JR   ¡   J   JS   ù   óŒ   ﬂ9T   óœ   s w ﬂó—   ¡   ¢•ï@`%ô ô ù ô ô ô &O
+`ˇˇˇˆPPH`ë ò ˇˇˇıPì `
+ˇˇˇ€Pì `O`'``	`
+`+`î `EÄ  ¡F`ˇˇˇ˛PˇˇˇP)`ë `EÄ  ¡F`ˇˇˇ˛PP(`« `î `ˇˇˇÈP
+!ˇˇˇ˚PDZ`ì!`ë ë ˇˇˇ˚PˇˇˇÂPˇˇˇ¯P(`ë î î ˇˇˇ±Pë +`ˇˇˇˇPJa`EÄ  ¡6c `î `.`.`/`î `ê `† *`ö `
+ˇˇˇ‚PNm`ö `ˇˇˇÒP)`ô `ˇˇˇ˜PIt`ˇˇˇˇPˇˇˇÊP(`ˇˇˇˇPî P$
+ `fü 
+`ô ê `
+`Jv)`ï@y`ë `ñ ˇˇˇ˘P)	`
+ˇˇˇıP `ë ˇˇˇÒP)`'`ˇˇˇˇPP `ê ˇˇˇ˜P
+P$`ˇˇˇÚP)`ö !
+ˇˇˇÁP%`	%/ˇˇˇıP£ ?ˇˇˇ˜Pú /&JÄ  ÆJÄ  Ω§@Ä  ÅPˇˇˇ˘PIÄ  ¿`%Qƒ
+  §
+  -   ã     ˇˇˇˇ        Õ  ∂          ]  v   Ù  ?.&ù‘                 ≤      $ﬁÕ  ﬂ¡  J   J   º  KŒ  ﬂ¡  J   Œ
+  ﬂ¡
+     úk   ó   ﬂ¡
+     úU   ó   ﬂ¡  J   ú>   ó   ﬂ¡
+     ú(   ó   ﬂ¡   æ  s ·J   ‰	   s ó   öo  ó   ¡  J
+   ·   üu   ó   ·   ü  ó   ·   ü	  ó   ·   ü¯   ó   ·   üÁ   ó   ·   ü  ó   ·   üü  ó   †≤  ó   h      i       i   Õ   ﬂ¡  J   ö-   ó   ¡  J   J   ·J   ‰   s Õ   ﬂó!   ¡  ¡
+  ¡      æ  s ·J   ‰   s ö   ó%   æ   Kô   ó&   æ   Kó'   Oﬂô¸  ó(   ¡  ¡
+  ¡      æ  s ·J   ‰s  Oﬂô   ó,   ¡  J   J   õ_   ó/   ¡  ¡
+  ¡      æ  s ·J   ‰s  Oﬂ¡  ¡
+  ¡      æ  s ·J   ‰s  OﬂôÏ   ó7   ¡      æ  s Õ  ﬂh    Œ   ﬂ¡  ¡
+  ¡   æ  s ·J   ‰s  Oﬂ¡  ¡
+  Kö5   ó?   ¡  ¡
+  ¡  ¡
+  K·J   ‰    s Oﬂô   óC   ¡  ¡
+  !   OﬂóD   ¡      æ  s ·J"   ‰m#   w ﬂ¡  ¡
+  ¡   ·J   ‰    s OﬂóK   ¡  J$   ú   óM   ﬂ¡  J$      óO   ö   óP   9%   Œ  ﬂóQ   ô"  óQ   ´¡  J   ú)   óS   ﬂ¡  ·J&   ‰¡  J   J'   s óW   ör   óX   ¡  ¡
+  ¡  J   J'   ·J(   ‰¡  ¡   )   æ  s *   s Oﬂ¡  ¡
+  K ö   óa   +   ßóa   ô   óa   ,   ßóa   ôS  óa    §≠∞±  ﬂ±  ﬂæ  ,   öf   óc   ¡  J.   ·J/   ‰ª0   J.   J1   J2   3   ¡  J.   J4   J5   J6   &ª0   J.   J4   J7   w ﬂós   æ  +   ök   óu   ¡  J.   ·J/   ‰ª0   J.   J1   J2   3   ¡  J.   J4   J5   J8   &ª0   J.   J4   J7   w ﬂôP   óÖ   ¡  J.   ·J/   ‰ª0   J.   J1   J2   æ  J9   ª0   J.   J4   J7   w ﬂóë   “óë   ô   óë   ¡  J.   ·J:   ‰¡  ¡
+  Kº  ¡  s Œ  ﬂ¡  Kö-   óò   ¡  ¡  ¡
+  K;   &¡  K&Oﬂ¢óù   ¡  J   J<   ö5   ó†   ¡  ¡
+  ¡  J.   ·J=   ‰¡  ¡
+  Ks Oﬂó•   ¡  J>   ?   ú1   ó®   ﬂ¡  J   ú   ó™   ﬂ¡  J   J@   ó≠   ö6   óÆ   ¡  ¡
+  K!   ö   ó±   ¡  ¡
+  A   Oﬂó≤   •&`ô `ê 
+`Ÿ Eˇˇˇ˛PPì `ˇ `û `î 	`õ PM
+`ï ˇˇˇˆPP™ ` `ï ˇˇˇÏP
+P%` `ô 	`ï %ˇˇˇÂP
+!P%	`ï 'ˇˇˇ‰P
+"P `ˇˇˇˆP `+	`ê ˇˇˇ˛P
+P%`ï `° P`ñ 	`ˇˇˇÊP*
+E*PD	`õ PJ!`¥ ,`ê `!`° ˇˇˇıPí 
+`† +ˇˇˇÌPˇˇˇ˜P%``ï `ò +`î `ë î ö î ˇˇˇ£P)`î `ë î ö î ˇˇˇ•P.`ë î 	
+î ˇˇˇœPO.`J0`ë ˇˇˇÍP)	`ì `ó *`A<F5	`ô `õ ˇˇˇıP*	`– 
+`õ `ñ@<PÄÙ  ‰  -   ó  F  ˇˇˇˇ        –  ø   T   ¶»é#T   !                         ¡   º  ¡   º s ·J   ‰s  Oﬂ• `ˇˇˇ˛P
+P%
+PÄT   […∫T   "                         ¡   º  ¡  J   ·J   ‰º s Oﬂ• `ô ˇˇˇıP%PÄÄ–  	
+gÛ¿  s         	       R      ¡      ¡   J   J   &s ·J   ‰w  ﬂº    ö;  ó   Õ   ﬂ¡  ·J   ‰¡   J   s öñ   ó   ¡   J   ·J   ‰¡   º  s Õ  ﬂ¡  ·J	   ‰æ  s öJ   ó   æ  KÕ   ﬂæ  Kö   ó   æ  Kô   ó   ¡   ó   Œ   ﬂô   ó   æ  Õ   ﬂó   æ   ö‹  ó   ¡   J   J
+   ö$   ó   ¡  ·J   ‰¡   m   w ﬂó   ¡  ·J   ‰9   ¡   ¡   s Œ   ﬂ¡   ¡   s ·J   ‰   ¡   ¡   w ﬂ¡   ¡ 	  s ·J   ‰      w ﬂÕ  ﬂò'   æ  ¡   J   J   J   öW   ó,   ¡   J   J   æ  KJ   ¡   ö   ó2   æ  Œ   ﬂô   ó2   æ  0(Õ  ﬂôèˇˇˇó4   ¡    ö*   ó6   ¡   J   J   ·J   ‰¡   w ﬂó:   ¡  ·J   ‰¡   J   s ö,   ó>   ¡   J   ·J   ‰¡   ¡   º  w ﬂóA   Œ   ﬂ¡   ¡ 	  s ·J   ‰   w ﬂôö   óD   ¡  ·J   ‰¡   J   s ö/   óH   ¡   J   ·J   ‰¡   ¡   º  º w ﬂóK   ¡   J   ö7   óN   ¡   ¡   s ·J   ‰   ¡   ¡   J   w ﬂóR   • `ê ˇˇˇ˜P
+P$`ì `&`
+ˇˇˇıP-	`ë ˇˇˇ˜P(`
+ˇˇˇ¯PM
+`+
+`∫ 
+`N`ê `ô 
+`ˇˇˇ˜PI	`ˇˇˇÒP)	`ˇˇˇˇPˇˇˇÊP$	`ˇˇˇˇPî P$ `fü `ô ê `
+`J-`ï@`ë `ñ ˇˇˇ˘P)`
+ˇˇˇıP `ë ˇˇˇÒP)	`'	`ˇˇˇˇPP `
+ˇˇˇıP-
+`ë ˇˇˇÎPI"`ñ 
+`ˇˇˇˇP
+ˇˇˇÂPI'P–         ≥  v   T   ^dA¯T   "                         ¡   º  ¡  J   ·J   ‰º s Oﬂ• `ô ˇˇˇıP%
+PÄÄ  r„OÙ  U                (      $¡      ¡   J   J   &s ·J   ‰w  ﬂ¡  ·J   ‰¡   J   s ö4   ó
+   ¡   J   ·J   ‰¡   ¡   º  º w ﬂôñ   ó   ´ª   J	   ·J
+   ‰ª   J	   J   J      º  J   &   &ª   J	   J   J   9      <   w ﬂô+   ó    §≠∞±   ﬂ±   ﬂª    º  J   w ﬂ“ó!   ¡   J   ö7   ó$   ¡   ¡   s ·J   ‰   ¡   ¡   J   w ﬂó(   • `ê ˇˇˇ˜P
+P$
+`
+ˇˇˇıP-`ë ˇˇˇÎP!	`ë î  î 
+ˇˇˇÉPë +	`ˇˇˇˇPJ
+`ñ `ˇˇˇˇP
+ˇˇˇÂPIPÄÄ       È      ˇˇˇˇ        |   e   t  ˛ç%t          
+              Ω  Œ   ﬂ‹Õ  ﬂﬁÕ  ﬂ9   º ù   ó   ﬂó   <   Õ   ﬂ¡  ·J   ‰æ  s ·J   ‰s Õ  ﬂæ  Kú9   ó	   ﬂæ  K   ú!   ó   ﬂ¡  ·J   ‰æ  Ks ó   ö=   ó   ¡  ·J   ‰¡  J   J	   æ   æ  Ks Œ   ﬂô   ó   æ   Œ   ﬂó   æ  ·J
+   ‰m   s ¢•ï@`%û@
+`ˇˇˇˆPPH`ë ò ˇˇˇıPì `
+ˇˇˇ€Pì `O`ˇˇˇ˚PC-QX  okå¨(  Û               M       $ﬁÕ  ﬂæ  Œ   ﬂ9   Œ   ﬂ¡   J   õ   ó    ¢ó   ¡   ¡   s ·J   ‰   ¡  s Õ   ﬂæ   ö   ó    ¢ó   Õ  ﬂò   æ  ¡   J   J   J   öW   ó   ¡   J   J   æ  KJ   ¡  ö   ó   æ  Œ   ﬂô   ó   æ  0(Õ  ﬂôèˇˇˇó   ¡    ö©  ó   ¡  ·J	   ‰¡  J
+   J   s öe   ó   ´¡         ¡  J   ·J   ‰æ   J   s &s ·J   ‰   w ﬂô   ó$    §≠∞±  ﬂ±  ﬂ“ó$   ¡  ·J   ‰¡   J   J   m   w ﬂ¡   ¡   s ·J   ‰   ¡  ¡   w ﬂ¡   æ   s ·J   ‰      s ·J   ‰   w ﬂ¡   J   J   ·J   ‰¡   w ﬂ¡      ¡  J   ·J   ‰¡  s &   ¡  J   ·J   ‰¡   J   J   s &s ·J   ‰   s ö   óC   ª    m   w ﬂóF   ¡  ·J	   ‰¡  J    s ö)   óJ   ¡  J    ·J!   ‰¡   ¡  w ﬂóM   •&`
+`+`î `AF`ˇˇˇ˛PˇˇˇP(`ê `AF	 `fü 	`ô ê `
+`J(`ï@`ë `ˇˇˇıP!`ë 	ˇˇˇ˚Pˇˇˇ›P1Pë ë@`ˇˇˇÏPD`ˇˇˇˇPˇˇˇÊP$`ˇˇˇˇPî PP$`ñ ˇˇˇ˘P$`ë ˇˇˇ˚Pë ˇˇˇ˚Pˇˇˇ⁄P5P-`ˇˇˇˇPI`
+ˇˇˇıP `ë ˇˇˇ˜PIPX  8     ~     ˇˇˇˇ       {   v           0  F   Ë   sË   ß                       ﬁÕ   ﬂæ   J   úR   ó   ﬂæ   J   ¡   J   J   ¡   K"ú(   ó	   ﬂ¡   æ   s ·J   ‰   s ó   ö9   ó   ¡   æ   J   ¡   J   J   ¡   Kæ   J   KOﬂó   •&	`ü '° ˇˇˇ˛PPì `¥@PÄÄÄ\   ÅÁ”\   $                          ¡   ¡   s ·J   ‰   ¡  w ﬂ• `ˇˇˇˇPˇˇˇÏPPÄ‰   ‹!ﬁÙ‰   ñ                       Ω  Œ   ﬂﬁÕ   ﬂ¡  ·J   ‰9      <   9   <      <   <	   <
+   9   9   <   <   ¡   ù   ó   ﬂ9   ó   s Œ   ﬂæ   ·J   ‰m   s ¢•/`%***&&/ö@	PI	`ˇˇˇ˚PC!QÄÄÄ  ¡ª[  4        
+       @        ﬁÕ  ﬂæ  J   õ   ó    ¢ó   æ  Œ   ﬂ¡  J   ö2   ó   ¡   ¡   J   J   s ·J   ‰m   w ﬂó   ¡   ¡   s ·J   ‰   ¡  J	   ¡  J
+   ¡  J   w ﬂ¡      ¡  J   ·J   ‰¡  J	   s &   ¡  J   ·J   ‰¡   J   J   s &s ·J   ‰   w ﬂ¡  J   öv   ó!   ¡      ¡  J   ·J   ‰¡  J	   s &   &   ¡  J   ·J   ‰¡   J   J   s &s ·J   ‰w  ﬂô§   ó0   ¡   J   J   Õ   ﬂæ   J   Õ  ﬂ¡  J   J   æ  æ   J   Oﬂ¡   ¡   s ·J   ‰   ¡  J	   ¡  J   w ﬂ¡   ¡   s ·J   ‰   ¡  J	   w ﬂó@   •&`ì `AF`*`ñ `ˇˇˇˇP
+ˇˇˇ˚PI`ˇˇˇˇP
+	
+
+ˇˇˇ÷P$`ë 
+ˇˇˇ˚Pë ˇˇˇ˚PˇˇˇÿP7P$`î `ë 
+ˇˇˇ˚P
+"ë ˇˇˇ˚Pˇˇˇ≈P
+JP `î `.`û `ˇˇˇˇP
+	
+ˇˇˇÂP$`ˇˇˇˇP
+ˇˇˇÈPIPÄÄ¯   M»¯   ±                       ﬁÕ  ﬂæ  J   ú   ó   ﬂæ  J   J   ó   ö~   ó   æ  J   J   Õ   ﬂ¡  ·J   ‰æ   s ö"   ó
+   æ   ·J   ‰¡   s ô   ó   æ   ó   Õ  ﬂ¡  J   æ  J   æ  Oﬂó   •&
+`± `ì `ˇˇˇıPò ˇˇˇ˚Põ `û@PÄ$  ∏zVh$                          Ω  Œ   ﬂΩ Œ   ﬂﬁÕ   ﬂ¡  ·J   ‰9   <      <   <      <   <	   
+   <   <      <   9   <   <   9   <   ¡  J   J   ¡   ù   ó   ﬂ9   ó   s Œ   ﬂæ   ·J   ‰m   s ¢•ò `%&*&*&*&*+*ö@	PI`ˇˇˇ˚PCÄ  àQÄ8  ;=r–(  „               í       ﬁÕ  ﬂæ  J   õ   ó    ¢ó   æ  Œ   ﬂ¡  J   J   öû  ó   ¡   J   J   Õ   ﬂÕ  ﬂò   æ  æ   J   öf  ó   æ   æ  KJ   ú   ó   ﬂæ   æ  KJ      ó   ö  ó   æ   æ  KJ	   öÛ   ó   9
+   <   <   <   <   <   <   9   <   <   Õ  ﬂ¡  ·J   ‰æ  æ   æ  KJ	   s Õ  ﬂ¡  J   9   æ  J   <   æ  J   <   æ  J   <   æ  J   <   æ  J   <   æ  J   <   æ  J   <   æ  J   <   M   ﬂó6   ô   ó6   æ  0(Õ  ﬂôã˛ˇˇó8   ¡  J   öÉ   ó:   ¡   ¡   s ·J   ‰   ¡  9    ¡  J!   <"   ¡  J#   <$   ¡  J%   <&   ¡   J   J'   (   &<'   m)   <*   w ﬂóJ   ¡  J+   öÉ   óL   ¡   ¡   s ·J   ‰   ¡  9,   ¡  J-   <"   ¡  J.   <$   ¡  J/   <&   ¡   J   J'   0   &<'   m1   <*   w ﬂó\   ¡  J2   ö·   ó^   ¡   ¡   s ·J   ‰   ¡  93   ¡  J4   ù   óc   ﬂ5   óc   <"   ¡  J6   ù   óf   ﬂ7   óf   <$   ¡  J8   <&   ¡   J   J'   9   &<'   m:   <*   w ﬂ¡   ;   ¡   J   J'   &9   &s ·J<   ‰=   w ﬂów   ¡  J>   ö·   óy   ¡   ¡   s ·J   ‰   ¡  9?   ¡  J@   ù   ó~   ﬂ5   ó~   <"   ¡  JA   ù   óÅ   ﬂB   óÅ   <$   ¡  JC   <&   ¡   J   J'   D   &<'   mE   <*   w ﬂ¡   ;   ¡   J   J'   &D   &s ·J<   ‰=   w ﬂóí   •&`ì `AzF`J`õ `î 
+`fî 	`º 
+`ò `%	&	&	&	&	&	&	*	K`
+
+ˇˇˇÓP(`/	.	.	.	.	.	.	.	ô@`J`ï@#`î `ˇˇˇˇP%///ö J$PI4`î `ˇˇˇˇP%///ö J5PIH`î `ˇˇˇˇP%§ § /ö JIPDc`ñ ˇˇˇ˚PPIe`î `ˇˇˇˇP%§ § /ö JfPDx`ñ ˇˇˇ˚PPIzPÄÄ8         _   z  ò  ÈN«ò                   #       ¡   ¡   s ·J   ‰   ¡  J   w ﬂ¡  J   J   õ⁄   ó   ¡      ¡   J   J   &   &s ·J	   ‰
+   w ﬂ¡      ¡   J   J   &   &s ·J	   ‰
+   w ﬂ¡      ¡   J   J   &   &s ·J   ‰
+   w ﬂ¡      ¡   J   J   &   &s ·J   ‰
+   w ﬂó#   • `ˇˇˇˇP
+ˇˇˇÔP$
+`ô `ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PPIPÄH  g»H  ô                0       ¡   ¡   s ·J   ‰      s Õ   ﬂæ   ö  ó   ¡   ¡   s ·J   ‰   æ   ¡  J   w ﬂ¡      ¡   J   J   &	   &s ·J
+   ‰   w ﬂ¡      ¡   J   J   &   &s ·J
+   ‰   w ﬂ¡      ¡   J   J   &   &s ·J   ‰   w ﬂ¡      ¡   J   J   &   &s ·J   ‰   w ﬂôb   ó$   ¡  J   ·J   ‰   9      ¡   J   J   &<   <   w ﬂ¡      s ·J   ‰w  ﬂó0   • `ˇˇˇˇPî P(
+`.`ˇˇˇˇP
+ˇˇˇÍP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP `ñ ï ˇˇˇ”P8`P
+PIPÄÄd  W-lûd  z         
+       K       ¡   ¡   s ·J   ‰      s Õ   ﬂæ   öÏ  ó   ¡      ¡  J   ·J   ‰æ   s &   ¡  J   ·J   ‰¡   J   J   s &s ·J	   ‰
+   s ö}   ó   ¡   J   J   Õ  ﬂæ  J   Õ  ﬂ¡  J   J   õ   ó   ¡  J   9   M   ﬂó   ¡  J   J   æ  æ  J   Oﬂó   ¡   ¡   s ·J   ‰   æ   ¡  J   w ﬂ¡      ¡   J   J   &   &s ·J   ‰   w ﬂ¡      ¡   J   J   &   &s ·J   ‰   w ﬂ¡      ¡   J   J   &   &s ·J   ‰   w ﬂ¡      ¡   J   J   &   &s ·J   ‰   w ﬂôb   ó?   ¡  J   ·J   ‰   9      ¡   J   J   &<   <   w ﬂ¡      s ·J    ‰w  ﬂóK   • `ˇˇˇˇPî P(
+`.`ë ˇˇˇ˚P
+ë ˇˇˇ˚Pˇˇˇ›P3P-`î `.`ô 
+`ö@		`£@`ˇˇˇˇP
+ˇˇˇÍP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP `ñ ï ˇˇˇ”P8`P
+PIPÄÄH  c;Î{H  ô                0       ¡   ¡   s ·J   ‰      s Õ   ﬂæ   ö  ó   ¡   ¡   s ·J   ‰   æ   ¡  J   w ﬂ¡      ¡   J   J   &	   &s ·J
+   ‰   w ﬂ¡      ¡   J   J   &   &s ·J
+   ‰   w ﬂ¡      ¡   J   J   &   &s ·J   ‰   w ﬂ¡      ¡   J   J   &   &s ·J   ‰   w ﬂôb   ó$   ¡  J   ·J   ‰   9      ¡   J   J   &<   <   w ﬂ¡      s ·J   ‰w  ﬂó0   • `ˇˇˇˇPî P(
+`.`ˇˇˇˇP
+ˇˇˇÁP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP$`ñ ˇˇˇ˚PP `ñ ï ˇˇˇ”P8`P
+PIPÄÄ3ıÿ  `{  p  "  #  $  %  &    @'      `(  )  *   +  ◊ ,     -    ê       @/    @  @_  ç 0  1  I  2  4  	  @5  6  
+  @7  8  9  t  :  ;  <  =  >    `E    F    G  H  I    `  @          0      p       å     pç ?  @  1  A  B    C  C  D    p    6     `  @C      J    @    	  
+            u           å     p	  `*    `p    {   +    ◊   N  (  O  *  S  )  T  9  \  Q  X /  P  ﬁ  :    ú R  U  V  :  W  >  ,  ê   å     p[    @  ]  6   ^  Œ   Ç Å 
+  `   _  `  ù   a  b  c  d  e  f  g  ]  h     ,  i  J  j  k  ê    `   -    `   -    `}  p  ç á  J      6   ä  ,  å     p    @  z      0  ?  I  {    |  D  	    F  
+    `}  p  ç á    	  6   `     _  ù   a  å  ç  é  c  f    @ê  è    `r      F  
+    `  @  J    @    	  
+            u             @  @  @          p  M  1     å     pm  #  n  o  _  ù   a  c  f    @p  q    `r  v  u  ç w  x  t    @  @j    @,  	  pz  0  ?  I  {  6   |  D  }  ~    @  Ä  Å    @É  Ç  0     
+  pÑ    pã  5  ë    @  `  {  p  ?    N    `  ó    `  @      p  ?  I  ç   ◊ ì  î  #     n  á    `å       pz      0  |  D  {    ï  ñ    p
+  6     `  @
+      u           å     p  `°  /  ¢    6   õ  {    `  û  p    å     p  £  ô  õ  ú  #     n  ç 7  ï  ü  §  •  v  u  †    ¶    ß    `    @ö  ô    @õ  ù  ú  û  ü    @  @  †     @å     p  `  ò  ≥  ü  #  p  ç ∆  «  »  …  ƒ  7       `  Õ  Œ    ¥  #  p  ç ∆  «  »  …  ƒ  7        œ  –  *  @“  —  ”  ‘      `  Õ  Œ  #     n  p  ç   ï  v  u  ¥    ,  @¶  I  ∆  7  »  …  ƒ  «     œ  –  -  @“  —  ”  ‘      `  Õ  Œ  F  ¥  #  p  ç ∆  7  »  …  ƒ  «        œ  –  /  @“  —  ”  ‘      `  ≥  ü  p    I  [  ∂  ∑  %  @C  ∏  π  ∫  ª  º  &  @  J    '  @    Ω    	  
+  †       æ  (  @¿  ø  ¬  ¡  ¨  √  ç ƒ    p≈  c  )  @À  Ã  ™       pÆ  +  @’  ê   ÷  ◊  Ø  ∆    p#  7  »  <   .  @ÿ  Ÿ  ⁄  ±  …    p  `  !  @c  ´  ™     ≠  ¨  Æ  ∞  Ø  <   ≤  ±  "  @ü  ≥  #  @¥     µ  $  @å     p  `        @    @  p    pI    pF    pò    p®     `  p`  ˇXÑÉ                s               U              8      €            0   ‹        0      ‹        Ô   U   I        n   B   ›        l      ﬁ        ∞      ›        ∂      Ñ        ≥      ‡        ‘      ã        p     F        N  "   ‚        D     „        K     „        †     ò        Ñ     ‰        |     Â        Z     ®          F   Ê        ≤     ≈        ¡     ≈        ⁄  !   ≈        ˚     ≈        ùH©¿      F      F                Ä 
+   
+F     
+F               Ç≥  á  ´  á            	   Ç ª  Å  ≥  Å  &               1  ˙  )  ˙  .   0            –    »    T   %          Çù  ë)  ï  ë)  f             Ç ∂  ¸  Æ  ¸  É   .            ≠  ˜  •  ˜  û               „    €    ÷               "  '  ˝!  '  Ï               ¸#  9$  Ù#  9$  ¸               %'  5)  '  5)              Ç™)  d/  ¢)  d/  (            Ç =+  ^/  5+  ^/  6              -  Ã-  	-  Ã-  D  #            ƒ.  È.  º.  È.  M             Ç z/  ≤3  q/  ≤3  V            Ç X0  ¨3  P0  ¨3  _              ’0  ∞1  Õ0  ∞1  c  #          Ç À3  ÔE  ¬3  ÔE  x            Ç 5  ÈE  5  ÈE  Ö               ß9  ;  û9  ;  Æ              ˆ;  >  Ì;  >  ø              ˜>  AB  Ó>  AB  ”              ÉC  ñE  zC  ñE              5°›€2`0∞rçÜ3K      g¯ﬁ˚g¯ﬁ˚Hıg¯Âw   V    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/grid.inlinedit.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:08:01 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|82235291-2a54-4456-001f-25c6a0363f3d|
+Accept-Ranges: bytes
+ETag: W/"17942-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 17942
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:08:01 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|82235291-2a54-4456-001f-25c6a0363f3d|
+Accept-Ranges: bytes
+ETag: W/"17942-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 17942
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=99
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 192 net-response-time-onstop 192 alt-data 1;17942,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  ·

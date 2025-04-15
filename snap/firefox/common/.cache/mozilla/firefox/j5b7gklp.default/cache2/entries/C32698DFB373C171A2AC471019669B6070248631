@@ -1,0 +1,1448 @@
+//** Smooth Navigational Menu- By Dynamic Drive DHTML code library: http://www.dynamicdrive.com
+//** Script Download/ instructions page: http://www.dynamicdrive.com/dynamicindex1/ddlevelsmenu/
+//** Menu created: Nov 12, 2008
+
+//** Dec 12th, 08" (v1.01): Fixed Shadow issue when multiple LIs within the same UL (level) contain sub menus: http://www.dynamicdrive.com/forums/showthread.php?t=39177&highlight=smooth
+
+//** Feb 11th, 09" (v1.02): The currently active main menu item (LI A) now gets a CSS class of ".selected", including sub menu items.
+
+//** May 1st, 09" (v1.3):
+//** 1) Now supports vertical (side bar) menu mode- set "orientation" to 'v'
+//** 2) In IE6, shadows are now always disabled
+
+//** July 27th, 09" (v1.31): Fixed bug so shadows can be disabled if desired.
+//** Feb 2nd, 10" (v1.4): Adds ability to specify delay before sub menus appear and disappear, respectively. See showhidedelay variable below
+
+//** Dec 17th, 10" (v1.5): Updated menu shadow to use CSS3 box shadows when the browser is FF3.5+, IE9+, Opera9.5+, or Safari3+/Chrome. Only .js file changed.
+
+//** Jun 28th, 2012: Unofficial update adds optional hover images for down and right arrows in the format: filename_over.ext
+//** These must be present for whichever or both of the arrow(s) are used and will preload.
+
+//** Dec 23rd, 2012 Unofficial update to fixed configurable z-index, add method option to init "toggle" which activates on click or "hover" 
+//** which activates on mouse over/out - defaults to "toggle" (click activation), with detection of touch devices to activate on click for them.
+//** Add option for when there are two or more menus using "toggle" activation, whether or not all previously opened menus collapse
+//** on new menu activation, or just those within that specific menu
+//** See: http://www.dynamicdrive.com/forums/showthread.php?72449-PLEASE-HELP-with-Smooth-Navigational-Menu-(v1-51)&p=288466#post288466
+
+//** Feb 7th, 2013 Unofficial update change fixed configurable z-index back to graduated for cases of main UL wrapping. Update off menu click detection in
+//** ipad/iphone to touchstart because document click wasn't registering. see: http://www.dynamicdrive.com/forums/showthread.php?72825
+
+//** Feb 14th, 2013 Add window.ontouchstart to means tests for detecting touch browsers - thanks DD!
+//** Feb 15th, 2013 Add 'ontouchstart' in window and 'ontouchstart' in document.documentElement to means tests for detecting touch browsers - thanks DD!
+
+//** Feb 20th, 2013 correct for IE 9+ sometimes adding a pixel to the offsetHeight of the top level trigger for horizontal menus
+//** Feb 23rd, 2013 move CSS3 shadow adjustment for IE 9+ to the script, add resize event for all browsers to reposition open toggle 
+//** menus and shadows in window if they would have gone to a different position at the new window dimensions
+//** Feb 25th, 2013 (v2.0) All unofficial updates by John merged into official and now called v2.0. Changed "method" option's default value to "hover"
+//** May 14th, 2013 (v2.1) Adds class 'repositioned' to menus moved due to being too close to the browser's right edge
+//** May 30th, 2013 (v2.1) Change from version sniffing to means testing for jQuery versions which require added code for click toggle event handling
+//** Sept 15th, 2013 add workaround for false positives for touch on Chrome
+//** Sept 22nd, 2013 (v2.2) Add vertical repositioning if sub menu will not fit in the viewable vertical area. May be turned off by setting
+// 	repositionv: false,
+//** in the init. Sub menus that are vertically repositioned will have the class 'repositionedv' added to them.
+
+var ddsmoothmenu = {
+
+///////////////////////// Global Configuration Options: /////////////////////////
+
+//Specify full URL to down and right arrow images (23 is padding-right for top level LIs with drop downs, 6 is for vertical top level items with fly outs):
+arrowimages: {down:['downarrowclass', 'img/header-nav-arrow-down-white.gif', 23], right:['rightarrowclass', 'img/header-nav-arrow-right-white.gif', 6]},
+transition: {overtime:300, outtime:300}, //duration of slide in/ out animation, in milliseconds
+shadow: true, //enable shadow? (offsets now set in ddsmoothmenu.css stylesheet)
+showhidedelay: {showdelay: 100, hidedelay: 200}, //set delay in milliseconds before sub menus appear and disappear, respectively
+zindexvalue: 1000, //set z-index value for menus
+closeonnonmenuclick: true, //when clicking outside of any "toggle" method menu, should all "toggle" menus close? 
+closeonmouseout: false, //when leaving a "toggle" menu, should all "toggle" menus close? Will not work on touchscreen
+
+/////////////////////// End Global Configuration Options ////////////////////////
+
+overarrowre: /(?=\.(gif|jpg|jpeg|png|bmp))/i,
+overarrowaddtofilename: '_over',
+detecttouch: !!('ontouchstart' in window) || !!('ontouchstart' in document.documentElement) || !!window.ontouchstart || (!!window.Touch && !!window.Touch.length) || !!window.onmsgesturechange || (window.DocumentTouch && window.document instanceof window.DocumentTouch),
+detectwebkit: navigator.userAgent.toLowerCase().indexOf("applewebkit") > -1, //detect WebKit browsers (Safari, Chrome etc)
+idevice: /ipad|iphone/i.test(navigator.userAgent),
+detectie6: (function(){var ie; return (ie = /MSIE (\d+)/.exec(navigator.userAgent)) && ie[1] < 7;})(),
+detectie9: (function(){var ie; return (ie = /MSIE (\d+)/.exec(navigator.userAgent)) && ie[1] > 8;})(),
+ie9shadow: function(){},
+css3support: typeof document.documentElement.style.boxShadow === 'string' || (!document.all && document.querySelector), //detect browsers that support CSS3 box shadows (ie9+ or FF3.5+, Safari3+, Chrome etc)
+prevobjs: [], menus: null,
+
+executelink: function($, prevobjs, e){
+	var prevscount = prevobjs.length, link = e.target;
+	while(--prevscount > -1){
+		if(prevobjs[prevscount] === this){
+			prevobjs.splice(prevscount, 1);
+			if(link.href !== ddsmoothmenu.emptyhash && link.href && $(link).is('a') && !$(link).children('span.' + ddsmoothmenu.arrowimages.down[0] +', span.' + ddsmoothmenu.arrowimages.right[0]).length){
+				if(link.target && link.target !== '_self'){
+					window.open(link.href, link.target);
+				} else {
+					window.location.href = link.href;
+				}
+				e.stopPropagation();
+			}
+		}
+	}
+},
+
+repositionv: function($subul, $link, newtop, winheight, doctop, method, menutop){
+	menutop = menutop || 0;
+	var topinc = 0, doclimit = winheight + doctop;
+	$subul.css({top: newtop, display: 'block'});
+	while($subul.offset().top < doctop) {
+		$subul.css({top: ++newtop});
+		++topinc;
+	}
+	if(!topinc && $link.offset().top + $link.outerHeight() < doclimit && $subul.data('height') + $subul.offset().top > doclimit){
+		$subul.css({top: doctop - $link.parents('ul').last().offset().top - $link.position().top});
+	}
+	method === 'toggle' && $subul.css({display: 'none'});
+	if(newtop !== menutop){$subul.addClass('repositionedv');}
+	return [topinc, newtop];
+},
+
+updateprev: function($, prevobjs, $curobj){
+	var prevscount = prevobjs.length, prevobj, $indexobj = $curobj.parents().add(this);
+	while(--prevscount > -1){
+		if($indexobj.index((prevobj = prevobjs[prevscount])) < 0){
+			$(prevobj).trigger('click', [1]);
+			prevobjs.splice(prevscount, 1);
+		}
+	}
+	prevobjs.push(this);
+},
+
+subulpreventemptyclose: function(e){
+	var link = e.target;
+	if(link.href === ddsmoothmenu.emptyhash && $(link).parent('li').find('ul').length < 1){
+		e.preventDefault();
+		e.stopPropagation();
+	}
+},
+
+getajaxmenu: function($, setting, nobuild){ //function to fetch external page containing the panel DIVs
+	var $menucontainer=$('#'+setting.contentsource[0]); //reference empty div on page that will hold menu
+	$menucontainer.html("Loading Menu...");
+	$.ajax({
+		url: setting.contentsource[1], //path to external menu file
+		async: true,
+		error: function(ajaxrequest){
+			$menucontainer.html('Error fetching content. Server Response: '+ajaxrequest.responseText);
+		},
+		success: function(content){
+			$menucontainer.html(content);
+			!!!nobuild && ddsmoothmenu.buildmenu($, setting);
+		}
+	});
+},
+
+closeall: function(e){
+	var smoothmenu = ddsmoothmenu, prevscount;
+	if(!smoothmenu.globaltrackopen){return;}
+	if(e.type === 'mouseleave' || ((e.type === 'click' || e.type === 'touchstart') && smoothmenu.menus.index(e.target) < 0)){
+		prevscount = smoothmenu.prevobjs.length;
+		while(--prevscount > -1){
+			$(smoothmenu.prevobjs[prevscount]).trigger('click');
+			smoothmenu.prevobjs.splice(prevscount, 1);
+		}
+	}
+},
+
+emptyhash: $('<a href="#"></a>').get(0).href,
+
+buildmenu: function($, setting){
+	var smoothmenu = ddsmoothmenu;
+	smoothmenu.globaltrackopen = smoothmenu.closeonnonmenuclick || smoothmenu.closeonmouseout;
+	var zsub = 0; //subtractor to be incremented so that each top level menu can be covered by previous one's drop downs
+	var prevobjs = smoothmenu.globaltrackopen? smoothmenu.prevobjs : [];
+	var $mainparent = $("#"+setting.mainmenuid).removeClass("ddsmoothmenu ddsmoothmenu-v").addClass(setting.classname || "ddsmoothmenu");
+	setting.repositionv = setting.repositionv !== false;
+	var $mainmenu = $mainparent.find('>ul'); //reference main menu UL
+	var method = smoothmenu.detecttouch? 'toggle' : setting.method === 'toggle'? 'toggle' : 'hover';
+	var $topheaders = $mainmenu.find('>li>ul').parent();//has('ul');
+	var orient = setting.orientation!='v'? 'down' : 'right', $parentshadow = $(document.body);
+	$mainmenu.click(function(e){e.target.href === smoothmenu.emptyhash && e.preventDefault();});
+	if(method === 'toggle') {
+		if(smoothmenu.globaltrackopen){
+			smoothmenu.menus = smoothmenu.menus? smoothmenu.menus.add($mainmenu.add($mainmenu.find('*'))) : $mainmenu.add($mainmenu.find('*'));
+		}
+		if(smoothmenu.closeonnonmenuclick){
+			if(orient === 'down'){$mainparent.click(function(e){e.stopPropagation();});}
+			$(document).unbind('click.smoothmenu').bind('click.smoothmenu', smoothmenu.closeall);
+			if(smoothmenu.idevice){
+				document.removeEventListener('touchstart', smoothmenu.closeall, false);
+				document.addEventListener('touchstart', smoothmenu.closeall, false);
+			}
+		} else if (setting.closeonnonmenuclick){
+			if(orient === 'down'){$mainparent.click(function(e){e.stopPropagation();});}
+			$(document).bind('click.' + setting.mainmenuid, function(e){$mainmenu.find('li>a.selected').parent().trigger('click');});
+			if(smoothmenu.idevice){
+				document.addEventListener('touchstart', function(e){$mainmenu.find('li>a.selected').parent().trigger('click');}, false);
+			}
+		}
+		if(smoothmenu.closeonmouseout){
+			var $leaveobj = orient === 'down'? $mainparent : $mainmenu;
+			$leaveobj.bind('mouseleave.smoothmenu', smoothmenu.closeall);
+		} else if (setting.closeonmouseout){
+			var $leaveobj = orient === 'down'? $mainparent : $mainmenu;
+			$leaveobj.bind('mouseleave.smoothmenu', function(){$mainmenu.find('li>a.selected').parent().trigger('click');});
+		}
+		if(!$('style[title="ddsmoothmenushadowsnone"]').length){
+			$('head').append('<style title="ddsmoothmenushadowsnone" type="text/css">.ddsmoothmenushadowsnone{display:none!important;}</style>');
+		}
+		var shadowstimer;
+		$(window).bind('resize scroll', function(){
+			clearTimeout(shadowstimer);
+			var $selected = $mainmenu.find('li>a.selected').parent(),
+			$shadows = $('.ddshadow').addClass('ddsmoothmenushadowsnone');
+			$selected.eq(0).trigger('click');
+			$selected.trigger('click');
+			shadowstimer = setTimeout(function(){$shadows.removeClass('ddsmoothmenushadowsnone');}, 100);
+		});
+	}
+
+	$topheaders.each(function(){
+		var $curobj=$(this).css({zIndex: (setting.zindexvalue || smoothmenu.zindexvalue) + zsub--}); //reference current LI header
+		var $subul=$curobj.children('ul:eq(0)').css({display:'block'}).data('timers', {});
+		var $link = $curobj.children("a:eq(0)").css({paddingRight: smoothmenu.arrowimages[orient][2]}).append( //add arrow images
+			'<span style="display: block;" class="' + smoothmenu.arrowimages[orient][0] + '"></span>'
+		);
+		var dimensions = {
+			w	: $link.outerWidth(),
+			h	: $curobj.innerHeight(),
+			subulw	: $subul.outerWidth(),
+			subulh	: $subul.outerHeight()
+		};
+		var menutop = orient === 'down'? dimensions.h : 0;
+		$subul.css({top: menutop});
+		function restore(){$link.removeClass('selected');}
+		method === 'toggle' && $subul.click(smoothmenu.subulpreventemptyclose);
+		$curobj[method](
+			function(e){
+				if(!$curobj.data('headers')){
+					smoothmenu.buildsubheaders($, $subul.find('>li>ul').parent(), setting, method, prevobjs);
+					$curobj.data('headers', true).find('>ul').each(function(i, ul){
+						var $ul = $(ul);
+						$ul.data('height', $ul.outerHeight());
+					}).css({display:'none', visibility:'visible'});
+				}
+				method === 'toggle' && smoothmenu.updateprev.call(this, $, prevobjs, $curobj);
+				clearTimeout($subul.data('timers').hidetimer);
+				$link.addClass('selected');
+				$subul.data('timers').showtimer=setTimeout(function(){
+					var menuleft = orient === 'down'? 0 : dimensions.w;
+					var menumoved = menuleft, newtop, doctop, winheight, topinc = 0;
+					menuleft=($curobj.offset().left+menuleft+dimensions.subulw>$(window).width())? (orient === 'down'? -dimensions.subulw+dimensions.w : -dimensions.w) : menuleft; //calculate this sub menu's offsets from its parent
+					menumoved = menumoved !== menuleft;
+					$subul.css({top: menutop}).removeClass('repositionedv');
+					if(setting.repositionv && $link.offset().top + menutop + $subul.data('height') > (winheight = $(window).height()) + (doctop = $(document).scrollTop())){
+						newtop = (orient === 'down'? 0 : $link.outerHeight()) - $subul.data('height');
+						topinc = smoothmenu.repositionv($subul, $link, newtop, winheight, doctop, method, menutop)[0];
+					}
+					$subul.css({left:menuleft, width:dimensions.subulw}).stop(true, true).animate({height:'show',opacity:'show'}, smoothmenu.transition.overtime, function(){this.style.removeAttribute && this.style.removeAttribute('filter');});
+					if(menumoved){$subul.addClass('repositioned');} else {$subul.removeClass('repositioned');}
+					if (setting.shadow){
+						if(!$curobj.data('$shadow')){
+							$curobj.data('$shadow', $('<div></div>').addClass('ddshadow toplevelshadow').prependTo($parentshadow).css({zIndex: $curobj.css('zIndex')}));  //insert shadow DIV and set it to parent node for the next shadow div
+						}
+						smoothmenu.ie9shadow($curobj.data('$shadow'));
+						var offsets = $subul.offset();
+						var shadowleft = offsets.left;
+						var shadowtop = offsets.top;
+						$curobj.data('$shadow').css({overflow: 'visible', width:dimensions.subulw, left:shadowleft, top:shadowtop}).stop(true, true).animate({height:dimensions.subulh}, smoothmenu.transition.overtime);
+					}
+				}, smoothmenu.showhidedelay.showdelay);
+			},
+			function(e, speed){
+				var $shadow = $curobj.data('$shadow');
+				if(method === 'hover'){restore();}
+				else{smoothmenu.executelink.call(this, $, prevobjs, e);}
+				clearTimeout($subul.data('timers').showtimer);
+				$subul.data('timers').hidetimer=setTimeout(function(){
+					$subul.stop(true, true).animate({height:'hide', opacity:'hide'}, speed || smoothmenu.transition.outtime, function(){method === 'toggle' && restore();});
+					if ($shadow){
+						if (!smoothmenu.css3support && smoothmenu.detectwebkit){ //in WebKit browsers, set first child shadow's opacity to 0, as "overflow:hidden" doesn't work in them
+							$shadow.children('div:eq(0)').css({opacity:0});
+						}
+						$shadow.stop(true, true).animate({height:0}, speed || smoothmenu.transition.outtime, function(){if(method === 'toggle'){this.style.overflow = 'hidden';}});
+					}
+				}, smoothmenu.showhidedelay.hidedelay);
+			}
+		); //end hover/toggle
+	}); //end $topheaders.each()
+},
+
+buildsubheaders: function($, $headers, setting, method, prevobjs){
+	//setting.$mainparent.data('$headers').add($headers);
+	$headers.each(function(){ //loop through each LI header
+		var smoothmenu = ddsmoothmenu;
+		var $curobj=$(this).css({zIndex: $(this).parent('ul').css('z-index')}); //reference current LI header
+		var $subul=$curobj.children('ul:eq(0)').css({display:'block'}).data('timers', {}), $parentshadow;
+		method === 'toggle' && $subul.click(smoothmenu.subulpreventemptyclose);
+		var $link = $curobj.children("a:eq(0)").append( //add arrow images
+			'<span style="display: block;" class="' + smoothmenu.arrowimages['right'][0] + '"></span>'
+		);
+		var dimensions = {
+			w	: $link.outerWidth(),
+			subulw	: $subul.outerWidth(),
+			subulh	: $subul.outerHeight()
+		};
+		$subul.css({top: 0});
+		function restore(){$link.removeClass('selected');}
+		$curobj[method](
+			function(e){
+				if(!$curobj.data('headers')){
+					smoothmenu.buildsubheaders($, $subul.find('>li>ul').parent(), setting, method, prevobjs);
+					$curobj.data('headers', true).find('>ul').each(function(i, ul){
+						var $ul = $(ul);
+						$ul.data('height', $ul.height());
+					}).css({display:'none', visibility:'visible'});
+				}
+				method === 'toggle' && smoothmenu.updateprev.call(this, $, prevobjs, $curobj);
+				clearTimeout($subul.data('timers').hidetimer);
+				$link.addClass('selected');
+				$subul.data('timers').showtimer=setTimeout(function(){
+					var menuleft= dimensions.w;
+					var menumoved = menuleft, newtop, doctop, winheight, topinc = 0;
+					menuleft=($curobj.offset().left+menuleft+dimensions.subulw>$(window).width())? -dimensions.w : menuleft; //calculate this sub menu's offsets from its parent
+					menumoved = menumoved !== menuleft;
+					$subul.css({top: 0}).removeClass('repositionedv');
+					if(setting.repositionv && $link.offset().top + $subul.data('height') > (winheight = $(window).height()) + (doctop = $(document).scrollTop())){
+						newtop = $link.outerHeight() - $subul.data('height');
+						topinc = smoothmenu.repositionv($subul, $link, newtop, winheight, doctop, method);
+						newtop = topinc[1];
+						topinc = topinc[0];
+					}
+					$subul.css({left:menuleft, width:dimensions.subulw}).stop(true, true).animate({height:'show',opacity:'show'}, smoothmenu.transition.overtime, function(){this.style.removeAttribute && this.style.removeAttribute('filter');});
+					if(menumoved){$subul.addClass('repositioned');} else {$subul.removeClass('repositioned');}
+					if (setting.shadow){
+						if(!$curobj.data('$shadow')){
+							$parentshadow = $curobj.parents("li:eq(0)").data('$shadow');
+							$curobj.data('$shadow', $('<div></div>').addClass('ddshadow').prependTo($parentshadow).css({zIndex: $parentshadow.css('z-index')}));  //insert shadow DIV and set it to parent node for the next shadow div
+						}
+						var offsets = $subul.offset();
+						var shadowleft = menuleft;
+						var shadowtop = $curobj.position().top - (newtop? $subul.data('height') - $link.outerHeight() - topinc : 0);
+						if (smoothmenu.detectwebkit && !smoothmenu.css3support){ //in WebKit browsers, restore shadow's opacity to full
+							$curobj.data('$shadow').css({opacity:1});
+						}
+						$curobj.data('$shadow').css({overflow: 'visible', width:dimensions.subulw, left:shadowleft, top:shadowtop}).stop(true, true).animate({height:dimensions.subulh}, smoothmenu.transition.overtime);
+					}
+				}, smoothmenu.showhidedelay.showdelay);
+			},
+			function(e, speed){
+				var $shadow = $curobj.data('$shadow');
+				if(method === 'hover'){restore();}
+				else{smoothmenu.executelink.call(this, $, prevobjs, e);}
+				clearTimeout($subul.data('timers').showtimer);
+				$subul.data('timers').hidetimer=setTimeout(function(){
+					$subul.stop(true, true).animate({height:'hide', opacity:'hide'}, speed || smoothmenu.transition.outtime, function(){
+						method === 'toggle' && restore();
+					});
+					if ($shadow){
+						if (!smoothmenu.css3support && smoothmenu.detectwebkit){ //in WebKit browsers, set first child shadow's opacity to 0, as "overflow:hidden" doesn't work in them
+							$shadow.children('div:eq(0)').css({opacity:0});
+						}
+						$shadow.stop(true, true).animate({height:0}, speed || smoothmenu.transition.outtime, function(){if(method === 'toggle'){this.style.overflow = 'hidden';}});
+					}
+				}, smoothmenu.showhidedelay.hidedelay);
+			}
+		); //end hover/toggle for subheaders
+	}); //end $headers.each() for subheaders
+},
+
+init: function(setting){
+	if(this.detectie6 && parseFloat(jQuery.fn.jquery) > 1.3){
+		this.init = function(setting){
+			if (typeof setting.contentsource=="object"){ //if external ajax menu
+				jQuery(function($){ddsmoothmenu.getajaxmenu($, setting, 'nobuild');});
+			}
+			return false;
+		};
+		jQuery('link[href*="ddsmoothmenu"]').attr('disabled', true);
+		jQuery(function($){
+			alert('You Seriously Need to Update Your Browser!\n\nDynamic Drive Smooth Navigational Menu Showing Text Only Menu(s)\n\nDEVELOPER\'s NOTE: This script will run in IE 6 when using jQuery 1.3.2 or less,\nbut not real well.');
+				$('link[href*="ddsmoothmenu"]').attr('disabled', true);
+		});
+		return this.init(setting);
+	}
+	var mainmenuid = '#' + setting.mainmenuid, right, down, stylestring = ['</style>\n'], stylesleft = setting.arrowswap? 4 : 2;
+	function addstyles(){
+		if(stylesleft){return;}
+		if (typeof setting.customtheme=="object" && setting.customtheme.length==2){ //override default menu colors (default/hover) with custom set?
+			var mainselector=(setting.orientation=="v")? mainmenuid : mainmenuid+', '+mainmenuid;
+			stylestring.push([mainselector,' ul li a {background:',setting.customtheme[0],';}\n',
+				mainmenuid,' ul li a:hover {background:',setting.customtheme[1],';}'].join(''));
+		}
+		stylestring.push('\n<style type="text/css">');
+		stylestring.reverse();
+		jQuery('head').append(stylestring.join('\n'));
+	}
+	if(setting.arrowswap){
+		right = ddsmoothmenu.arrowimages.right[1].replace(ddsmoothmenu.overarrowre, ddsmoothmenu.overarrowaddtofilename);
+		down = ddsmoothmenu.arrowimages.down[1].replace(ddsmoothmenu.overarrowre, ddsmoothmenu.overarrowaddtofilename);
+		jQuery(new Image()).bind('load error', function(e){
+			setting.rightswap = e.type === 'load';
+			if(setting.rightswap){
+				stylestring.push([mainmenuid, ' ul li a:hover .', ddsmoothmenu.arrowimages.right[0], ', ',
+				mainmenuid, ' ul li a.selected .', ddsmoothmenu.arrowimages.right[0],
+				' { background-image: url(', this.src, ');}'].join(''));
+			}
+			--stylesleft;
+			addstyles();
+		}).attr('src', right);
+		jQuery(new Image()).bind('load error', function(e){
+			setting.downswap = e.type === 'load';
+			if(setting.downswap){
+				stylestring.push([mainmenuid, ' ul li a:hover .', ddsmoothmenu.arrowimages.down[0], ', ',
+				mainmenuid, ' ul li a.selected .', ddsmoothmenu.arrowimages.down[0],
+				' { background-image: url(', this.src, ');}'].join(''));
+			}
+			--stylesleft;
+			addstyles();
+		}).attr('src', down);
+	}
+	jQuery(new Image()).bind('load error', function(e){
+		if(e.type === 'load'){
+			stylestring.push([mainmenuid+' ul li a .', ddsmoothmenu.arrowimages.right[0],' { background: url(', this.src, ') no-repeat;width:', this.width,'px;height:', this.height, 'px;}'].join(''));
+		}
+		--stylesleft;
+		addstyles();
+	}).attr('src', ddsmoothmenu.arrowimages.right[1]);
+	jQuery(new Image()).bind('load error', function(e){
+		if(e.type === 'load'){
+			stylestring.push([mainmenuid+' ul li a .', ddsmoothmenu.arrowimages.down[0],' { background: url(', this.src, ') no-repeat;width:', this.width,'px;height:', this.height, 'px;}'].join(''));
+		}
+		--stylesleft;
+		addstyles();
+	}).attr('src', ddsmoothmenu.arrowimages.down[1]);
+	setting.shadow = this.detectie6 && (setting.method === 'hover' || setting.orientation === 'v')? false : setting.shadow || this.shadow; //in IE6, always disable shadow except for horizontal toggle menus
+	jQuery(document).ready(function($){ //ajax menu?
+		if (setting.shadow && ddsmoothmenu.css3support){$('body').addClass('ddcss3support');}
+		if (typeof setting.contentsource=="object"){ //if external ajax menu
+			ddsmoothmenu.getajaxmenu($, setting);
+		}
+		else{ //else if markup menu
+			ddsmoothmenu.buildmenu($, setting);
+		}
+	});
+}
+}; //end ddsmoothmenu variable
+
+
+// Patch for jQuery 1.9+ which lack click toggle (deprecated in 1.8, removed in 1.9)
+// Will not run if using another patch like jQuery Migrate, which also takes care of this
+if(
+	(function($){
+		var clicktogglable = false;
+		try {
+			$('<a href="#"></a>').toggle(function(){}, function(){clicktogglable = true;}).trigger('click').trigger('click');
+		} catch(e){}
+		return !clicktogglable;
+	})(jQuery)
+){
+	(function(){
+		var toggleDisp = jQuery.fn.toggle; // There's an animation/css method named .toggle() that toggles display. Save a reference to it.
+		jQuery.extend(jQuery.fn, {
+			toggle: function( fn, fn2 ) {
+				// The method fired depends on the arguments passed.
+				if ( !jQuery.isFunction( fn ) || !jQuery.isFunction( fn2 ) ) {
+					return toggleDisp.apply(this, arguments);
+				}
+				// Save reference to arguments for access in closure
+				var args = arguments, guid = fn.guid || jQuery.guid++,
+					i = 0,
+					toggler = function( event ) {
+						// Figure out which function to execute
+						var lastToggle = ( jQuery._data( this, "lastToggle" + fn.guid ) || 0 ) % i;
+						jQuery._data( this, "lastToggle" + fn.guid, lastToggle + 1 );
+	
+						// Make sure that clicks stop
+						event.preventDefault();
+	
+						// and execute the function
+						return args[ lastToggle ].apply( this, arguments ) || false;
+					};
+
+				// link all the functions, so any of them can unbind this click handler
+				toggler.guid = guid;
+				while ( i < args.length ) {
+					args[ i++ ].guid = guid;
+				}
+
+				return this.click( toggler );
+			}
+		});
+	})();
+}
+
+/* TECHNICAL NOTE: To overcome an intermittent layout bug in IE 9+, the script will change margin top and left for the shadows to 
+   1px less than their computed values, and the first two values for the box-shadow property will be changed to 1px larger than 
+   computed, ex: -1px top and left margins and 6px 6px 5px #aaa box-shadow results in what appears to be a 5px box-shadow. 
+   Other browsers skip this step and it shouldn't affect you in most cases. In some rare cases it will result in 
+   slightly narrower (by 1px) box shadows for IE 9+ on one or more of the drop downs. Without this, sometimes 
+   the shadows could be 1px beyond their drop down resulting in a gap. This is the first of the two patches below. 
+   and also relates to the MS CSSOM which uses decimal fractions of pixels for layout while only reporting rounded values. 
+   There appears to be no computedStyle workaround for this one. */
+
+//Scripted CSS Patch for IE 9+ intermittent mis-rendering of box-shadow elements (see above TECHNICAL NOTE for more info)
+//And jQuery Patch for IE 9+ CSSOM re: offset Width and Height and re: getBoundingClientRect(). Both run only in IE 9 and later.
+//IE 9 + uses decimal fractions of pixels internally for layout but only reports rounded values using the offset and getBounding methods.
+//These are sometimes rounded inconsistently. This second patch gets the decimal values directly from computedStyle.
+if(ddsmoothmenu.detectie9){
+	(function($){ //begin Scripted CSS Patch
+		function incdec(v, how){return parseInt(v) + how + 'px';}
+		ddsmoothmenu.ie9shadow = function($elem){ //runs once
+			var getter = document.defaultView.getComputedStyle($elem.get(0), null),
+			curshadow = getter.getPropertyValue('box-shadow').split(' '),
+			curmargin = {top: getter.getPropertyValue('margin-top'), left: getter.getPropertyValue('margin-left')};
+			$('head').append(['\n<style title="ie9shadow" type="text/css">',
+			'.ddcss3support .ddshadow {',
+			'\tbox-shadow: ' + incdec(curshadow[0], 1) + ' ' + incdec(curshadow[1], 1) + ' ' + curshadow[2] + ' ' + curshadow[3] + ';',
+			'}', '.ddcss3support .ddshadow.toplevelshadow {',
+			'\topacity: ' + ($('.ddcss3support .ddshadow').css('opacity') - 0.1) + ';',
+			'\tmargin-top: ' + incdec(curmargin.top, -1) + ';',
+			'\tmargin-left: ' + incdec(curmargin.left, -1) + ';', '}',
+			'</style>\n'].join('\n'));
+			ddsmoothmenu.ie9shadow = function(){}; //becomes empty function after running once
+		}; //end Scripted CSS Patch
+		var jqheight = $.fn.height, jqwidth = $.fn.width; //begin jQuery Patch for IE 9+ .height() and .width()
+		$.extend($.fn, {
+			height: function(){
+				var obj = this.get(0);
+				if(this.length < 1 || arguments.length || obj === window || obj === document){
+					return jqheight.apply(this, arguments);
+				}
+				return parseFloat(document.defaultView.getComputedStyle(obj, null).getPropertyValue('height'));
+			},
+			innerHeight: function(){
+				if(this.length < 1){return null;}
+				var val = this.height(), obj = this.get(0), getter = document.defaultView.getComputedStyle(obj, null);
+				val += parseInt(getter.getPropertyValue('padding-top'));
+				val += parseInt(getter.getPropertyValue('padding-bottom'));
+				return val;
+			},
+			outerHeight: function(bool){
+				if(this.length < 1){return null;}
+				var val = this.innerHeight(), obj = this.get(0), getter = document.defaultView.getComputedStyle(obj, null);
+				val += parseInt(getter.getPropertyValue('border-top-width'));
+				val += parseInt(getter.getPropertyValue('border-bottom-width'));
+				if(bool){
+					val += parseInt(getter.getPropertyValue('margin-top'));
+					val += parseInt(getter.getPropertyValue('margin-bottom'));
+				}
+				return val;
+			},
+			width: function(){
+				var obj = this.get(0);
+				if(this.length < 1 || arguments.length || obj === window || obj === document){
+					return jqwidth.apply(this, arguments);
+				}
+				return parseFloat(document.defaultView.getComputedStyle(obj, null).getPropertyValue('width'));
+			},
+			innerWidth: function(){
+				if(this.length < 1){return null;}
+				var val = this.width(), obj = this.get(0), getter = document.defaultView.getComputedStyle(obj, null);
+				val += parseInt(getter.getPropertyValue('padding-right'));
+				val += parseInt(getter.getPropertyValue('padding-left'));
+				return val;
+			},
+			outerWidth: function(bool){
+				if(this.length < 1){return null;}
+				var val = this.innerWidth(), obj = this.get(0), getter = document.defaultView.getComputedStyle(obj, null);
+				val += parseInt(getter.getPropertyValue('border-right-width'));
+				val += parseInt(getter.getPropertyValue('border-left-width'));
+				if(bool){
+					val += parseInt(getter.getPropertyValue('margin-right'));
+					val += parseInt(getter.getPropertyValue('margin-left'));
+				}
+				return val;
+			}
+		}); //end jQuery Patch for IE 9+ .height() and .width()
+	})(jQuery);
+}        L x ˇˇ     20250331133932-8l/ _xz*   https://erp.cmrit.ac.in/js/ddsmoothmenu.js      -v  //** Smooth Navigational Menu- By Dynamic Drive DHTML code library: http://www.dynamicdrive.com
+//** Script Download/ instructions page: http://www.dynamicdrive.com/dynamicindex1/ddlevelsmenu/
+//** Menu created: Nov 12, 2008
+
+//** Dec 12th, 08" (v1.01): Fixed Shadow issue when multiple LIs within the same UL (level) contain sub menus: http://www.dynamicdrive.com/forums/showthread.php?t=39177&highlight=smooth
+
+//** Feb 11th, 09" (v1.02): The currently active main menu item (LI A) now gets a CSS class of ".selected", including sub menu items.
+
+//** May 1st, 09" (v1.3):
+//** 1) Now supports vertical (side bar) menu mode- set "orientation" to 'v'
+//** 2) In IE6, shadows are now always disabled
+
+//** July 27th, 09" (v1.31): Fixed bug so shadows can be disabled if desired.
+//** Feb 2nd, 10" (v1.4): Adds ability to specify delay before sub menus appear and disappear, respectively. See showhidedelay variable below
+
+//** Dec 17th, 10" (v1.5): Updated menu shadow to use CSS3 box shadows when the browser is FF3.5+, IE9+, Opera9.5+, or Safari3+/Chrome. Only .js file changed.
+
+//** Jun 28th, 2012: Unofficial update adds optional hover images for down and right arrows in the format: filename_over.ext
+//** These must be present for whichever or both of the arrow(s) are used and will preload.
+
+//** Dec 23rd, 2012 Unofficial update to fixed configurable z-index, add method option to init "toggle" which activates on click or "hover" 
+//** which activates on mouse over/out - defaults to "toggle" (click activation), with detection of touch devices to activate on click for them.
+//** Add option for when there are two or more menus using "toggle" activation, whether or not all previously opened menus collapse
+//** on new menu activation, or just those within that specific menu
+//** See: http://www.dynamicdrive.com/forums/showthread.php?72449-PLEASE-HELP-with-Smooth-Navigational-Menu-(v1-51)&p=288466#post288466
+
+//** Feb 7th, 2013 Unofficial update change fixed configurable z-index back to graduated for cases of main UL wrapping. Update off menu click detection in
+//** ipad/iphone to touchstart because document click wasn't registering. see: http://www.dynamicdrive.com/forums/showthread.php?72825
+
+//** Feb 14th, 2013 Add window.ontouchstart to means tests for detecting touch browsers - thanks DD!
+//** Feb 15th, 2013 Add 'ontouchstart' in window and 'ontouchstart' in document.documentElement to means tests for detecting touch browsers - thanks DD!
+
+//** Feb 20th, 2013 correct for IE 9+ sometimes adding a pixel to the offsetHeight of the top level trigger for horizontal menus
+//** Feb 23rd, 2013 move CSS3 shadow adjustment for IE 9+ to the script, add resize event for all browsers to reposition open toggle 
+//** menus and shadows in window if they would have gone to a different position at the new window dimensions
+//** Feb 25th, 2013 (v2.0) All unofficial updates by John merged into official and now called v2.0. Changed "method" option's default value to "hover"
+//** May 14th, 2013 (v2.1) Adds class 'repositioned' to menus moved due to being too close to the browser's right edge
+//** May 30th, 2013 (v2.1) Change from version sniffing to means testing for jQuery versions which require added code for click toggle event handling
+//** Sept 15th, 2013 add workaround for false positives for touch on Chrome
+//** Sept 22nd, 2013 (v2.2) Add vertical repositioning if sub menu will not fit in the viewable vertical area. May be turned off by setting
+// 	repositionv: false,
+//** in the init. Sub menus that are vertically repositioned will have the class 'repositionedv' added to them.
+
+var ddsmoothmenu = {
+
+///////////////////////// Global Configuration Options: /////////////////////////
+
+//Specify full URL to down and right arrow images (23 is padding-right for top level LIs with drop downs, 6 is for vertical top level items with fly outs):
+arrowimages: {down:['downarrowclass', 'img/header-nav-arrow-down-white.gif', 23], right:['rightarrowclass', 'img/header-nav-arrow-right-white.gif', 6]},
+transition: {overtime:300, outtime:300}, //duration of slide in/ out animation, in milliseconds
+shadow: true, //enable shadow? (offsets now set in ddsmoothmenu.css stylesheet)
+showhidedelay: {showdelay: 100, hidedelay: 200}, //set delay in milliseconds before sub menus appear and disappear, respectively
+zindexvalue: 1000, //set z-index value for menus
+closeonnonmenuclick: true, //when clicking outside of any "toggle" method menu, should all "toggle" menus close? 
+closeonmouseout: false, //when leaving a "toggle" menu, should all "toggle" menus close? Will not work on touchscreen
+
+/////////////////////// End Global Configuration Options ////////////////////////
+
+overarrowre: /(?=\.(gif|jpg|jpeg|png|bmp))/i,
+overarrowaddtofilename: '_over',
+detecttouch: !!('ontouchstart' in window) || !!('ontouchstart' in document.documentElement) || !!window.ontouchstart || (!!window.Touch && !!window.Touch.length) || !!window.onmsgesturechange || (window.DocumentTouch && window.document instanceof window.DocumentTouch),
+detectwebkit: navigator.userAgent.toLowerCase().indexOf("applewebkit") > -1, //detect WebKit browsers (Safari, Chrome etc)
+idevice: /ipad|iphone/i.test(navigator.userAgent),
+detectie6: (function(){var ie; return (ie = /MSIE (\d+)/.exec(navigator.userAgent)) && ie[1] < 7;})(),
+detectie9: (function(){var ie; return (ie = /MSIE (\d+)/.exec(navigator.userAgent)) && ie[1] > 8;})(),
+ie9shadow: function(){},
+css3support: typeof document.documentElement.style.boxShadow === 'string' || (!document.all && document.querySelector), //detect browsers that support CSS3 box shadows (ie9+ or FF3.5+, Safari3+, Chrome etc)
+prevobjs: [], menus: null,
+
+executelink: function($, prevobjs, e){
+	var prevscount = prevobjs.length, link = e.target;
+	while(--prevscount > -1){
+		if(prevobjs[prevscount] === this){
+			prevobjs.splice(prevscount, 1);
+			if(link.href !== ddsmoothmenu.emptyhash && link.href && $(link).is('a') && !$(link).children('span.' + ddsmoothmenu.arrowimages.down[0] +', span.' + ddsmoothmenu.arrowimages.right[0]).length){
+				if(link.target && link.target !== '_self'){
+					window.open(link.href, link.target);
+				} else {
+					window.location.href = link.href;
+				}
+				e.stopPropagation();
+			}
+		}
+	}
+},
+
+repositionv: function($subul, $link, newtop, winheight, doctop, method, menutop){
+	menutop = menutop || 0;
+	var topinc = 0, doclimit = winheight + doctop;
+	$subul.css({top: newtop, display: 'block'});
+	while($subul.offset().top < doctop) {
+		$subul.css({top: ++newtop});
+		++topinc;
+	}
+	if(!topinc && $link.offset().top + $link.outerHeight() < doclimit && $subul.data('height') + $subul.offset().top > doclimit){
+		$subul.css({top: doctop - $link.parents('ul').last().offset().top - $link.position().top});
+	}
+	method === 'toggle' && $subul.css({display: 'none'});
+	if(newtop !== menutop){$subul.addClass('repositionedv');}
+	return [topinc, newtop];
+},
+
+updateprev: function($, prevobjs, $curobj){
+	var prevscount = prevobjs.length, prevobj, $indexobj = $curobj.parents().add(this);
+	while(--prevscount > -1){
+		if($indexobj.index((prevobj = prevobjs[prevscount])) < 0){
+			$(prevobj).trigger('click', [1]);
+			prevobjs.splice(prevscount, 1);
+		}
+	}
+	prevobjs.push(this);
+},
+
+subulpreventemptyclose: function(e){
+	var link = e.target;
+	if(link.href === ddsmoothmenu.emptyhash && $(link).parent('li').find('ul').length < 1){
+		e.preventDefault();
+		e.stopPropagation();
+	}
+},
+
+getajaxmenu: function($, setting, nobuild){ //function to fetch external page containing the panel DIVs
+	var $menucontainer=$('#'+setting.contentsource[0]); //reference empty div on page that will hold menu
+	$menucontainer.html("Loading Menu...");
+	$.ajax({
+		url: setting.contentsource[1], //path to external menu file
+		async: true,
+		error: function(ajaxrequest){
+			$menucontainer.html('Error fetching content. Server Response: '+ajaxrequest.responseText);
+		},
+		success: function(content){
+			$menucontainer.html(content);
+			!!!nobuild && ddsmoothmenu.buildmenu($, setting);
+		}
+	});
+},
+
+closeall: function(e){
+	var smoothmenu = ddsmoothmenu, prevscount;
+	if(!smoothmenu.globaltrackopen){return;}
+	if(e.type === 'mouseleave' || ((e.type === 'click' || e.type === 'touchstart') && smoothmenu.menus.index(e.target) < 0)){
+		prevscount = smoothmenu.prevobjs.length;
+		while(--prevscount > -1){
+			$(smoothmenu.prevobjs[prevscount]).trigger('click');
+			smoothmenu.prevobjs.splice(prevscount, 1);
+		}
+	}
+},
+
+emptyhash: $('<a href="#"></a>').get(0).href,
+
+buildmenu: function($, setting){
+	var smoothmenu = ddsmoothmenu;
+	smoothmenu.globaltrackopen = smoothmenu.closeonnonmenuclick || smoothmenu.closeonmouseout;
+	var zsub = 0; //subtractor to be incremented so that each top level menu can be covered by previous one's drop downs
+	var prevobjs = smoothmenu.globaltrackopen? smoothmenu.prevobjs : [];
+	var $mainparent = $("#"+setting.mainmenuid).removeClass("ddsmoothmenu ddsmoothmenu-v").addClass(setting.classname || "ddsmoothmenu");
+	setting.repositionv = setting.repositionv !== false;
+	var $mainmenu = $mainparent.find('>ul'); //reference main menu UL
+	var method = smoothmenu.detecttouch? 'toggle' : setting.method === 'toggle'? 'toggle' : 'hover';
+	var $topheaders = $mainmenu.find('>li>ul').parent();//has('ul');
+	var orient = setting.orientation!='v'? 'down' : 'right', $parentshadow = $(document.body);
+	$mainmenu.click(function(e){e.target.href === smoothmenu.emptyhash && e.preventDefault();});
+	if(method === 'toggle') {
+		if(smoothmenu.globaltrackopen){
+			smoothmenu.menus = smoothmenu.menus? smoothmenu.menus.add($mainmenu.add($mainmenu.find('*'))) : $mainmenu.add($mainmenu.find('*'));
+		}
+		if(smoothmenu.closeonnonmenuclick){
+			if(orient === 'down'){$mainparent.click(function(e){e.stopPropagation();});}
+			$(document).unbind('click.smoothmenu').bind('click.smoothmenu', smoothmenu.closeall);
+			if(smoothmenu.idevice){
+				document.removeEventListener('touchstart', smoothmenu.closeall, false);
+				document.addEventListener('touchstart', smoothmenu.closeall, false);
+			}
+		} else if (setting.closeonnonmenuclick){
+			if(orient === 'down'){$mainparent.click(function(e){e.stopPropagation();});}
+			$(document).bind('click.' + setting.mainmenuid, function(e){$mainmenu.find('li>a.selected').parent().trigger('click');});
+			if(smoothmenu.idevice){
+				document.addEventListener('touchstart', function(e){$mainmenu.find('li>a.selected').parent().trigger('click');}, false);
+			}
+		}
+		if(smoothmenu.closeonmouseout){
+			var $leaveobj = orient === 'down'? $mainparent : $mainmenu;
+			$leaveobj.bind('mouseleave.smoothmenu', smoothmenu.closeall);
+		} else if (setting.closeonmouseout){
+			var $leaveobj = orient === 'down'? $mainparent : $mainmenu;
+			$leaveobj.bind('mouseleave.smoothmenu', function(){$mainmenu.find('li>a.selected').parent().trigger('click');});
+		}
+		if(!$('style[title="ddsmoothmenushadowsnone"]').length){
+			$('head').append('<style title="ddsmoothmenushadowsnone" type="text/css">.ddsmoothmenushadowsnone{display:none!important;}</style>');
+		}
+		var shadowstimer;
+		$(window).bind('resize scroll', function(){
+			clearTimeout(shadowstimer);
+			var $selected = $mainmenu.find('li>a.selected').parent(),
+			$shadows = $('.ddshadow').addClass('ddsmoothmenushadowsnone');
+			$selected.eq(0).trigger('click');
+			$selected.trigger('click');
+			shadowstimer = setTimeout(function(){$shadows.removeClass('ddsmoothmenushadowsnone');}, 100);
+		});
+	}
+
+	$topheaders.each(function(){
+		var $curobj=$(this).css({zIndex: (setting.zindexvalue || smoothmenu.zindexvalue) + zsub--}); //reference current LI header
+		var $subul=$curobj.children('ul:eq(0)').css({display:'block'}).data('timers', {});
+		var $link = $curobj.children("a:eq(0)").css({paddingRight: smoothmenu.arrowimages[orient][2]}).append( //add arrow images
+			'<span style="display: block;" class="' + smoothmenu.arrowimages[orient][0] + '"></span>'
+		);
+		var dimensions = {
+			w	: $link.outerWidth(),
+			h	: $curobj.innerHeight(),
+			subulw	: $subul.outerWidth(),
+			subulh	: $subul.outerHeight()
+		};
+		var menutop = orient === 'down'? dimensions.h : 0;
+		$subul.css({top: menutop});
+		function restore(){$link.removeClass('selected');}
+		method === 'toggle' && $subul.click(smoothmenu.subulpreventemptyclose);
+		$curobj[method](
+			function(e){
+				if(!$curobj.data('headers')){
+					smoothmenu.buildsubheaders($, $subul.find('>li>ul').parent(), setting, method, prevobjs);
+					$curobj.data('headers', true).find('>ul').each(function(i, ul){
+						var $ul = $(ul);
+						$ul.data('height', $ul.outerHeight());
+					}).css({display:'none', visibility:'visible'});
+				}
+				method === 'toggle' && smoothmenu.updateprev.call(this, $, prevobjs, $curobj);
+				clearTimeout($subul.data('timers').hidetimer);
+				$link.addClass('selected');
+				$subul.data('timers').showtimer=setTimeout(function(){
+					var menuleft = orient === 'down'? 0 : dimensions.w;
+					var menumoved = menuleft, newtop, doctop, winheight, topinc = 0;
+					menuleft=($curobj.offset().left+menuleft+dimensions.subulw>$(window).width())? (orient === 'down'? -dimensions.subulw+dimensions.w : -dimensions.w) : menuleft; //calculate this sub menu's offsets from its parent
+					menumoved = menumoved !== menuleft;
+					$subul.css({top: menutop}).removeClass('repositionedv');
+					if(setting.repositionv && $link.offset().top + menutop + $subul.data('height') > (winheight = $(window).height()) + (doctop = $(document).scrollTop())){
+						newtop = (orient === 'down'? 0 : $link.outerHeight()) - $subul.data('height');
+						topinc = smoothmenu.repositionv($subul, $link, newtop, winheight, doctop, method, menutop)[0];
+					}
+					$subul.css({left:menuleft, width:dimensions.subulw}).stop(true, true).animate({height:'show',opacity:'show'}, smoothmenu.transition.overtime, function(){this.style.removeAttribute && this.style.removeAttribute('filter');});
+					if(menumoved){$subul.addClass('repositioned');} else {$subul.removeClass('repositioned');}
+					if (setting.shadow){
+						if(!$curobj.data('$shadow')){
+							$curobj.data('$shadow', $('<div></div>').addClass('ddshadow toplevelshadow').prependTo($parentshadow).css({zIndex: $curobj.css('zIndex')}));  //insert shadow DIV and set it to parent node for the next shadow div
+						}
+						smoothmenu.ie9shadow($curobj.data('$shadow'));
+						var offsets = $subul.offset();
+						var shadowleft = offsets.left;
+						var shadowtop = offsets.top;
+						$curobj.data('$shadow').css({overflow: 'visible', width:dimensions.subulw, left:shadowleft, top:shadowtop}).stop(true, true).animate({height:dimensions.subulh}, smoothmenu.transition.overtime);
+					}
+				}, smoothmenu.showhidedelay.showdelay);
+			},
+			function(e, speed){
+				var $shadow = $curobj.data('$shadow');
+				if(method === 'hover'){restore();}
+				else{smoothmenu.executelink.call(this, $, prevobjs, e);}
+				clearTimeout($subul.data('timers').showtimer);
+				$subul.data('timers').hidetimer=setTimeout(function(){
+					$subul.stop(true, true).animate({height:'hide', opacity:'hide'}, speed || smoothmenu.transition.outtime, function(){method === 'toggle' && restore();});
+					if ($shadow){
+						if (!smoothmenu.css3support && smoothmenu.detectwebkit){ //in WebKit browsers, set first child shadow's opacity to 0, as "overflow:hidden" doesn't work in them
+							$shadow.children('div:eq(0)').css({opacity:0});
+						}
+						$shadow.stop(true, true).animate({height:0}, speed || smoothmenu.transition.outtime, function(){if(method === 'toggle'){this.style.overflow = 'hidden';}});
+					}
+				}, smoothmenu.showhidedelay.hidedelay);
+			}
+		); //end hover/toggle
+	}); //end $topheaders.each()
+},
+
+buildsubheaders: function($, $headers, setting, method, prevobjs){
+	//setting.$mainparent.data('$headers').add($headers);
+	$headers.each(function(){ //loop through each LI header
+		var smoothmenu = ddsmoothmenu;
+		var $curobj=$(this).css({zIndex: $(this).parent('ul').css('z-index')}); //reference current LI header
+		var $subul=$curobj.children('ul:eq(0)').css({display:'block'}).data('timers', {}), $parentshadow;
+		method === 'toggle' && $subul.click(smoothmenu.subulpreventemptyclose);
+		var $link = $curobj.children("a:eq(0)").append( //add arrow images
+			'<span style="display: block;" class="' + smoothmenu.arrowimages['right'][0] + '"></span>'
+		);
+		var dimensions = {
+			w	: $link.outerWidth(),
+			subulw	: $subul.outerWidth(),
+			subulh	: $subul.outerHeight()
+		};
+		$subul.css({top: 0});
+		function restore(){$link.removeClass('selected');}
+		$curobj[method](
+			function(e){
+				if(!$curobj.data('headers')){
+					smoothmenu.buildsubheaders($, $subul.find('>li>ul').parent(), setting, method, prevobjs);
+					$curobj.data('headers', true).find('>ul').each(function(i, ul){
+						var $ul = $(ul);
+						$ul.data('height', $ul.height());
+					}).css({display:'none', visibility:'visible'});
+				}
+				method === 'toggle' && smoothmenu.updateprev.call(this, $, prevobjs, $curobj);
+				clearTimeout($subul.data('timers').hidetimer);
+				$link.addClass('selected');
+				$subul.data('timers').showtimer=setTimeout(function(){
+					var menuleft= dimensions.w;
+					var menumoved = menuleft, newtop, doctop, winheight, topinc = 0;
+					menuleft=($curobj.offset().left+menuleft+dimensions.subulw>$(window).width())? -dimensions.w : menuleft; //calculate this sub menu's offsets from its parent
+					menumoved = menumoved !== menuleft;
+					$subul.css({top: 0}).removeClass('repositionedv');
+					if(setting.repositionv && $link.offset().top + $subul.data('height') > (winheight = $(window).height()) + (doctop = $(document).scrollTop())){
+						newtop = $link.outerHeight() - $subul.data('height');
+						topinc = smoothmenu.repositionv($subul, $link, newtop, winheight, doctop, method);
+						newtop = topinc[1];
+						topinc = topinc[0];
+					}
+					$subul.css({left:menuleft, width:dimensions.subulw}).stop(true, true).animate({height:'show',opacity:'show'}, smoothmenu.transition.overtime, function(){this.style.removeAttribute && this.style.removeAttribute('filter');});
+					if(menumoved){$subul.addClass('repositioned');} else {$subul.removeClass('repositioned');}
+					if (setting.shadow){
+						if(!$curobj.data('$shadow')){
+							$parentshadow = $curobj.parents("li:eq(0)").data('$shadow');
+							$curobj.data('$shadow', $('<div></div>').addClass('ddshadow').prependTo($parentshadow).css({zIndex: $parentshadow.css('z-index')}));  //insert shadow DIV and set it to parent node for the next shadow div
+						}
+						var offsets = $subul.offset();
+						var shadowleft = menuleft;
+						var shadowtop = $curobj.position().top - (newtop? $subul.data('height') - $link.outerHeight() - topinc : 0);
+						if (smoothmenu.detectwebkit && !smoothmenu.css3support){ //in WebKit browsers, restore shadow's opacity to full
+							$curobj.data('$shadow').css({opacity:1});
+						}
+						$curobj.data('$shadow').css({overflow: 'visible', width:dimensions.subulw, left:shadowleft, top:shadowtop}).stop(true, true).animate({height:dimensions.subulh}, smoothmenu.transition.overtime);
+					}
+				}, smoothmenu.showhidedelay.showdelay);
+			},
+			function(e, speed){
+				var $shadow = $curobj.data('$shadow');
+				if(method === 'hover'){restore();}
+				else{smoothmenu.executelink.call(this, $, prevobjs, e);}
+				clearTimeout($subul.data('timers').showtimer);
+				$subul.data('timers').hidetimer=setTimeout(function(){
+					$subul.stop(true, true).animate({height:'hide', opacity:'hide'}, speed || smoothmenu.transition.outtime, function(){
+						method === 'toggle' && restore();
+					});
+					if ($shadow){
+						if (!smoothmenu.css3support && smoothmenu.detectwebkit){ //in WebKit browsers, set first child shadow's opacity to 0, as "overflow:hidden" doesn't work in them
+							$shadow.children('div:eq(0)').css({opacity:0});
+						}
+						$shadow.stop(true, true).animate({height:0}, speed || smoothmenu.transition.outtime, function(){if(method === 'toggle'){this.style.overflow = 'hidden';}});
+					}
+				}, smoothmenu.showhidedelay.hidedelay);
+			}
+		); //end hover/toggle for subheaders
+	}); //end $headers.each() for subheaders
+},
+
+init: function(setting){
+	if(this.detectie6 && parseFloat(jQuery.fn.jquery) > 1.3){
+		this.init = function(setting){
+			if (typeof setting.contentsource=="object"){ //if external ajax menu
+				jQuery(function($){ddsmoothmenu.getajaxmenu($, setting, 'nobuild');});
+			}
+			return false;
+		};
+		jQuery('link[href*="ddsmoothmenu"]').attr('disabled', true);
+		jQuery(function($){
+			alert('You Seriously Need to Update Your Browser!\n\nDynamic Drive Smooth Navigational Menu Showing Text Only Menu(s)\n\nDEVELOPER\'s NOTE: This script will run in IE 6 when using jQuery 1.3.2 or less,\nbut not real well.');
+				$('link[href*="ddsmoothmenu"]').attr('disabled', true);
+		});
+		return this.init(setting);
+	}
+	var mainmenuid = '#' + setting.mainmenuid, right, down, stylestring = ['</style>\n'], stylesleft = setting.arrowswap? 4 : 2;
+	function addstyles(){
+		if(stylesleft){return;}
+		if (typeof setting.customtheme=="object" && setting.customtheme.length==2){ //override default menu colors (default/hover) with custom set?
+			var mainselector=(setting.orientation=="v")? mainmenuid : mainmenuid+', '+mainmenuid;
+			stylestring.push([mainselector,' ul li a {background:',setting.customtheme[0],';}\n',
+				mainmenuid,' ul li a:hover {background:',setting.customtheme[1],';}'].join(''));
+		}
+		stylestring.push('\n<style type="text/css">');
+		stylestring.reverse();
+		jQuery('head').append(stylestring.join('\n'));
+	}
+	if(setting.arrowswap){
+		right = ddsmoothmenu.arrowimages.right[1].replace(ddsmoothmenu.overarrowre, ddsmoothmenu.overarrowaddtofilename);
+		down = ddsmoothmenu.arrowimages.down[1].replace(ddsmoothmenu.overarrowre, ddsmoothmenu.overarrowaddtofilename);
+		jQuery(new Image()).bind('load error', function(e){
+			setting.rightswap = e.type === 'load';
+			if(setting.rightswap){
+				stylestring.push([mainmenuid, ' ul li a:hover .', ddsmoothmenu.arrowimages.right[0], ', ',
+				mainmenuid, ' ul li a.selected .', ddsmoothmenu.arrowimages.right[0],
+				' { background-image: url(', this.src, ');}'].join(''));
+			}
+			--stylesleft;
+			addstyles();
+		}).attr('src', right);
+		jQuery(new Image()).bind('load error', function(e){
+			setting.downswap = e.type === 'load';
+			if(setting.downswap){
+				stylestring.push([mainmenuid, ' ul li a:hover .', ddsmoothmenu.arrowimages.down[0], ', ',
+				mainmenuid, ' ul li a.selected .', ddsmoothmenu.arrowimages.down[0],
+				' { background-image: url(', this.src, ');}'].join(''));
+			}
+			--stylesleft;
+			addstyles();
+		}).attr('src', down);
+	}
+	jQuery(new Image()).bind('load error', function(e){
+		if(e.type === 'load'){
+			stylestring.push([mainmenuid+' ul li a .', ddsmoothmenu.arrowimages.right[0],' { background: url(', this.src, ') no-repeat;width:', this.width,'px;height:', this.height, 'px;}'].join(''));
+		}
+		--stylesleft;
+		addstyles();
+	}).attr('src', ddsmoothmenu.arrowimages.right[1]);
+	jQuery(new Image()).bind('load error', function(e){
+		if(e.type === 'load'){
+			stylestring.push([mainmenuid+' ul li a .', ddsmoothmenu.arrowimages.down[0],' { background: url(', this.src, ') no-repeat;width:', this.width,'px;height:', this.height, 'px;}'].join(''));
+		}
+		--stylesleft;
+		addstyles();
+	}).attr('src', ddsmoothmenu.arrowimages.down[1]);
+	setting.shadow = this.detectie6 && (setting.method === 'hover' || setting.orientation === 'v')? false : setting.shadow || this.shadow; //in IE6, always disable shadow except for horizontal toggle menus
+	jQuery(document).ready(function($){ //ajax menu?
+		if (setting.shadow && ddsmoothmenu.css3support){$('body').addClass('ddcss3support');}
+		if (typeof setting.contentsource=="object"){ //if external ajax menu
+			ddsmoothmenu.getajaxmenu($, setting);
+		}
+		else{ //else if markup menu
+			ddsmoothmenu.buildmenu($, setting);
+		}
+	});
+}
+}; //end ddsmoothmenu variable
+
+
+// Patch for jQuery 1.9+ which lack click toggle (deprecated in 1.8, removed in 1.9)
+// Will not run if using another patch like jQuery Migrate, which also takes care of this
+if(
+	(function($){
+		var clicktogglable = false;
+		try {
+			$('<a href="#"></a>').toggle(function(){}, function(){clicktogglable = true;}).trigger('click').trigger('click');
+		} catch(e){}
+		return !clicktogglable;
+	})(jQuery)
+){
+	(function(){
+		var toggleDisp = jQuery.fn.toggle; // There's an animation/css method named .toggle() that toggles display. Save a reference to it.
+		jQuery.extend(jQuery.fn, {
+			toggle: function( fn, fn2 ) {
+				// The method fired depends on the arguments passed.
+				if ( !jQuery.isFunction( fn ) || !jQuery.isFunction( fn2 ) ) {
+					return toggleDisp.apply(this, arguments);
+				}
+				// Save reference to arguments for access in closure
+				var args = arguments, guid = fn.guid || jQuery.guid++,
+					i = 0,
+					toggler = function( event ) {
+						// Figure out which function to execute
+						var lastToggle = ( jQuery._data( this, "lastToggle" + fn.guid ) || 0 ) % i;
+						jQuery._data( this, "lastToggle" + fn.guid, lastToggle + 1 );
+	
+						// Make sure that clicks stop
+						event.preventDefault();
+	
+						// and execute the function
+						return args[ lastToggle ].apply( this, arguments ) || false;
+					};
+
+				// link all the functions, so any of them can unbind this click handler
+				toggler.guid = guid;
+				while ( i < args.length ) {
+					args[ i++ ].guid = guid;
+				}
+
+				return this.click( toggler );
+			}
+		});
+	})();
+}
+
+/* TECHNICAL NOTE: To overcome an intermittent layout bug in IE 9+, the script will change margin top and left for the shadows to 
+   1px less than their computed values, and the first two values for the box-shadow property will be changed to 1px larger than 
+   computed, ex: -1px top and left margins and 6px 6px 5px #aaa box-shadow results in what appears to be a 5px box-shadow. 
+   Other browsers skip this step and it shouldn't affect you in most cases. In some rare cases it will result in 
+   slightly narrower (by 1px) box shadows for IE 9+ on one or more of the drop downs. Without this, sometimes 
+   the shadows could be 1px beyond their drop down resulting in a gap. This is the first of the two patches below. 
+   and also relates to the MS CSSOM which uses decimal fractions of pixels for layout while only reporting rounded values. 
+   There appears to be no computedStyle workaround for this one. */
+
+//Scripted CSS Patch for IE 9+ intermittent mis-rendering of box-shadow elements (see above TECHNICAL NOTE for more info)
+//And jQuery Patch for IE 9+ CSSOM re: offset Width and Height and re: getBoundingClientRect(). Both run only in IE 9 and later.
+//IE 9 + uses decimal fractions of pixels internally for layout but only reports rounded values using the offset and getBounding methods.
+//These are sometimes rounded inconsistently. This second patch gets the decimal values directly from computedStyle.
+if(ddsmoothmenu.detectie9){
+	(function($){ //begin Scripted CSS Patch
+		function incdec(v, how){return parseInt(v) + how + 'px';}
+		ddsmoothmenu.ie9shadow = function($elem){ //runs once
+			var getter = document.defaultView.getComputedStyle($elem.get(0), null),
+			curshadow = getter.getPropertyValue('box-shadow').split(' '),
+			curmargin = {top: getter.getPropertyValue('margin-top'), left: getter.getPropertyValue('margin-left')};
+			$('head').append(['\n<style title="ie9shadow" type="text/css">',
+			'.ddcss3support .ddshadow {',
+			'\tbox-shadow: ' + incdec(curshadow[0], 1) + ' ' + incdec(curshadow[1], 1) + ' ' + curshadow[2] + ' ' + curshadow[3] + ';',
+			'}', '.ddcss3support .ddshadow.toplevelshadow {',
+			'\topacity: ' + ($('.ddcss3support .ddshadow').css('opacity') - 0.1) + ';',
+			'\tmargin-top: ' + incdec(curmargin.top, -1) + ';',
+			'\tmargin-left: ' + incdec(curmargin.left, -1) + ';', '}',
+			'</style>\n'].join('\n'));
+			ddsmoothmenu.ie9shadow = function(){}; //becomes empty function after running once
+		}; //end Scripted CSS Patch
+		var jqheight = $.fn.height, jqwidth = $.fn.width; //begin jQuery Patch for IE 9+ .height() and .width()
+		$.extend($.fn, {
+			height: function(){
+				var obj = this.get(0);
+				if(this.length < 1 || arguments.length || obj === window || obj === document){
+					return jqheight.apply(this, arguments);
+				}
+				return parseFloat(document.defaultView.getComputedStyle(obj, null).getPropertyValue('height'));
+			},
+			innerHeight: function(){
+				if(this.length < 1){return null;}
+				var val = this.height(), obj = this.get(0), getter = document.defaultView.getComputedStyle(obj, null);
+				val += parseInt(getter.getPropertyValue('padding-top'));
+				val += parseInt(getter.getPropertyValue('padding-bottom'));
+				return val;
+			},
+			outerHeight: function(bool){
+				if(this.length < 1){return null;}
+				var val = this.innerHeight(), obj = this.get(0), getter = document.defaultView.getComputedStyle(obj, null);
+				val += parseInt(getter.getPropertyValue('border-top-width'));
+				val += parseInt(getter.getPropertyValue('border-bottom-width'));
+				if(bool){
+					val += parseInt(getter.getPropertyValue('margin-top'));
+					val += parseInt(getter.getPropertyValue('margin-bottom'));
+				}
+				return val;
+			},
+			width: function(){
+				var obj = this.get(0);
+				if(this.length < 1 || arguments.length || obj === window || obj === document){
+					return jqwidth.apply(this, arguments);
+				}
+				return parseFloat(document.defaultView.getComputedStyle(obj, null).getPropertyValue('width'));
+			},
+			innerWidth: function(){
+				if(this.length < 1){return null;}
+				var val = this.width(), obj = this.get(0), getter = document.defaultView.getComputedStyle(obj, null);
+				val += parseInt(getter.getPropertyValue('padding-right'));
+				val += parseInt(getter.getPropertyValue('padding-left'));
+				return val;
+			},
+			outerWidth: function(bool){
+				if(this.length < 1){return null;}
+				var val = this.innerWidth(), obj = this.get(0), getter = document.defaultView.getComputedStyle(obj, null);
+				val += parseInt(getter.getPropertyValue('border-right-width'));
+				val += parseInt(getter.getPropertyValue('border-left-width'));
+				if(bool){
+					val += parseInt(getter.getPropertyValue('margin-right'));
+					val += parseInt(getter.getPropertyValue('margin-left'));
+				}
+				return val;
+			}
+		}); //end jQuery Patch for IE 9+ .height() and .width()
+	})(jQuery);
+}”ò¿Ÿ1  +        $^V]      ddsmoothmenu   Û≤      arrowimages    ÅŒV      down   ¡-Ä      downarrowclass     (Ëv#      img/header-nav-arrow-down-white.gif     ë∏.      right      µ^ﬂ      rightarrowclass    √àH$      img/header-nav-arrow-right-white.gif   Ã∏
+      transition	     û’vÁ      overtime
+   ]◊[Ï      outtime    gK4£      shadow     ¬      showhidedelay      öŒ¡©	      showdelay      Y\”	      hidedelay      <ì      zindexvalue    QΩÄ«      closeonnonmenuclick    ﬂ¬Kq      closeonmouseout    †©â´      overarrowre    âé£;      (?=\.(gif|jpg|jpeg|png|bmp))   ™ﬂ≠T      overarrowaddtofilename      ◊–µ      _over      e∆≤â      detecttouch    éD5÷      ontouchstart   ¯2áâ      window     ∏OÄ      document   ï,Øp      documentElement    Yº≥      Touch      ™ Œ      onmsgesturechange      ÿ˘&Ç      DocumentTouch      ÷4kô      detectwebkit   π„+	      navigator       ìãà	      userAgent!      RâDo      toLowerCase"    ⁄Eú¡      indexOf#    
+];D      applewebkit$    –ìMí      idevice%    Ø:ç
+      ipad|iphone&    
+qπ	      detectie6'      ?»C÷
+      MSIE (\d+)(     m±[¢	      detectie9)      ˚Ωúr	      ie9shadow*      !"ç      css3support+    ˜Ë◊;	      boxShadow,      ÿ1:Ú      querySelector-      n+¥      prevobjs.   Óóù      menus/      CqΩs      executelink0    Ñç¡^
+      prevscount1     ¸IÎ’      link2   ˝ÂgÑ      splice3     ª©`X      href4   W$ei	      emptyhash5      
+}N      children6   V@ıä      span.7      rj•o      , span.8     Fúñ      _self9      óx5      open:   0+QA      location;   ı/F/      stopPropagation<    ≤¨lû      repositionv=    O‘ŸÑ      $subul>     é	2      $link?      D	∫      newtop@     ˚ÎZ	      winheightA      »∞˚î      doctopB     Ωpwm      methodC     wî’      menutopD    ÍÎ˝      topincE     ∞∑ ¬      doclimitF   >ü      cssG    $√Á      topH    e}ü      displayI    ü‡˚Å      blockJ      k]2      outerHeightK    6ó(Å      dataL   ∑…≈      heightM     Õv=      parentsN    æ’      lastO   »Åí      positionP   Ogµ      toggleQ     ,Ω      noneR   Bå|      addClassS   ·ßE      repositionedvT      wÅÁÒ
+      updateprevU     ôœL*      $curobjV    ,ªP       prevobjW    !iËO	      $indexobjX      ˘!p¬      triggerY    ü™‚X      clickZ      Ñu2      push[   ≥∑V      subulpreventemptyclose\     ˛Ë˘2      parent]     B9∫¿      preventDefault^     Ü˙ç8      getajaxmenu_    e∂´P      setting`    ˜öGP      nobuilda    Ó·l~      $menucontainerb     å¬À‘      contentsourcec      ‘„X      htmld   x¿ß      Loading Menu...e    æd»ê      ajaxf   ˛tuW      errorg      MmD_      ajaxrequesth    tÕ>)      Error fetching content. Server Response: i      H}ı#      responseTextj   …©\9      successk    4W»      contentl    µó{„	      buildmenum      Xrcú      closealln   ˆL&4
+      smoothmenuo     ÿEÛ      globaltrackopenp    fNæ
+      mouseleaveq     à8ı≠
+      touchstartr     ¥∆©      <a href="#"></a>s   ]'N?      zsubt   ≤Ï>      $mainparentu    Øsø
+      mainmenuidv     ˆ+      removeClassw    ï|ö°      ddsmoothmenu ddsmoothmenu-vx    J€Ω™	      classnamey      ™E˘n	      $mainmenuz      ´â5ù      >ul{    d®§˙      hover|      ”e/x      $topheaders}    …Ew,      >li>ul~     mj≤a      orient     å˝Põ      orientationÄ    q∆¢      $parentshadowÅ      òh;      bodyÇ   ı˛«Æ      unbindÉ     ˙¯÷U      click.smoothmenuÑ   ‡Õ      bindÖ   ]¸ç      removeEventListenerÜ     rO      addEventListenerá   ]¶îc      click.à     èkÑ™      li>a.selectedâ      ˇ“≤‘	      $leaveobjä      ‹Ÿ®Ë      mouseleave.smoothmenuã      {˚pQ&      style[title="ddsmoothmenushadowsnone"]å     ∑7Ma      headç   ‹B-      appendé     ≤ıíp      <style title="ddsmoothmenushadowsnone" type="text/css">.ddsmoothmenushadowsnone{display:none!important;}</style>è   ŒÅBÓ      shadowstimerê   Ü.¨b      resize scrollë      QÔ8u      clearTimeoutí   ôK*Ë	      $selectedì      ¸c)ç      $shadowsî   ∑'ﬂä	      .ddshadowï      2je:      ddsmoothmenushadowsnoneñ    3AtŸ
+      setTimeoutó     f˜      zIndexò     ÀÀ∑      ul:eq(0)ô   ﬁ™ÚI      timersö     [¢!X      a:eq(0)õ    }™Ô      paddingRightú   òUj˘%      <span style="display: block;" class="ù      +(XÍ	      "></span>û      „(Ê
+      dimensionsü     QÒ=i
+      outerWidth†     0Uó      innerHeight°    ¯og\      subulw¢     ØZ∏⁄      subulh£     ÓÇ¡0      restore§    ≈.»œ      selected•   ¨yòü      headers¶    ˝É‹      buildsubheadersß    á0Åÿ      $ul®    1“— 
+      visibility©     ?Iqõ      visible™    üR3¸	      hidetimer´      œw·	      showtimer¨      ºÛ}      menuleft≠   6rœﬂ	      menumovedÆ      ı]á      leftØ   ÎƒJ˚      width∞      ìGÎ	      scrollTop±      mêÅ      stop≤   ÷q1º      animate≥    HáíK      show¥   ﬂue…      opacityµ    $Gà†      removeAttribute∂    >	≈      filter∑     ò‡˙      repositioned∏   ç{z      $shadowπ    .Iv      <div></div>∫    (ˆë      ddshadow toplevelshadowª    ©8GR	      prependToº      –%      offsetsΩ    ˜ˆ÷ﬁ
+      shadowleftæ     ƒ∞Ω6	      shadowtopø      y4§       speed¿      üvÙ}      hide¡   =4ô	      div:eq(0)¬      Ñ€ËW      hidden√     }@ë      $headersƒ   å/Í      z-index≈    ık‹˚      li:eq(0)∆   ◊^      ddshadow«   íu`      init»   >Â/      jQuery…     ˝f§       jquery      s<[8      link[href*="ddsmoothmenu"]À     A¢Ωê      attrÃ   ûzÉw      disabledÕ   “Ô¢Z      alertŒ      Ú$H–      You Seriously Need to Update Your Browser!
+
+Dynamic Drive Smooth Navigational Menu Showing Text Only Menu(s)
+
+DEVELOPER's NOTE: This script will run in IE 6 when using jQuery 1.3.2 or less,
+but not real well.œ   faS      stylestring–    ú©0‹	      </style>
+—       œûÍ
+      stylesleft“     e  	      arrowswap”      7+~.	      addstyles‘      Ô –§      customtheme’    ”OË…      mainselector÷   ˆ^v      , ◊     FÇOO       ul li a {background:ÿ      “∑”3      ;}
+Ÿ    ‘ó2h       ul li a:hover {background:⁄    ªçA      ;}€     Dü{      
+<style type="text/css">‹   ∆e=?      reverse›    û“      Imageﬁ      ∑Ωºﬁ
+      load errorﬂ     "©˚¯	      rightswap‡      2áU)      load·    “ú_       ul li a:hover .‚   „ie       ul li a.selected .„    —(a\       { background-image: url(‰      ú∑»õ      srcÂ    ≤≠[      );}Ê    ∆N      downswapÁ   †W„F
+       ul li a .Ë     _4|î       { background: url(È    bÊ*π      ) no-repeat;width:Í     ©c
+·
+      px;height:Î     ÂåÜ      px;}Ï   ¢Ñ
+      readyÌ      ìπ¿Ï      ddcss3supportÓ      eÆC3      clicktogglableÔ     ;≥
+      toggleDisp     ªl‡Ù      extendÒ     ¸°Ä      fn2Ú    ãè@i
+      isFunctionÛ     ‹Ÿú…      argsÙ   DâïÙ      guidı   d$ê¸      togglerˆ    II∑P      event˜      √±r∂
+      lastToggle¯     %¬      _data˘      ¿ΩT≥      incdec˙     ë‰Ó¥      how˚    ˘àŸ_      $elem¸      dªé<      getter˝     Œî&Ò      defaultView˛    ∆ÇÈë      getComputedStyleˇ   ›,r‚	      curshadow      .1≤ã      getPropertyValue  ¬X7
+      box-shadow    útM	      curmargin     A=
+      margin-top    Ú(:…      margin-left   IEd*      
+<style title="ie9shadow" type="text/css">    çS√^      .ddcss3support .ddshadow {    Ø˘˝∫      	box-shadow:      Ú≠ K)      .ddcss3support .ddshadow.toplevelshadow {	     ‹,g
+      	opacity: 
+    ïÙÏÜ      .ddcss3support .ddshadow  Úí€ø      	margin-top:      zÎ[       	margin-left:     ïKÜr      jqheight  ÎOˆ+      jqwidth   ﬂN#9      obj   &⁄õ      val   ˙ π      padding-top   A/+◊      padding-bottom    £cïï      bool  ûØ6H      border-top-width  ﬂﬁ¢      border-bottom-width   ’î,9      margin-bottom     Uü
+      innerWidth    ]s˝¨      padding-right     ‘Ê      padding-left  ¨|Éñ      border-right-width    RË˜«      border-left-width     \M~      margin-right  ∏Á(      ddsmoothmenu.detectie6<   u9ñ      ddsmoothmenu.detectie9<!   ^Öç5      buildmenu/<"   ˚}∏      buildmenu/</shadowstimer<$     »˘øÜ      buildmenu/</<%     yÙe      buildmenu/</</<&   P¿‘      buildsubheaders/<(     ,≤∂≈      buildsubheaders/</<)   ¶œoû      buildsubheaders/</</<*     Æp/ÿ      init/this.init+    ¯÷mù      init/this.init/<,  –“M∆      init/</    rcÜû      ddsmoothmenu.ie9shadow0    L.8†-      ddsmoothmenu.ie9shadow/ddsmoothmenu.ie9shadow     D   û  E   D          .   Ô%,â                                                                                                                                                                              	                 
+                                                                                                                                                                                                                                                                                                                                                                                	                      !                  "      "           #      "           $      $           %                 &      &           '      '           (      '           )                 *      *           .      *          +      ,           ,      *           -      *           /      *           0      *           1      *           2      *           3                 4      4           5      4           6      4                            7      8          8      9           9                 :      ;           ;      ;           <      =           =      ;           >      ;           ?      ;           @      ;           A      ;           B      ;           C      ≥Oåc                          é               é                             $  -  e  0  1  ã   	            =  >  ?  @  A  B  C  D  E              $  -  U  0  V  W  ã               e  1               $ `_  P`  Pa  P             g               k              e  n  0              $ `_  Pn  Ps  P-  Pt  y  PB  P|  ~  PÄ  Pâ  è  P             e               e               e               e               e                                í  ì  P                              U  P=  P>  Pû  PC  P£  Pã                               e  ã               i  ï ß  	   	           ¨  ≠  ?  A  @  D  º  Ω  æ                ã               e  ø  P∏  Pã                                                 ã                $ `√  _  PB  P-  P              n  PU  P=  PÄ  P>  Pû  P£  Pã                               e  ã               i  ï ß  	   	           ¨  ≠  ?  A  @  D  º  Ω  æ                ã               e  ø  P∏  Pã                                                 ã               _  Pu  P    œ  P—  P”  Pã                 ’               _  P             $               $              e  ã               e  ã               e  ã               e  ã                $               $  Ó  P                                         e                 Ô  P            ◊`Ò  Û  PÙ  i `ı     ã               ˆ  ˜     ã                $ `˘  P P P             v  ˙              ˚  ¸  ˇ                                     ã                   ¸  ã                  ¸  ã                     ã                   ¸  ã                  ¸  ã   Ø¬0∞     %     '      '      IÙ$KEÆ˙ö   å                            $  &  (  )  *  -  .  /  <  T  [  ^  m  4  l  ¶  «     
+                                      Ä¯ˇ                           Ä¯ˇ      	  ,   Ä¯ˇ
+  ,   Ä¯ˇ         d    Ä¯ˇ  »    Ä¯ˇ   
+    G  H         G          G          H          J     f  j           ó          H                 õ          w  h  °  ¢           G     
+     H  ®         G     
+     Æ  Ø     
+    L  ¥         ó          ¨  Ø  Æ  G           L     
+     L  ¥         ¥          L          ó          H                 w  °  ¢        G     
+     H  ®         G     
+     Æ  Ø     
+    L  ¥         ó          ¥          ¨  Ø  Æ  G           L     
+     L  ¥         ¥          L          P     
+     G  Æ         L  †  J  Ø   ü  á&’™ç!´!D   ∏     π™å∏  ‡                Å        ⁄    ∑   9   :   :   <   :   <   <   :	   <
+   <   :   <   Ë<   <   <   l   <      <      ª   "ù∏   ó   ﬂ   ª   J   "ùõ   ó   ﬂª   J   ùÑ   ó   ﬂª   J   ú   ó"   ﬂª   J   J   ó'   ùL   ó(   ﬂª   J   ù5   ó-   ﬂª   J   ú    ó0   ﬂª   J   ª   J   !ó5   <   ª   J   ·J    ‰s  ·J!   ‰"   s ˇ<#   l$   ·J%   ‰ª   J   s <&   m'    s  <(   m)    s  <*   m+   <,   ª   J   J-   J.   /   ù+   óR   ﬂª   J0   ú   óV   ﬂª   J1   óX   <2   h    <3   <4   m5   <6   m7   <8   m9   <:   m;   <<   m=   <>   m?   <@   ªA    B   s ·JC   ‰s JD   <E   mF   <G   mH   <I   mJ   <K       ﬂmL    ªM   s ö   óy   mN    w  ﬂó{   ª   J*   ö   ó~   mO    ªM   w ﬂóÅ   •E+eE0D6:* ì  ò  ó  ó  °  ∂ Qï #ëPP+ñ ˇˇˇ˚P(dV(dV*¶ A™ ê0E:V:f:q:y:Ä  âJÄ  ï[P:Ä :Ä `ê0Ä ± `FÄ ∏ˇˇˇˇP `FÄ ⁄PIÄ Í`î `FÄ 0ˇˇˇˇP)PÄh   §Ôh   8                         l   ·J   ‰ª   J   s Õ   ú   ó   ﬂæ   Kó   ¢• `
+ˇˇˇ˚P† (Qh   {x¯Th   8                         l   ·J   ‰ª   J   s Õ   ú   ó   ﬂæ   Kó   ¢• `
+ˇˇˇ˚P† (Q$   ûï∞P$                               • L  ÿ®Ó<  ≤               7      ﬁÕ  ﬂº J   Õ   ﬂº J   Õ  ﬂò   æ   0)Õ   ˇöy  ó   º æ   Kæ  öX  ó	   º ·J   ‰æ   w ﬂæ  J   ª   J   úé   ó   ﬂæ  J   úz   ó   ﬂº   æ  s ·J   ‰   s úU   ó   ﬂº   æ  s ·J	   ‰
+   ª   J   J   K&   &ª   J   J   K&s J   ó&   öî   ó'   æ  J   ú   ó)   ﬂæ  J      ó+   ö1   ó,   ª   ·J   ‰æ  J   æ  J   w ﬂô#   ó1   ª   J   æ  J   L   ﬂó5   º ·J   ‰w  ﬂó7   ôy˛ˇˇó7   •&``-fó `/`
+ˇˇˇ˘P$`	Æ )ˇˇˇ˛PPˇˇˇ˛P
+
+ò .í ˇˇˇøPò `≤ `		ˇˇˇP `û@`
+Pì0PL             å  ¿  RÂ÷s∞  ˘         	       A      º ù   ó   ﬂó   Ã ﬂÕ   ﬂº º &Õ  ﬂº  ·J   ‰9   º <      <   w ﬂò   º  ·J   ‰s  J   º ö:   ó   º  ·J   ‰9   º 0(Ã <   w ﬂæ   0(Õ   ﬂôØˇˇˇó   æ   úe   ó   ﬂº ·J   ‰s  J   º ·J   ‰s  &æ  ú5   ó   ﬂº  ·J	   ‰
+   s º  ·J   ‰s  J   &æ  ó%   öd   ó&   º  ·J   ‰9   º º ·J   ‰   s ·J   ‰s  ·J   ‰s  J   'º ·J   ‰s  J   '<   w ﬂó6   º    ú'   ó8   ﬂº  ·J   ‰9      <   w ó<   ﬂº º ö   ó>   º  ·J   ‰   w ﬂó@   h   æ   i    º i   ¢• `ò ``)`
+
+ˇˇˇÓP$f
+P.`
+ˇˇˇ˚P$`ï@`ö P
+Pü P
+P	î `
+P
+P
+P	
+PˇˇˇΩPI`û "
+ˇˇˇ˚P)`	`P)`	QÄÄÄ¿         O   V   T  t∑°pD  —         	             ﬁÕ  ﬂº J   Õ   ﬂº ·J   ‰s  ·J   ‰æ  s Õ  ﬂò   æ   0)Õ   ˇös   ó	   æ  ·J   ‰º æ   KÕ  s öC   ó   º   æ  s ·J   ‰   h   i    w ﬂº ·J   ‰æ   w ﬂó   ôˇˇˇó   º ·J   ‰æ  w ﬂ•&`&`
+P
+ˇˇˇ¸P(fó `ˇˇˇ˘P/`ˇˇˇˇPˇˇˇÔP$`
+ˇˇˇ˘Pì@`
+ˇˇˇ˚PPÄT         3   Ü   ÿ   3ºAÿ   è                        º  J   Õ   ﬂæ   J   ª   J   ú=   ó   ﬂª    æ   s ·J   ‰   s ·J   ‰	   s J
+   ó   ö&   ó   º  ·J   ‰w  ﬂº  ·J   ‰w  ﬂó   • `-`	ú ˇˇˇ˛PPPô `
+P$`
+P9PÄ‡   S2bŒ‡   í                        Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂ¡       ¡   J   K&s Œ   ﬂ¡   ·J   ‰   w ﬂ¡   ·J   ‰9   ¡   J   K<   <   m	   <
+   m   <   w ﬂ•õ `ˇˇˇ˚P)`ë P$`%ë &J	JP4PÄÄP   O˚∞P                            ¡   ·J   ‰   º  J   &w ﬂ• `,	ˇˇˇœP$Pà   \Æ@ªà   F                  	       ¡   ·J   ‰º  w ﬂ¡   ú$   ó   ﬂª   ·J   ‰¡   ¡   w ó	   ﬂ• `ˇˇˇ˚P$`  ü #ˇˇˇÛP)PÄê  [>Ä                  !      ª   Õ   ﬂæ   J   õ   ó    ¢ó   º  J      ù_   ó   ﬂº  J      ù   ó	   ﬂº  J      ó   ú(   ó   ﬂæ   J   ·J   ‰º  J	   s ó   ö   ó   æ   J
+   J   Õ  ﬂò   æ  0)Õ  ˇöO   ó   ª    æ   J
+   æ  Ks ·J   ‰   w ﬂæ   J
+   ·J   ‰æ  w ﬂô£ˇˇˇó!   • `*`ì `1
+F`‡ fˇˇˇ˙Pî `ì 	fó `ˇˇˇˇP"P$`ê ˇˇˇ˘P>
+PÄê         ≥   b     ‹ñí]  |               É       Ω  Œ   ﬂΩ Œ   ﬂª   Œ   ﬂ¡   ¡   J   ù   ó   ﬂ¡   J   ó   L   ﬂŒ   ﬂ¡   J   ö   ó   ¡   J   ô   ó   h    ó	   Œ   ﬂ¡       ¡   J   &s ·J   ‰	   s ·J
+   ‰¡   J   ù   ó   ﬂ   ó   s Õ   ﬂ¡   ¡   J   L   ﬂæ   ·J   ‰   s Œ   ﬂ¡   J   ö   ó      ô8   ó   ¡   J      ö   ó      ô   ó      ó   Œ   ﬂ¡   ·J   ‰   s ·J   ‰s  Õ  ﬂ¡   J      ö   ó#      ô   ó#      ó#   Œ 	  ﬂ¡    ª   J   s Œ 
+  ﬂ¡   ·J   ‰m   w ﬂ¡      ö`  ó+   ¡   J   öí   ó-   ¡   ¡   J   öF   ó/   ¡   J   ·J   ‰¡   ·J   ‰¡   ·J   ‰   s s s ô-   ó6   ¡   ·J   ‰¡   ·J   ‰   s s ó:   L   ﬂó;   ¡   J   öÕ   ó=   ¡ 	     ö   ó?   æ   ·J   ‰m    w ﬂóB   ¡    ª   s ·J!   ‰"   s ·J#   ‰"   ¡   J$   w ﬂ¡   J%   öJ   óK   ª   ·J&   ‰'   ¡   J$   w ﬂª   ·J(   ‰'   ¡   J$   w ﬂóS   ô©   óS   ¡   J   öï   óU   ¡ 	     ö   óW   æ   ·J   ‰m)   w ﬂóZ   ¡    ª   s ·J#   ‰*   ¡   J   &m+   w ﬂ¡   J%   ö%   óc   ª   ·J(   ‰'   m,   w ﬂóg   ¡   J   ö_   ói   ¡ 	     ö   ók   æ   ô   ók   ¡   ók   Õ  ﬂæ  ·J#   ‰-   ¡   J$   w ﬂôi   ón   ¡   J   öU   óp   ¡ 	     ö   ór   æ   ô   ór   ¡   ór   Õ  ﬂæ  ·J#   ‰-   m.   w ﬂóu   ¡    /   s J0   õ(   óx   ¡    1   s ·J2   ‰3   w ﬂó{   ¡    ª4   s ·J#   ‰5   m6   w ﬂóÄ   æ  ·J7   ‰m8   w ﬂ•í `+`Ø `'`∏ `ˇˇˇ˚PP
+4ü ˇˇˇ˜P(`ó `ê P)`‹ `ë 
+P
+P(`π <`
+ˇˇˇˇP)`ˇˇˇ˙P$`ï `î `™ :ë 
+PˇˇˇÚPˇˇˇÚPô 8ë 
+PˇˇˇÚPì@`î `ï `ˇˇˇ˙P)`ˇˇˇˇPP4
+ˇˇˇÁP$`î `ë +ˇˇˇﬁP$`ë (ˇˇˇ·Pì@`î `ï `ˇˇˇ˙P)`ˇˇˇˇP
+ˇˇˇ‹P$`î `ë (ˇˇˇ·PI`î `≤ `ê (
+ˇˇˇ‚P.`î `≤ `ê (ˇˇˇ‚PI%`Pí `P	P9( `ˇˇˇˇPˇˇˇÍPI3`ˇˇˇ˚P4xPÄÄd   ~J≤nd   7                         º  J   J   ¡   J   ú   ó   ﬂº  ·J   ‰w  ó   ﬂ• `† P	P<   E=s<                            º  ·J   ‰w  ﬂ• `
+PPÄÄÄ<   E=s<                            º  ·J   ‰w  ﬂ• `
+PPÄÄÄ`   â¸¯`   /                         ¡   ·J   ‰   s ·J   ‰s  ·J   ‰   w ﬂ• `ë 
+P
+P	PP`   â¸¯`   /                         ¡   ·J   ‰   s ·J   ‰s  ·J   ‰   w ﬂ• `ë 
+P
+P	PP`   Ñù∆`   /                          ¡   ·J   ‰   s ·J   ‰s  ·J   ‰   w ﬂ• `ë 
+P
+P	PP¸   ˆ[¸   ü                         ª    ¡  w ﬂ¡  ·J   ‰   s ·J   ‰s  Õ   ﬂ¡      s ·J   ‰   s Œ   ﬂæ   ·J   ‰s ·J	   ‰
+   w ﬂæ   ·J	   ‰
+   w ﬂª    m   ds Œ  ﬂ• `ˇˇˇˇP$`ë 
+P
+P(`PP)`
+PP$`ê 
+P$`ˇˇˇıP)PD   ó‡BYD                             ¡   ·J   ‰   w ﬂ• `ë 	P'PÄÄÄ‘  {„≈±‘                 B        ﬁÕ   ﬂm   Œ   ﬂ¡   æ   s ·J   ‰9   ¡  J   ù   ó   ﬂ¡  J   ó   ¡  0·)Œ  ﬂ&<   s Œ   ﬂ¡   ·J   ‰   s ·J   ‰9   	   <
+   s ·J   ‰   9   s Œ   ﬂ¡   ·J   ‰   s ·J   ‰9   ¡  J   ¡	  KK<   s ·J   ‰   ¡  J   ¡	  KK&   &s Œ   ﬂ9   ¡   ·J   ‰s  <   ¡   ·J   ‰s  <   ¡   ·J   ‰s  <   ¡   ·J   ‰s  <   Œ   ﬂ¡	     ö   ó4   ¡   J   ô   ó5   ó5   Œ   ﬂ¡   ·J   ‰9   ¡   <   w ﬂ¡      ú$   ó;   ﬂ¡   ·J!   ‰¡  J"   w ó>   ﬂ¡   ·¡  K‰m#   m$   w ﬂ•ë `ˇˇˇˇP
+§ :î ˇˇˇ¡P)`ë P
+
+ˇˇˇ˚P&ˇˇˇÒP)`ë P
+ò ˇˇˇ˚P**ô@bPI`%
+P(P(P(PN`µ `
+ˇˇˇ˚PD`¢ $
+ˇˇˇ˙P)`-E4EPDDPÄÄÄD   ~ìX‚D                             ¡   ·J   ‰   w ﬂ• `ë PPÄÄÄ  x6Ëø  u               )       ﬁÕ   ﬂ¡   ·J   ‰   s õ£   ó   ¡  ·J   ‰¡  ¡   ·J   ‰   s ·J   ‰s  ¡  ¡  ¡  w ﬂ¡   ·J   ‰   s ·J   ‰   s ·J   ‰m	   s ·J
+   ‰9      <      <   w ﬂó   ¡     ú2   ó   ﬂ¡  J   ·J   ‰æ   ¡  ¡  ¡   w ó   ﬂª    ¡   ·J   ‰   s J   w ﬂ¡   ·J   ‰   w ﬂ¡   ·J   ‰   s ª    m   ¡  J   J   s L   ﬂ•&`ë 	P-`ë P
+P
+	ˇˇˇºP$`í PP
+ˇˇˇ˚PJ
+
+ˇˇˇÎPI`ß 2
+ˇˇˇËP)`ë Pˇˇˇ¯P$`ë P$`ë P	$E!O%PI"PÄt   œ¬Üt   4                        ¡   º s Õ   ﬂæ   ·J   ‰   æ   ·J   ‰s  w ﬂ• `ˇˇˇˇP(`ê PˇˇˇÌP$PÄÄÃ  ‚Ω”Ã  r      	          ~        ¡	     ö   ó   ô   ó   ¡   J   ó   Õ   ﬂæ   Õ  ﬂÕ  ﬂ¡   ·J   ‰s  J   æ   &¡   J   &¡   ª   s ·J   ‰s  öT   ó   ¡	     ö%   ó   ¡   J   ¡   J   &ô   ó   ¡   J   ó   ô   ó   æ   ó   Õ   ﬂæ  æ   Õ  ﬂ¡   ·J   ‰9	   ¡   <
+   s ·J   ‰   w ﬂ¡  J   út   ó    ﬂ¡   ·J   ‰s  J
+   ¡   &¡   ·J   ‰   s &¡   ª   s ·J   ‰s  Õ  ¡   ª   s ·J   ‰s  Õ  &ó1   öé   ó2   ¡	     ö   ó4   ô   ó4   ¡   ·J   ‰s  ó6   ¡   ·J   ‰   s 'Õ  ﬂ¡  ·J   ‰¡   ¡   æ  æ  æ  ¡  ¡   s KÕ  ﬂó<   ¡   ·J   ‰9   æ   <   ¡   J   <   s ·J   ‰s ·J   ‰9      <      <   ¡  J   J   m   w ﬂæ  ö$   óM   ¡   ·J   ‰   w ﬂô   óO   ¡   ·J   ‰   w ﬂóQ   ¡  J   ör  óS   ¡   ·J   ‰   s õs   óV   ¡   ·J   ‰   ¡       s ·J   ‰!   s ·J"   ‰¡
+  s ·J   ‰9#   ¡   ·J   ‰$   s <$   s w ﬂóc   ¡  ·J%   ‰¡   ·J   ‰   s w ﬂ¡   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J
+   Õ  ﬂ¡   ·J   ‰   s ·J   ‰9&   '   <(   ¡   J   <   æ  <   æ  <
+   s ·J   ‰s ·J   ‰9)   ¡   J*   <   ¡  J   J   w ﬂó~   • `¥ `	.`&`P	ˇˇˇ˛P
+
+P£ ï ® `*`
+ˇˇˇ˚PP$	`° P
+ë Pˇˇˇ˛P
+
+Pˇˇˇ˛P
+Pò `¨ 'Pë P)` ˇˇˇ¬PO
+`	ˇˇˇÏP.P
+
+
+ ˇˇˇ∏P$	``ë P!`ë P)
+`î 
+`ë 	P-`ë [P
+.ˇˇˇˆP
+ë PˇˇˇÎPˇˇˇ¢PI`ë PˇˇˇÓP$`P(`.`.`ë P
+
+		ˇˇˇºPTP
+ˇˇˇ‹PIPÄl   qÕl   >                        ﬁÕ   ﬂæ   J   J   ú#   ó   ﬂæ   J   ·J   ‰   w ó   ﬂ•`Æ )P	PÄÄÄ@  ’4‰@  ÿ                       Ω Œ   ﬂﬁÕ   ﬂ¡  ·J   ‰   s Œ   ﬂ¡     ö   ó   ¡   w  ﬂô0   ó   ¡  J   ·J   ‰æ   ¡  ¡  º  w ﬂó   ª    ¡  ·J   ‰   s J   w ﬂ¡  ·J   ‰   s ª	    m
+   ¡  J   J   s L   ﬂ•/`ë P)`ï `î 
+`ë 
+ˇˇˇËP)`ë Pˇˇˇ¯P$`ë P	$EO%PIPÄÄÄå  Æ*éå  !                 !        ¡  ·J   ‰s ·J   ‰9      <      <   ¡   ù   ó   ﬂ¡  J   J   ó	   m	   w ﬂ¡   ö∏   ó   ¡  J
+   ú   ó   ﬂ¡  J   ó   ö4   ó   ¡   ·J   ‰   s ·J   ‰9   <   w ﬂó   ¡   ·J   ‰s ·J   ‰9   <   ¡   ù   ó   ﬂ¡  J   J   ó   m   w ﬂó!   • `P
+
+
+§ (ˇˇˇØP$
+`/`Ø `ë P
+ˇˇˇ˚PI`P
+§ (ˇˇˇƒPIPÄT   >ÔG]T   &                          ¡     ú   ó   ﬂ¡   w  ó   ﬂ• `ú P	
+PÄÄÄd   2uÃd   5                        ﬁÕ   ﬂ¡     ö   ó   æ   J      L   ﬂó   •`ï `ô  PÄÄÄl   Ï´l   8   $                     Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂº ·J   ‰m   w ﬂ•§@`
+ˇˇˇ˚P4MPÄÄÄX  s!€AX  ©               5        ﬁÕ   ﬂm   Œ   ﬂª   Œ   ﬂ¡   æ   s ·J   ‰9   ¡   æ   s ·J   ‰   s ·J   ‰   s <   s Œ   ﬂ¡   ·J	   ‰
+   s ·J   ‰9      <   s ·J   ‰   9   s Œ   ﬂ¡     ú$   ó   ﬂ¡   ·J   ‰¡   J   w ó   ﬂ¡   ·J	   ‰   s ·J   ‰   ¡   J   J   K&   &s Œ   ﬂ9   ¡   ·J   ‰s  <   ¡   ·J   ‰s  <   ¡   ·J   ‰s  <   Œ   ﬂ¡   ·J   ‰9    <!   w ﬂ¡   ·¡  K‰m"   m#   w ﬂ•ë `+`ˇˇˇˇP
+
+ˇˇˇ˛PPPˇˇˇﬁP)`ë P
+
+ˇˇˇ˚P&ˇˇˇÒP)`¢ $
+ˇˇˇ˙P)`ë P**ò@+PI`%
+P(P(PN`ˇˇˇ˚PD`-E8EPDJPD   ˘XDD                             ¡   ·J   ‰   w ﬂ• `ë PPÄÄÄ  )_>  u               )       ﬁÕ   ﬂ¡   ·J   ‰   s õ£   ó   ¡   ·J   ‰¡  ¡   ·J   ‰   s ·J   ‰s  ¡  ¡  ¡  w ﬂ¡   ·J   ‰   s ·J   ‰   s ·J   ‰m	   s ·J
+   ‰9      <      <   w ﬂó   ¡     ú2   ó   ﬂ¡   J   ·J   ‰æ   ¡  ¡  ¡   w ó   ﬂª    ¡   ·J   ‰   s J   w ﬂ¡   ·J   ‰   w ﬂ¡   ·J   ‰   s ª    m   ¡   J   J   s L   ﬂ•&`ë 	P-`ë P
+P
+	ˇˇˇºP$`í PP
+ˇˇˇ˚PJ
+
+ˇˇˇÎPI`ß 2
+ˇˇˇËP)`ë Pˇˇˇ¯P$`ë P$`ë P	$E&O%PI'PÄt   ≈MÔùt   4                        ¡   º s Õ   ﬂæ   ·J   ‰   æ   ·J   ‰s  w ﬂ• `ˇˇˇˇP(`ê PˇˇˇÌP$PÄÄ   zp\?   §      	          à        ¡   J   Õ   ﬂæ   Õ  ﬂÕ  ﬂ¡   ·J   ‰s  J   æ   &¡   J   &¡   ª   s ·J   ‰s  ö   ó   ¡   J   ô   ó   æ   ó   Õ   ﬂæ  æ   Õ  ﬂ¡   ·J   ‰9   <	   s ·J
+   ‰   w ﬂ¡  J   ún   ó   ﬂ¡   ·J   ‰s  J	   ¡   ·J   ‰   s &¡   ª   s ·J   ‰s  Õ  ¡   ª   s ·J   ‰s  Õ  &ó(   öx   ó)   ¡   ·J   ‰s  ¡   ·J   ‰   s 'Õ  ﬂ¡   ·J   ‰¡   ¡   æ  æ  æ  ¡  s Õ  ﬂæ  KÕ  ﬂæ  KÕ  ﬂó2   ¡   ·J   ‰9   æ   <   ¡   J   <   s ·J   ‰s ·J   ‰9      <      <   ¡   J   J   m   w ﬂæ  ö$   óC   ¡   ·J   ‰   w ﬂô   óE   ¡   ·J
+   ‰   w ﬂóG   ¡  J   ö#  óI   ¡   ·J   ‰   s õú   óL   ¡   ·J   ‰    s ·J   ‰   s Œ   ﬂ¡   ·J   ‰   ¡   !   s ·J   ‰"   s ·J#   ‰¡   s ·J   ‰9$   ¡   ·J   ‰%   s <&   s w ﬂó]   ¡   ·J   ‰s  Õ  ﬂæ   Õ  ﬂ¡   ·J'   ‰s  J	   æ  ö8   óc   ¡   ·J   ‰   s ¡   ·J   ‰s  'æ  'ô   ói   ói   'Õ  ﬂ¡   J(   ú   ól   ﬂ¡   J)   ón   ö4   óo   ¡   ·J   ‰   s ·J   ‰9*   <   w ﬂóu   ¡   ·J   ‰   s ·J   ‰9+   ,   <-   ¡   J   <   æ  <   æ  <	   s ·J   ‰s ·J   ‰9.   ¡   J/   <   ¡   J   J   w ﬂóà   • `/`	.`&`P	ˇˇˇ˛P
+
+P
+£ `*`ˇˇˇ˚PP$	`° Pë Pˇˇˇ˛P
+
+Pˇˇˇ˛P
+Pò `Pë P)` ˇˇˇ P(`+`ê@`	ˇˇˇÏP.P
+
+
+ ˇˇˇ∏P$	``ë P!`ë P)
+`î 
+`ë 	P-`ë PP)`ë [P
+ˇˇˇˆP
+ë PˇˇˇÂPˇˇˇ±PI`P(`)`Pü PPõ `ï ö `ë P
+ˇˇˇ˚PI`ë P
+
+		ˇˇˇºPTP
+ˇˇˇ‹PIPÄÄÄl   qÕl   >                        ﬁÕ   ﬂæ   J   J   ú#   ó   ﬂæ   J   ·J   ‰   w ó   ﬂ•`Æ )P	PÄÄÄ@  ﬂBè@  ÿ                       Ω Œ   ﬂﬁÕ   ﬂ¡  ·J   ‰   s Œ   ﬂ¡     ö   ó   ¡   w  ﬂô0   ó   ¡  J   ·J   ‰æ   ¡  ¡  º  w ﬂó   ª    ¡  ·J   ‰   s J   w ﬂ¡  ·J   ‰   s ª	    m
+   ¡  J   J   s L   ﬂ•/`ë P)`ï `î 
+`ë 
+ˇˇˇËP)`ë Pˇˇˇ¯P$`ë P	$EO%PIPÄÄÄå  ê+¯å  !                 !        ¡  ·J   ‰s ·J   ‰9      <      <   ¡   ù   ó   ﬂ¡  J   J   ó	   m	   w ﬂ¡   ö∏   ó   ¡  J
+   ú   ó   ﬂ¡  J   ó   ö4   ó   ¡   ·J   ‰   s ·J   ‰9   <   w ﬂó   ¡   ·J   ‰s ·J   ‰9   <   ¡   ù   ó   ﬂ¡  J   J   ó   m   w ﬂó!   • `P
+
+
+§ (ˇˇˇØPD
+`/`Ø `ë P
+ˇˇˇ˚PI`P
+§ (ˇˇˇƒPI
+PT   kÃ/XT   &                          ¡     ú   ó   ﬂ¡   w  ó   ﬂ• `ú P)PÄÄÄd   Î°Á›d   5                        ﬁÕ   ﬂ¡     ö   ó   æ   J      L   ﬂó   •`ï `ô  PÄÄÄ`  A≈Ó`  F               n      Ω  Œ   ﬂﬁÕ  ﬂm   Œ   ﬂæ  J   ú-   ó   ﬂª    ª   J   J   s 
+ÕÃÃÃÃÃÙ?ó	   ö[   ó
+   æ  m   L   ﬂª    	   s ·J
+   ‰   w ﬂª    m   w ﬂæ  ·J   ‰¡   s ¢ó      ¡   J   &Œ   ﬂh      i    Œ   ﬂ¡   J   ö   ó   ô   ó   ó   Œ   ﬂ¡   J   öÓ   ó   ª   J   J   K·J   ‰ª   J   ª   J   s Õ   ﬂª   J   J   K·J   ‰ª   J   ª   J   s Õ  ﬂª    ª   Ä„  Å  s ·J   ‰   m   s ·J
+   ‰   æ   w ﬂª    ª   Ä„  Å  s ·J   ‰   m   s ·J
+   ‰   æ  w ﬂóB   ª    ª   Ä„  Å  s ·J   ‰   m   s ·J
+   ‰   ª   J   J   Kw ﬂª    ª   Ä„  Å  s ·J   ‰   m   s ·J
+   ‰   ª   J   J   Kw ﬂ¡   æ  J   ú6   ó^   ﬂ¡   J    !   ù   óa   ﬂ¡   J"   #   óc   ö   ód   ô(   ód   ¡   J$   ù   óf   ﬂæ  J$   óg   L$   ﬂª    ª%   s ·J&   ‰m'   w ﬂ•ö `ö ˇˇˇıPú `O`Pê P$`ˇˇˇˇPD`ˇˇˇ˚P3KF`ë /`ï `≠@`î `ò 2
+
+ˇˇˇﬁP(`ò 0
+
+ˇˇˇﬁP(`ZˇˇˇˇP!ˇˇˇÌPJ'	ˇˇˇÙP$`ZˇˇˇˇP!ˇˇˇÌPJ1	ˇˇˇÙPI3`ZˇˇˇˇP!ˇˇˇÌPJ9ñ ˇˇˇÙP$`ZˇˇˇˇP!ˇˇˇÌPJ@ñ ˇˇˇÙP$`ˇ(`ˇˇˇˇP
+ˇˇˇ˙P4KPÄÄÄt   óSg{t   ;   	                     Ω  Œ   ﬂ¡   J      ö   ó   ª    m   w ﬂó   ¢•)`õ `ˇˇˇˇPI`!QÄÄP   Ê∞â”P                            ª   ·J   ‰º  ¡      w ﬂ• `
+ˇˇˇÒP#PÄd   ‡Rîd   -                         ª       w ﬂº      s ·J   ‰   w ﬂ• `P$`	Pê P$PÄÄÄ‰  ê;)å‰  p                !        ¡   ö   ó    ¢ó   ¡   J      ú   ó   ﬂ¡   J   J   ó   öœ   ó	   ¡   J      ö   ó   ¡   ô   ó   ¡      &¡   &ó   Õ   ﬂ¡   ·J   ‰h   æ   i       i   ¡   J   Ki   	   i   ¡   i   
+   i   ¡   J   Ki      i   ·J   ‰   s w ﬂó   ¡   ·J   ‰   w ﬂ¡   ·J   ‰w  ﬂª       s ·J   ‰¡   ·J   ‰   s w ﬂ• ``A
+F`Ω `¥ 8ê `ì %õ î )ß PCPI`ë P$`P$`P
+ë PˇˇˇÌP$PÄÄÄD  … ¸ÊD  Ù                       ﬁÕ   ﬂ¡   º  J      L   ﬂ¡   J   öÆ   ó   ¡   ·J   ‰h
+   ¡   i       i   ª   J   J   Ki   	   i   ¡   i   
+   i   ª   J   J   Ki      i   æ   J   i      i	   ·J   ‰   s w ﬂó   ¡   0)Œ   ﬂ¡    w  ﬂ•&`ô `î `î  † î #ñ "Æ PCPI`-`*PÄÄD  … ¸ÊD  Ù                       ﬁÕ   ﬂ¡   º  J      L   ﬂ¡   J   öÆ   ó   ¡   ·J   ‰h
+   ¡   i       i   ª   J   J   Ki   	   i   ¡   i   
+   i   ª   J   J   Ki      i   æ   J   i      i	   ·J   ‰   s w ﬂó   ¡   0)Œ   ﬂ¡    w  ﬂ•&`ô `î `î  † î #ñ "Æ PCPI`-`*PÄÄ$  _qyi$  ◊                       ﬁÕ   ﬂº  J      ö¶   ó   ¡   ·J   ‰h	   ¡      &i    ª   J   J   Ki      i   æ   J	   i   
+   i   æ   J   i      i   æ   J   i      i   ·J   ‰   s w ﬂó   ¡   0)Œ   ﬂ¡    w  ﬂ•&`ò `ê † 9ò  ò § PˇˇˇZPI`-`*PÄ$  ¸¥$  ◊                       ﬁÕ   ﬂº  J      ö¶   ó   ¡   ·J   ‰h	   ¡      &i    ª   J   J   Ki      i   æ   J	   i   
+   i   æ   J   i      i   æ   J   i      i   ·J   ‰   s w ﬂó   ¡   0)Œ   ﬂ¡    w  ﬂ•&`ò `ê † 8ò  ò § Pˇˇˇ[PI`-`*PÄ¸   7	‘u¸   ™                         ¡   J   ú   ó   ﬂª   J   ó   ö&   ó   º      s ·J   ‰   w ﬂó   ¡   J      ö'   ó   ª   ·J	   ‰º  ¡   w ﬂô"   ó   ª   ·J
+   ‰º  ¡   w ﬂó   • `Æ ,`	P	P)`õ `ˇˇˇÒP> `ˇˇˇÛPIP‹   }Nº   m                 
+      $Œ   ﬂ´º      s ·J   ‰m   m   s ·J   ‰   s ·J   ‰   w ﬂô   ó	    §≠∞±   ﬂ±   ﬂ“ó	   ¡   ¢• `!`	P
+ˇˇˇÎP9PPë ë ` &Q‹   Ã      T      ˇˇˇˇ           D   $   ûï∞P$                               • 0   êï%h0                              Œ   ﬂ• `PÄx   “nèYx   ?                          ª   J   J   Œ   ﬂª   ·J   ‰ª   J   9   m   <   w ﬂ• `ï `
+%J
+PD PÄÄÄ∏  ò’i®  .                     Ω  Œ   ﬂ‹Õ  ﬂﬁÕ  ﬂª   ·J   ‰¡   s ù   ó   ﬂª   ·J   ‰º s ó	   ö"   ó
+   ¡  ·J   ‰æ  æ  s ¢ó   æ  Œ   ﬂ¡   J   ù!   ó   ﬂª   ·J   0·Ê(L   ﬂó   Õ   ﬂŒ   ﬂm   Õ  ﬂæ  æ   L   ﬂò   ¡   ¡   J   ö-   ó   ¡   ¡   0·(Œ   ﬂKæ   L   ﬂô¬ˇˇˇó   æ  ·J   ‰æ  s ¢•ï@
+`ˇˇˇÙPˇˇˇÙPì `ˇˇˇÙPCF`
+`µ 
+`'`J`.fï `®@`ˇˇˇ˘P#QÄÄ∏         “   C     ÔK˚  ≤         	              ‹Õ  ﬂﬁÕ  ﬂª   ·J   ‰æ     ¡   J   &s ù   ó   ﬂó   ¡   ,Õ   ﬂª   ·J   ‰æ     ¡   J   &æ   &w ﬂº  ·J   ‰w  ﬂ¡   æ   K·J   ‰æ  æ  s ù   ó   ﬂó   ¢•L`ˇˇˇ‰Pî /+`	ˇˇˇ€PD`
+PD	`ë !ˇˇˇÛPî QÄÄÄ¸   'π*¿¸   ™   	                     Ω  Œ   ﬂm   Œ   ﬂª   m   L   ﬂ¡   J   J   Œ   ﬂ¡   J   J   Œ   ﬂ¡   ·J   ‰¡   J   9	   m
+   <   m   <   m   <   m   <   m   <   m   <   w ﬂ•î@`ê@`ï `ï `	
+%JJ J+J2J9JPDEPÄÄL   <“L                            ª    º  s º &   &¢• 	`ˇˇˇ˜P
+QÄÄÄ|  J–x“|  Ÿ                6       ª   J   ·J   ‰º  ·J   ‰s s Õ   ﬂæ   ·J   ‰   s ·J   ‰   s Õ  ﬂ9	   æ   ·J   ‰
+   s <   æ   ·J   ‰   s <   Õ  ﬂ¡       s ·J   ‰h
+      i       i      ¡    æ  Ks &   &¡    æ  Ks &   &æ  K&   &æ  K&   &i      i      i      ¡       s ·J   ‰   s 
+öôôôôôπ?'&   &i      ¡    æ  J   ˇs &   &i      ¡    æ  J   ˇs &   &i      i      i	   ·J   ‰   s w ﬂª   m    L!   ﬂ• `ë &PˇˇˇÈP(`ê PP(`ê P ê P-`P
+*ˇˇˇ˘P
+ ˇˇˇ˘P
+ ìî [Pô ˇˇˇ˘P/ˇˇˇ˘Pô ñPCPD`ê PÄÄ$   ûï∞P$                               • $  "·3¸$  »         	               ‹Õ  ﬂﬁÕ  ﬂæ  ·J   ‰s Õ   ﬂæ  J   ù>   ó   ﬂæ  J   ù*   ó   ﬂæ   ª   ù   ó
+   ﬂæ   ª   ó   ö"   ó   ¡   ·J   ‰æ  æ  s ¢ó   ª    ª   J   ·J   ‰æ   s ·J	   ‰
+   s s ¢•,`P(`Æ /ï ï `ˇˇˇÙPCF`ë &ˇˇˇÔPPˇˇˇƒP#Q$  FJ"$  ª         
+               ﬁÕ  ﬂæ  J   ö   ó   ¢ó   æ  ·J   ‰s  Õ   ﬂæ  ·J   ‰s Õ  ﬂª   J   ·J   ‰æ  s Õ  ﬂæ   ª    æ  ·J   ‰	   s s &.Õ   ﬂæ   ª    æ  ·J   ‰
+   s s &.Õ   ﬂæ   ¢•&`ï `AF`P`P`ë &ˇˇˇÔP(`
+ê PˇˇˇP*`
+ê PˇˇˇP*`$QÄ®  t≥∂®          
+               ﬁÕ  ﬂæ  J   ö   ó   ¢ó   æ  ·J   ‰s  Õ   ﬂæ  ·J   ‰s Õ  ﬂª   J   ·J   ‰æ  s Õ  ﬂæ   ª    æ  ·J   ‰	   s s &.Õ   ﬂæ   ª    æ  ·J   ‰
+   s s &.Õ   ﬂº  öX   ó   æ   ª    æ  ·J   ‰   s s &.Õ   ﬂæ   ª    æ  ·J   ‰   s s &.Õ   ﬂó    æ   ¢•&`ï `A
+F`P`P`ë &ˇˇˇÔP(`
+ê PˇˇˇP*`
+ê PˇˇˇP*`-`
+ê PˇˇˇP*`
+ê PˇˇˇPO	`$QÄÄÄ$  æÍTJ$  »         	               ‹Õ  ﬂﬁÕ  ﬂæ  ·J   ‰s Õ   ﬂæ  J   ù>   ó   ﬂæ  J   ù*   ó   ﬂæ   ª   ù   ó
+   ﬂæ   ª   ó   ö"   ó   ¡   ·J   ‰æ  æ  s ¢ó   ª    ª   J   ·J   ‰æ   s ·J	   ‰
+   s s ¢•,`P(`Æ /ï ï `ˇˇˇÙPCF`ë &ˇˇˇÔPPˇˇˇƒP#Q$  ˚Å⁄$  ª         
+               ﬁÕ  ﬂæ  J   ö   ó   ¢ó   æ  ·J   ‰s  Õ   ﬂæ  ·J   ‰s Õ  ﬂª   J   ·J   ‰æ  s Õ  ﬂæ   ª    æ  ·J   ‰	   s s &.Õ   ﬂæ   ª    æ  ·J   ‰
+   s s &.Õ   ﬂæ   ¢•&`ï `AF`PM≤‡`P`ë &ˇˇˇÔP(`
+ê PˇˇˇP*`
+ê PˇˇˇP*`$QÄ®  ﬂÁ∫ô®          
+               ﬁÕ  ﬂæ  J   ö   ó   ¢ó   æ  ·J   ‰s  Õ   ﬂæ  ·J   ‰s Õ  ﬂª   J   ·J   ‰æ  s Õ  ﬂæ   ª    æ  ·J   ‰	   s s &.Õ   ﬂæ   ª    æ  ·J   ‰
+   s s &.Õ   ﬂº  öX   ó   æ   ª    æ  ·J   ‰   s s &.Õ   ﬂæ   ª    æ  ·J   ‰   s s &.Õ   ﬂó    æ   ¢•&`ï `A
+F`P`P`ë &ˇˇˇÔP(`
+ê PˇˇˇP*`
+ê PˇˇˇP*`-`
+ê PˇˇˇP*`
+ê PˇˇˇPO	`$QÄÄÄ3ıÿ  `  P°          `  P°          `  `I    2  3     4  ú a  5  6      7    8    9  :  ;    `F    @G  I  H  •    @J  K  L    @M  ï N  O  P  	  @Q  R  S    `I  M       X  Y  2  Z    `  3     4  $  \  R ∞   ï I  ]  ;  	  `c  h  i  
+  `c     l    `#  b  c  d  e  
+  @J     	  pf  
+  pj    `   o  0  p  Y  q  .      -  I  $  X  2    `  3  4  ]    `;    `;    `∞   à  \  X  Y    `∞   à  \  X  Y    `∞   à  \  X  Y    `v  ï    `ë  ∞   à  \  î  R  ï  ö X  Y  ñ    p  `v  §    `K  L  J    `
+  µ  ∂    `  w  •  Æ  °    Ø  F    @G  v  S  <  K  L    ∞  J    @±  ≤    @≥  ¥    	    pR  ∑    ∏  π  ∫  ª    @ó  )    @©  ¨    @¢    `K  •  ¶  ∞   }  \  z  å     pF    @Q  H  ©  ®  P  T  6   ë  ô  ™  R  §  ñ    p    ´    `P    `P  
+  ¬  ¨    `±  ≤    @¿  L  ¥    
+    p*    5  ¡  F    @  @  p  `K  ∏  {  /  6   ë  ô  ´  ñ    p    ™    `  pF    @  ó  5  ò    @I  H  K  ô    @ö    @  õ  ç  ú  ù    @ü  w  †  h  °  J  ¢      @G  P  Y  [    p  p  `       o  -  #  u  v  w  R  x  <  ∞   z    P  B  {  }  \    v        Å  Y    p.     *    pÇ  É  Ñ  m  $  Ö  q  Ü    pá    p  pä    pã  I  å  ç  é    ê    på     p!  `v  §  #  `K  L  %  `
+  µ  ∂  $  `w  •  Æ  °    Ø  F  !  @G  v  S  <  K  L    ∞  J  "  @±  ≤  #  @≥  ¥    	  %  pR  ∑    ∏  M  ≈  π  ∆  ª  $  @ƒ  ó  O    *  %  @&  @©  ¨  '  @¢  "  `K  •  ¶  ∞   }  \  z  å   #  pF     @Q  H  ©  ®  P  T  6   ë  ô  ™  R  §  ñ  $  p    ´  (  `P  )  `P  
+  ¬  ¨  '  `±  ≤  (  @¿  L  ¥    
+  (  p*    5  ¡  F  )  @*  @)  p&  `K  ∏  {  /  6   ë  ô  ´  ñ  '  p    ™     `!  p   F    @\  ï ƒ  ó  5  ò    @I  H  K  ô    @P  Y  [  ö  ç  ú      ù    @ü  w  °  J  ¢    @G  "  p&  p  `å      p+  `‘  u  I    v  ÷  Z  ◊  ÿ  Ÿ  ⁄  >  ê   €  ‹  »  å  ç  
+  -  `   ^  `  ,  `b  u  »  ,  p.  `Õ  Œ     À  Ã  /  `0  ‡  ﬂ  Z  ·         ÷  ‚  „  ‰  Â  >  ê   0  `0  ‡  Ê  Z  ·         ÷  ‚  „  ‰  Â  >  ê   1  `0  ‡  Z  Á         Ë  ‰  È  Ø  Í  L  Î  >  ê   2  `0  ‡  Z  Á         Ë  ‰  È  Ø  Í  L  Î  >  ê   3  `     *  Å  R  Ì  b  u  ^  l  *  `.  p&  ∞  »  ◊ …  +  p«     À  Ã  -  p#  u  –  “         ⁄        ›  Ñ  ﬁ  /  p‰  0  p1  p2  pB  {    v      Ï  3  p5  `6  `4  `r  P  5  p6  pX  Y  7  `:  `»  ¯  ˜  Ù  ]     9  `»  Ú     Ù  9  pI  Y  8  `»  ◊ P    +  @8  p<  `±  a >  `=  `  ˝  ˛  Œ      ﬁ     ,  @ G   Æ  å  ç     ;  }   	 
+ F  ¥    –  >  
+     =  p)  ?  `Œ   I         ∞  ˝  ˛    L  @  `I  L  Œ     ˝  ˛  ±      A  `I  †  Œ     ˝  ˛  ±        B  `Œ   I         ∞  ˝  ˛    Ø  C  `I  Ø  Œ     ˝  ˛  ±      D  `I   Œ     ˝  ˛  ±        ;  `;  p   <  p)  ◊ L  Ø    -  @>  p?  p†  @  pJ  A  pB  p C  pü     `      @  @  @    @      @      @           P                I             !  "  #      P  $    p&    p(    p)  
+  +  w     ,  *  -  .    p/    p<    pT    p[    p^    pm  $  r  Œ   3  4    pl    p¶  *  p«  4  p»  7  p:  pˇXÑN  P                                         
+      )              /              <        4   	   T        =      [        R      ^        J      f        N      j        _      m        8  9   l        n      !       s      !       u      !       w      !       }      !       É      !       å      !       â      "         %   !       ô      £        œ      $       ú      %       §   +             †                     $       Û                Ï                Ó                     ¶        Ô  $   &       q     £        ´     (       t     )       {  0             w               ·     (       œ               »                               Ü  (   «        .     *       *     +       3     ,            ”        9     ,       I     ,       Y     ,       j     ,       {     ,       ∞               Æ               Ø               «               ø     P        ∏     ı        :               Œ     ˘        “  "   /       —     0       Ù     L        ˇ     †        
+     J             Ø        "            -     ü        ùH©¿      -v      -v                  z  »  r  »  @                ·  /  Ÿ  /  A                G  K  ?  K  B               M  t  E  t  F               å    Ñ    W                D    D  g               g    _    r   !          Ä$  _    _  z               o  ﬂ  g  ﬂ  Ä               Ù  X  Ï  X  É               t  ˇ   l  ˇ   ä             ÄD!  =  <!  =  ò               £$  Â$  õ$  Â$  £               	&  "&  &  "&  ©   4            í'  ´'  ä'  ´'  ∞   4            Í'  )(  ‚'  )(  ±   <            {(  ∫(  s(  ∫(  ≥   5            *  F*   *  F*  ª   4           ÄS+  ù,  K+  ù,  ¡   +             ^,  í,  V,  í,  «   &           Çæ,  Á<  ∂,  Á<  À                l/  é/  \/  é/  Ÿ              ˜/  G9  Ô/  G9  ‹               π0  1  ±0  1  ﬂ   =           2  9  2  9  Á   8            €5  "6  ”5  "6  Ò   ú           ÇT9  Ã<  L9  Ã<  ˇ              Y:  °<  Q:  °<    8             ”:  ¯:  À:  ¯:    w            V<  í<  N<  í<  
+  d           Ä =  ]N  =  ]N              Çò=  4N  ê=  4N                 :@  \@  *@  \@  "             {@  xJ  s@  xJ  $              =A  ãA  5A  ãA  '  =           ùB  MJ  ïB  MJ  /  8            
+F  QF  F  QF  ;  ú           ÇÖJ  
+N  }J  
+N  L             äK  ﬂM  ÇK  ﬂM  Q  8             L  6L  ¸K  6L  R  w            îM  –M  åM  –M  Y  d           ÇnN  ˛\  fN  ˛\  a            Ä N  ÅO  ¬N  ÅO  c              0O  eO  (O  eO  e              ”O  ˚P  ÀO  ˚P  j              ØQ  „S  ùQ  „S  q              U  kV  U  kV    2           ≤V  X  ™V  X  â  2           NX  QY  FX  QY  î  1           ≥Y  µZ  ´Y  µZ  õ  1            —[  ˙\  …[  ˙\  £  !          Ä›]  ®^  ’]  ®^  ≥              0^  4^  (^  4^  ∂  )             >^  X^  6^  X^  ∂  7           Äø^  ,c  ∑^  ,c  ª             Çy_  #c  q_  #c  æ             œ`  Pb  «`  Pb  ∆            ÄÍh  !v  ‚h  !v  Ï              i  Ei  i  Ei  Ì             ii  …l  ai  …l  Ó  $            îl  òl  ål  òl  ˙  %            tm  Ån  lm  Ån  ˛              õn  ¡o  ìn  ¡o                €o  •q  ”o  •q               πq  ƒr  ±q  ƒr                ›r  t  ’r  t                t  ‰u  t  ‰u  %            5°›}% A|È~⁄70      g¯ﬁ˚g¯ﬁ˚H≈tg¯Âp   T    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/ddsmoothmenu.js necko:classified 1 strongly-framed 1 security-info FnhllAKWRHGAlo+ESXykKAAAAAAAAAAAwAAAAAAAAEaphjojH6pBabDSgSnsfLHeAAAAAgAAAAAAAAAAAAAAAAAAAAEAOQFmCjImkVxP+7sgiYWmMt8FvcOXmlQiTNWFiWlrbpbqgwAAAAAAAAZeMIIGWjCCBUKgAwIBAgIMBDRov99iNgtiT0/6MA0GCSqGSIb3DQEBCwUAMFUxCzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMSswKQYDVQQDEyJHbG9iYWxTaWduIEdDQyBSNiBBbHBoYVNTTCBDQSAyMDIzMB4XDTI0MDcwNTA5MDUyMVoXDTI1MDgwNjA5MDUyMFowGDEWMBQGA1UEAwwNKi5jbXJpdC5hYy5pbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBANYiwzmvUK2/gsxQAtHV+G0vy665aU6ugVBmPzAEwCJr64nlJzPtA4nKiKddlbF0n5wIYz6qHEYswc/VMe03LLOFEyGHZCicGajhmvAv4MI3oVgQ8r/NDmc63WY1BazuIvlaEBaSdo7TosAMIhuSMbry0ZJ+72aTDrr22XXMB8iOmiEFzf/MMVgO5/fnh69czcjxT/kUWw+hP1qsAe3vXly1XdArNERI1m6d33SNuAFIrDvCM1nFuFpNf2GhiMDoeGnkR55cLgz7lzuX3uW84dfS2rhnhGBQGP+7bBzw8lkD6N/f0u7ahswxw8H6MOhMqmSSNSt/DoT8jP24h/6jRCkCAwEAAaOCA2UwggNhMA4GA1UdDwEB/wQEAwIFoDAMBgNVHRMBAf8EAjAAMIGZBggrBgEFBQcBAQSBjDCBiTBJBggrBgEFBQcwAoY9aHR0cDovL3NlY3VyZS5nbG9iYWxzaWduLmNvbS9jYWNlcnQvZ3NnY2NyNmFscGhhc3NsY2EyMDIzLmNydDA8BggrBgEFBQcwAYYwaHR0cDovL29jc3AuZ2xvYmFsc2lnbi5jb20vZ3NnY2NyNmFscGhhc3NsY2EyMDIzMFcGA1UdIARQME4wCAYGZ4EMAQIBMEIGCisGAQQBoDIKAQMwNDAyBggrBgEFBQcCARYmaHR0cHM6Ly93d3cuZ2xvYmFsc2lnbi5jb20vcmVwb3NpdG9yeS8wRAYDVR0fBD0wOzA5oDegNYYzaHR0cDovL2NybC5nbG9iYWxzaWduLmNvbS9nc2djY3I2YWxwaGFzc2xjYTIwMjMuY3JsMCUGA1UdEQQeMByCDSouY21yaXQuYWMuaW6CC2Ntcml0LmFjLmluMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAfBgNVHSMEGDAWgBS9BbfzipM8c8t5+g+FEqF3lhiRdDAdBgNVHQ4EFgQUf3W8QY8EiQ7VPwxF4aS4Vf8WetwwggF+BgorBgEEAdZ5AgQCBIIBbgSCAWoBaAB2AK8YGijWjKPgqYpMnGerCfi7vCK6rryxOKOhndP5tgMNAAABkIIkH2EAAAQDAEcwRQIgTN19xjG3exUUK8CUQTJyyW3lC6PbP7tSLIPQfg62S8oCIQDaz7bAkIsTLvQgeGmRLlxxTxm/8OIAgsCNVjTnQWVBtwB2ABLxTjS9U3JMhAYZw48/ehP457Vih4icbTAFhOvlhiY6AAABkIIkIDMAAAQDAEcwRQIhAIt6+TPWN/uXoo50HsiUEJM9gnQAwDRhGejwSPvu4YIfAiAK2/DtKUuMvI+PtbokhaSz+NDIfec2NJzVqX4f3OGimwB2AObSMWNAd4zBEEEG13G5zsHSQPaWhIb7uocyHf0eN45QAAABkIIkH24AAAQDAEcwRQIhANQJnsn2DGT93ap7L8PL4lHIMSN6km0tBxntLCxKOL1dAiBPh7iC+H2lPvlPQjkr1IVVBkirx0/Ese2qg2qGi8CEjTANBgkqhkiG9w0BAQsFAAOCAQEAGP2xoNrcnvmeqt84f+EmQYIm79CxvUEYsZ7tlMhdm3eWzs7EJ96BDr020b5bL5sELUoN3C4C56TZcJztd/ieDWR79oKAjUMEnC8yuW+FAffetYwZSK4WQ17lJowV5kntQEhh6PilWnDi45Na5/gyiXCPmAXEFMV/vBsIgUOy1k6VFTUccxUXCRbIgusxYDvoiA+gWAJ3QHL8JKKYLtScUcBJxvTRyi6HeUiGfayu/RZ3gDOontPyOWJVqALAh/qiOa5roMxXrK4EVQyhwvGWLEASIzHPejj66HxM5RiMmWyH0BGrTF2lCI/Ts/132GUlMHdFs60B8CqcyGGBxYkBosAwAAMAAAAAAAEBAAAFAAAABFAyNTYAAAAQUlNBLVBLQ1MxLVNIQTUxMgADZgoyJpFcT/u7IImFpjLfBb3Dl5pUIkzVhYlpa26W6oMAAAAAAAAGXjCCBlowggVCoAMCAQICDAQ0aL/fYjYLYk9P+jANBgkqhkiG9w0BAQsFADBVMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xvYmFsU2lnbiBudi1zYTErMCkGA1UEAxMiR2xvYmFsU2lnbiBHQ0MgUjYgQWxwaGFTU0wgQ0EgMjAyMzAeFw0yNDA3MDUwOTA1MjFaFw0yNTA4MDYwOTA1MjBaMBgxFjAUBgNVBAMMDSouY21yaXQuYWMuaW4wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDWIsM5r1Ctv4LMUALR1fhtL8uuuWlOroFQZj8wBMAia+uJ5Scz7QOJyoinXZWxdJ+cCGM+qhxGLMHP1THtNyyzhRMhh2QonBmo4ZrwL+DCN6FYEPK/zQ5nOt1mNQWs7iL5WhAWknaO06LADCIbkjG68tGSfu9mkw669tl1zAfIjpohBc3/zDFYDuf354evXM3I8U/5FFsPoT9arAHt715ctV3QKzRESNZund90jbgBSKw7wjNZxbhaTX9hoYjA6Hhp5EeeXC4M+5c7l97lvOHX0tq4Z4RgUBj/u2wc8PJZA+jf39Lu2obMMcPB+jDoTKpkkjUrfw6E/Iz9uIf+o0QpAgMBAAGjggNlMIIDYTAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH/BAIwADCBmQYIKwYBBQUHAQEEgYwwgYkwSQYIKwYBBQUHMAKGPWh0dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0L2dzZ2NjcjZhbHBoYXNzbGNhMjAyMy5jcnQwPAYIKwYBBQUHMAGGMGh0dHA6Ly9vY3NwLmdsb2JhbHNpZ24uY29tL2dzZ2NjcjZhbHBoYXNzbGNhMjAyMzBXBgNVHSAEUDBOMAgGBmeBDAECATBCBgorBgEEAaAyCgEDMDQwMgYIKwYBBQUHAgEWJmh0dHBzOi8vd3d3Lmdsb2JhbHNpZ24uY29tL3JlcG9zaXRvcnkvMEQGA1UdHwQ9MDswOaA3oDWGM2h0dHA6Ly9jcmwuZ2xvYmFsc2lnbi5jb20vZ3NnY2NyNmFscGhhc3NsY2EyMDIzLmNybDAlBgNVHREEHjAcgg0qLmNtcml0LmFjLmluggtjbXJpdC5hYy5pbjAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwHwYDVR0jBBgwFoAUvQW384qTPHPLefoPhRKhd5YYkXQwHQYDVR0OBBYEFH91vEGPBIkO1T8MReGkuFX/FnrcMIIBfgYKKwYBBAHWeQIEAgSCAW4EggFqAWgAdgCvGBoo1oyj4KmKTJxnqwn4u7wiuq68sTijoZ3T+bYDDQAAAZCCJB9hAAAEAwBHMEUCIEzdfcYxt3sVFCvAlEEycslt5Quj2z+7UiyD0H4OtkvKAiEA2s+2wJCLEy70IHhpkS5ccU8Zv/DiAILAjVY050FlQbcAdgAS8U40vVNyTIQGGcOPP3oT+Oe1YoeInG0wBYTr5YYmOgAAAZCCJCAzAAAEAwBHMEUCIQCLevkz1jf7l6KOdB7IlBCTPYJ0AMA0YRno8Ej77uGCHwIgCtvw7SlLjLyPj7W6JIWks/jQyH3nNjSc1al+H9zhopsAdgDm0jFjQHeMwRBBBtdxuc7B0kD2loSG+7qHMh39HjeOUAAAAZCCJB9uAAAEAwBHMEUCIQDUCZ7J9gxk/d2qey/Dy+JRyDEjepJtLQcZ7SwsSji9XQIgT4e4gvh9pT75T0I5K9SFVQZIq8dPxLHtqoNqhovAhI0wDQYJKoZIhvcNAQELBQADggEBABj9saDa3J75nqrfOH/hJkGCJu/Qsb1BGLGe7ZTIXZt3ls7OxCfegQ69NtG+Wy+bBC1KDdwuAuek2XCc7Xf4ng1ke/aCgI1DBJwvMrlvhQH33rWMGUiuFkNe5SaMFeZJ7UBIYej4pVpw4uOTWuf4Molwj5gFxBTFf7wbCIFDstZOlRU1HHMVFwkWyILrMWA76IgPoFgCd0By/CSimC7UnFHAScb00couh3lIhn2srv0Wd4AzqJ7T8jliVagCwIf6ojmua6DMV6yuBFUMocLxlixAEiMxz3o4+uh8TOUYjJlsh9ARq0xdpQiP07P9d9hlJTB3RbOtAfAqnMhhgcWJAaJmCjImkVxP+7sgiYWmMt8FvcOXmlQiTNWFiWlrbpbqgwAAAAAAAAWQMIIFjDCCA3SgAwIBAgIQfx8skC6D0OO2+zvuR4tegDANBgkqhkiG9w0BAQsFADBMMSAwHgYDVQQLExdHbG9iYWxTaWduIFJvb3QgQ0EgLSBSNjETMBEGA1UEChMKR2xvYmFsU2lnbjETMBEGA1UEAxMKR2xvYmFsU2lnbjAeFw0yMzA3MTkwMzQzMjVaFw0yNjA3MTkwMDAwMDBaMFUxCzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMSswKQYDVQQDEyJHbG9iYWxTaWduIEdDQyBSNiBBbHBoYVNTTCBDQSAyMDIzMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA00Jvk5ADppO0rgDnj1M14XIb032Aas409JJFAb8cUjipFOth7ySLdaWLe3s63oSs5x3eWwzTpX4BFkzZbxT1eoJSHfT2M0wZ5QOPcCIjsr+YB8TAvV2yJSyq+emRrN/FtgCSTaWXSJ5jipW8SJ/VAuXPMzuAP2yYpuPcjjQ5GyrssDXgu+FhtYxqyFP7BSvx9jQhh5QV5zhLycuan8n+J0Uw09WRQK6JGQ5HzDZQinkNel+fZZNRG1gE9Qeh+tHBplrkalB1g85qJkPOJ7SoEvKsmDkajggk/sSq7NPyzFaa/VBGZiRRG+FkxCBniGD5618PQ4trcwHyMojSFObOHQIDAQABo4IBXzCCAVswDgYDVR0PAQH/BAQDAgGGMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1UdDgQWBBS9BbfzipM8c8t5+g+FEqF3lhiRdDAfBgNVHSMEGDAWgBSubAWjkxPioufi1xzWx/B/yGdToDB7BggrBgEFBQcBAQRvMG0wLgYIKwYBBQUHMAGGImh0dHA6Ly9vY3NwMi5nbG9iYWxzaWduLmNvbS9yb290cjYwOwYIKwYBBQUHMAKGL2h0dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0L3Jvb3QtcjYuY3J0MDYGA1UdHwQvMC0wK6ApoCeGJWh0dHA6Ly9jcmwuZ2xvYmFsc2lnbi5jb20vcm9vdC1yNi5jcmwwIQYDVR0gBBowGDAIBgZngQwBAgEwDAYKKwYBBAGgMgoBAzANBgkqhkiG9w0BAQsFAAOCAgEAfMkkMo5g4mn1ft4d4xR2kHzYpDukhC1XYPwfSZN3A9nEBadjdKZMH7iuS1vF8uScg26/30DRPen2fFRsr662ECyUCR4OfeiiGNdoQvcesM9Xpew3HLQP4qHg+s774hNLvGRD4aKSKwFqLMrcqCw6tEAfX99tFWsD4jzbC6k8tjSLzEl0fTUlfkJaWpvLVkpg9et8tD8d51bymCg5J6J6wcXpmsSGnksBobac1+nXmgB7jQC9edU8Z41FFo87BV3kCtrWWsdkQavObMsXUPl/AO8y/jOuAWz0wyvPnKom+o6W4vKDY6/6XPypNdebOJ6mjyaILp0quoQvhjx87BzENh5s57AIOyIGpS0sDEChVDPzLEfRsH2FJ8/W5woF0nvsBTqfYSCqblQbHeDDtCj7Mlf8JfqaMuqcbE4rMSyfeHyCdZQwnc/r9ujnth691AJhxyYeCM04metJIe7cB6d4dFm+Pd5ervY4x32r0uQ1Q0spy1VjNqUJjussYuXNyMmFHSuLQQ6PrePmH5lcSMQpYKzPoD/RiNVD/PK0O3vuO5vh3o7oKb1FfzoanDsFFTrw0aLOdRW/tmLPWVNVlAb8ad+B80YJsL4HXYnQG8wYAFb8LhwSDyT9v+C1C1lcIHE7nE0AAp9JSHxDYsma9pi4g0Phg3BgOm2euTRzw7R0SzVmCjImkVxP+7sgiYWmMt8FvcOXmlQiTNWFiWlrbpbqgwAAAAAAAAWHMIIFgzCCA2ugAwIBAgIORea7A4Mzw4VlSOb/RVEwDQYJKoZIhvcNAQEMBQAwTDEgMB4GA1UECxMXR2xvYmFsU2lnbiBSb290IENBIC0gUjYxEzARBgNVBAoTCkdsb2JhbFNpZ24xEzARBgNVBAMTCkdsb2JhbFNpZ24wHhcNMTQxMjEwMDAwMDAwWhcNMzQxMjEwMDAwMDAwWjBMMSAwHgYDVQQLExdHbG9iYWxTaWduIFJvb3QgQ0EgLSBSNjETMBEGA1UEChMKR2xvYmFsU2lnbjETMBEGA1UEAxMKR2xvYmFsU2lnbjCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAJUH6HPKZvnsFMp7PPcNCPG0RQssgrRIxutbPK6DuEGSMxSkb3/pKszGsIhrxbaJ0cay/xTOURQh7ErdG1rG1ofuTToVBu1kZguSgMpE3nOUTvOniX9PeGMIyBJQbUJmL025eShNUhqKGoC3GYEOfsSKvGRMIRxDaNc9PIrFsmbVkJq3MQbFvuJtMgamHvm566qjuL++gmNQ0PAYid/kD3n16qIfKtJwLnvnvJO7bVPiSHyMEAc4/2ayd2F+4OqMPKq0pPbzlUoSB239jLKJz9CgYXfIWHSw1CM69106yqLbnQneXUQtkPGBzVeS+n68UARjNN9rkxi+azayOeSsJDa38O+2HBNXk7besvjihbdzorg1qkXy4J02oW9UivFyVm4uiMVRQkQVlO6jxTiWm05OWgtH8wY2SXcwvHE35absIQh1/OZhFj931dmRl4QKbNQCTXTAFO39OfuD8l4UoQSwC+n+7o/hbguyCLNhZglqsQY6ZZZZwPA1/cnaKI0aEYdwgQqomnUdnjqGBQCe24DWJfncBZ4nWUx2OVvq+aWh2IMP0f/fMBH5hc8zSPXKbWQULHpYT9NLCEnFlWQaYw55PfWzjMpYrZxCRXluDocZXFSxZba/jJvcE+kNb7gu3GduyYsRtYQUigAZcIN5kZeR1BonvzceMgfYFGM8KEyvAgMBAAGjYzBhMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBSubAWjkxPioufi1xzWx/B/yGdToDAfBgNVHSMEGDAWgBSubAWjkxPioufi1xzWx/B/yGdToDANBgkqhkiG9w0BAQwFAAOCAgEAgyXt6NH9lVLNnsAEoJFp5lzQhN7craJP6Ed41mWYqVuoPId8AorRbrcWc+ZfwFSY1XS+wc3iEZGtIxg93eFyRJa0lV7Ae46ZeBZDE1ZXs6KzO7V33EByrKPrmzU+sQghoefEQzd5Mr6155wsTLxDKZmOMNOsIeDjHfrYBzN2VAAiKrlNIC5waNrlU/yDXNOd8v9EDERm8tLjvUYAGm0CuiVdjaExUd1URhxN25mW7xocBFymFe944Hn+Xds+qkxV/ZoVqW/hpvvfcDDpw+5CRu3CkwWJ+n1jez/QcYF8AOiYrg54NMMl+68KnyBr3TsTjxKM4kEaSHpzoHdpx7Zcf4LIHv5YGygrqGytXm3ABdJ7t+uA/iU3/gKbaKxCXcPu9czc8FB10jZpnOZ7BN9uBmm23goJSFmH63sUYHpkqmlD75HHTOwY3WzvUy2MmeFe8nI+z1TIvWfspA9MRf/TuTAjB0yPEL+GltmZWrSZVxykzLsViVO6LAUP5MSeGbEYNNVMnbrt9x+vJJUEeKgDu+6B5dpffItKoZB0JaezPkvILFa9x8jvOOJckvB595yEunQtYQEgfn7R8k8HWV+LLUNS60YMlOH1Zkd5d9VUWx+tJDfLRVpOoERIyNiwmcUVhAn21klJwGW45hpxbqCo8YLoRT5s1gLXCmeDBVrJpBAAAAABAAAAAAABAAAAAE10bHNmbGFnczB4MDAwMDAwMDA6ZXJwLmNtcml0LmFjLmluOjQ0M15wYXJ0aXRpb25LZXk9JTI4aHR0cHMlMkNjbXJpdC5hYy5pbiUyOQAA request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|b57e3a6f-d529-362d-001f-25c4eff9a052|
+Accept-Ranges: bytes
+ETag: W/"30253-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 30253
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|b57e3a6f-d529-362d-001f-25c4eff9a052|
+Accept-Ranges: bytes
+ETag: W/"30253-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 30253
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=97
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 277 net-response-time-onstop 306 alt-data 1;30253,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  ïï

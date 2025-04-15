@@ -1,0 +1,2090 @@
+/*
+ * jQuery Plugin: Tokenizing Autocomplete Text Entry
+ * Version 1.6.0
+ *
+ * Copyright (c) 2009 James Smith (http://loopj.com)
+ * Licensed jointly under the GPL and MIT licenses,
+ * choose which one suits your project best!
+ *
+ */
+
+(function ($) {
+// Default settings
+var gAjaxCallAbortArr = new Array();
+var DEFAULT_SETTINGS = {
+    // Search settings
+    method: "GET",
+    queryParam: "q",
+    encode : false,
+    searchDelay: 300,
+    minChars: 1,
+    propertyToSearch: "name",
+    jsonContainer: null,
+    contentType: "json",
+
+	// Prepopulation settings
+    prePopulate: null,
+    processPrePopulate: false,
+
+    // Display settings
+    hintText: "Type in a search term",
+    noResultsText: "No results",
+    searchingText: "Searching...",
+    deleteText: "&times;",
+    placeholder: null,
+    animateDropdown: true,
+    theme: null,
+    zindex: 1105,
+    resultsFormatter: function(item){ return "<li>" + item[this.propertyToSearch]+ "</li>" },
+    tokenFormatter: function(item) { return "<li><p>" + item[this.propertyToSearch] + "</p></li>" },
+
+    // Tokenization settings
+    tokenLimit: null,
+    tokenDelimiter: ",",
+    preventDuplicates: false,
+    tokenValue: "id",
+
+    // Callbacks
+    onResult: null,
+    onAdd: null,
+    onDelete: null,
+    onReady: null,
+    addOnKeyEnter: false,// This will add given input string
+    abortPrevCall: false, // #792701 - Abort previous running call to save server processing time, to resolve continues AJAX call triggers or long time processing.
+    
+    // Other settings
+    idPrefix: "token-input-",
+
+    // Keep track if the input is currently in disabled mode
+    disabled: false
+};
+
+// Default classes to use when theming
+var DEFAULT_CLASSES = {
+    tokenList: "token-input-list",
+    token: "token-input-token",
+    tokenDelete: "token-input-delete-token",
+    selectedToken: "token-input-selected-token",
+    highlightedToken: "token-input-highlighted-token",
+    dropdown: "token-input-dropdown",
+    dropdownItem: "token-input-dropdown-item",
+    dropdownItem2: "token-input-dropdown-item2",
+    selectedDropdownItem: "token-input-selected-dropdown-item",
+    inputToken: "token-input-input-token",
+    findSearchableByClass: "token-input-remove-searchableById",
+    focused: "token-input-focused",
+    disabled: "token-input-disabled"
+};
+
+// Input box position "enum"
+var POSITION = {
+    BEFORE: 0,
+    AFTER: 1,
+    END: 2
+};
+
+// Keys "enum"
+var KEY = {
+    BACKSPACE: 8,
+    TAB: 9,
+    ENTER: 13,
+    ESCAPE: 27,
+    SPACE: 32,
+    PAGE_UP: 33,
+    PAGE_DOWN: 34,
+    END: 35,
+    HOME: 36,
+    LEFT: 37,
+    UP: 38,
+    RIGHT: 39,
+    DOWN: 40,
+    NUMPAD_ENTER: 108,
+    COMMA: 188
+};
+
+// Additional public (exposed) methods
+var methods = {
+    init: function(url_or_data_or_function, options) {
+        var settings = $.extend({}, DEFAULT_SETTINGS, options || {});
+
+        return this.each(function () {
+            $(this).data("tokenInputObject", new $.TokenList(this, url_or_data_or_function, settings));
+        });
+    },
+    clear: function() {
+        this.data("tokenInputObject").clear();
+        return this;
+    },
+    add: function(item) {
+        this.data("tokenInputObject").add(item);
+        return this;
+    },
+    remove: function(item) {
+        this.data("tokenInputObject").remove(item);
+        return this;
+    },
+    get: function() {
+        return this.data("tokenInputObject").getTokens();
+    },
+    toggleDisabled: function(disable) {
+        this.data("tokenInputObject").toggleDisabled(disable);
+        return this;
+    }
+}
+
+// Expose the .tokenInput function to jQuery as a plugin
+$.fn.tokenInput = function (method) {
+    // Method calling and initialization logic
+    if(methods[method]) {
+        return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
+    } else {
+        return methods.init.apply(this, arguments);
+    }
+};
+
+// TokenList class for each input
+$.TokenList = function (input, url_or_data, settings) {
+    //
+    // Initialization
+    //
+
+    // Configure the data source
+    if($.type(url_or_data) === "string" || $.type(url_or_data) === "function") {
+        // Set the url to query against
+        settings.url = url_or_data;
+
+        // If the URL is a function, evaluate it here to do our initalization work
+        var url = computeURL();
+
+        // Make a smart guess about cross-domain if it wasn't explicitly specified
+        if(settings.crossDomain === undefined && typeof url === "string") {
+            if(url.indexOf("://") === -1) {
+                settings.crossDomain = false;
+            } else {
+                settings.crossDomain = (location.href.split(/\/+/g)[1] !== url.split(/\/+/g)[1]);
+            }
+        }
+    } else if(typeof(url_or_data) === "object") {
+        // Set the local data to search through
+        settings.local_data = url_or_data;
+    }
+
+    // Build class names
+    if(settings.classes) {
+        // Use custom class names
+        settings.classes = $.extend({}, DEFAULT_CLASSES, settings.classes);
+    } else if(settings.theme) {
+        // Use theme-suffixed default class names
+        settings.classes = {};
+        $.each(DEFAULT_CLASSES, function(key, value) {
+            settings.classes[key] = value + "-" + settings.theme;
+        });
+    } else {
+        settings.classes = DEFAULT_CLASSES;
+    }
+
+
+    // Save the tokens
+    var saved_tokens = [];
+
+    // Keep track of the number of tokens in the list
+    var token_count = 0;
+
+    // Basic cache to save on db hits
+    var cache = new $.TokenList.Cache();
+
+    // Keep track of the timeout, old vals
+    var timeout;
+    var input_val;
+
+    // Create a new text input an attach keyup events
+    var input_box = $("<input type=\"text\"  autocomplete=\"off\">")
+        .css({
+            outline: "none"
+        })
+        .attr("id", settings.idPrefix + input.id)
+        .focus(function () {
+            if (settings.disabled) {
+                return false;
+            } else
+            if (settings.tokenLimit === null || settings.tokenLimit !== token_count) {
+                show_dropdown_hint();
+            }
+            token_list.addClass(settings.classes.focused);
+        })
+        .blur(function () {
+            hide_dropdown();
+            $(this).val("");
+            token_list.removeClass(settings.classes.focused);
+        })
+        .bind("keyup keydown blur update", resize_input)
+        .keydown(function (event) {
+            var previous_token;
+            var next_token;
+
+            switch(event.keyCode) {
+                case KEY.LEFT:
+                case KEY.RIGHT:
+                case KEY.UP:
+                case KEY.DOWN:
+                    if(!$(this).val()) {
+                        previous_token = input_token.prev();
+                        next_token = input_token.next();
+
+                        if((previous_token.length && previous_token.get(0) === selected_token) || (next_token.length && next_token.get(0) === selected_token)) {
+                            // Check if there is a previous/next token and it is selected
+                            if(event.keyCode === KEY.LEFT || event.keyCode === KEY.UP) {
+                                deselect_token($(selected_token), POSITION.BEFORE);
+                            } else {
+                                deselect_token($(selected_token), POSITION.AFTER);
+                            }
+                        } else if((event.keyCode === KEY.LEFT || event.keyCode === KEY.UP) && previous_token.length) {
+                            // We are moving left, select the previous token if it exists
+                            select_token($(previous_token.get(0)));
+                        } else if((event.keyCode === KEY.RIGHT || event.keyCode === KEY.DOWN) && next_token.length) {
+                            // We are moving right, select the next token if it exists
+                            select_token($(next_token.get(0)));
+                        }
+                    } else {
+                        var dropdown_item = null;
+
+                        if(event.keyCode === KEY.DOWN || event.keyCode === KEY.RIGHT) {
+                            dropdown_item = $(selected_dropdown_item).next();
+                        } else {
+                            dropdown_item = $(selected_dropdown_item).prev();
+                        }
+
+                        if(dropdown_item.length) {
+                            select_dropdown_item(dropdown_item);
+                        }
+                    }
+                    return false;
+                    break;
+
+                case KEY.BACKSPACE:
+                    previous_token = input_token.prev();
+
+                    if(!$(this).val().length) {
+                        if(selected_token) {
+                            delete_token($(selected_token));
+                            hidden_input.change();
+                        } else if(previous_token.length) {
+                            select_token($(previous_token.get(0)));
+                        }
+
+                        return false;
+                    } else if($(this).val().length === 1) {
+                        hide_dropdown();
+                    } else {
+                        // set a timeout just long enough to let this function finish.
+                        setTimeout(function(){do_search();}, 5);
+                    }
+                    break;
+
+                case KEY.TAB:
+                case KEY.ENTER:
+                	//This will add given input string - Kiran Badave 
+                	if(settings.addOnKeyEnter==true && $('.token-input-noResult').is(':visible')){
+                		add_token({id:'other-'+token_count,name:$(this).val()});
+                    	break;
+                	}
+                case KEY.NUMPAD_ENTER:
+                case KEY.COMMA:
+                  if(selected_dropdown_item) {
+                    add_token($(selected_dropdown_item).data("tokeninput"));
+                    hidden_input.change();
+                    return false;
+                  }
+                  break;
+
+                case KEY.ESCAPE:
+                  hide_dropdown();
+                  return true;
+
+                default:
+                    if(String.fromCharCode(event.which)) {
+                        // set a timeout just long enough to let this function finish.
+                        setTimeout(function(){do_search();}, 5);
+                    }
+                    break;
+            }
+        });
+
+    if (settings.placeholder)
+       input_box.attr("placeholder", settings.placeholder) 
+    // Keep a reference to the original input box
+    var hidden_input = $(input)
+                           .hide()
+                           .val("")
+                           .focus(function () {
+                               focus_with_timeout(input_box);
+                           })
+                           .blur(function () {
+                               input_box.blur();
+                           });
+
+    // Keep a reference to the selected token and dropdown item
+    var selected_token = null;
+    var selected_token_index = 0;
+    var selected_dropdown_item = null;
+
+    // The list to store the token items in
+    var token_list = $("<ul />")
+        .addClass(settings.classes.tokenList)
+        .click(function (event) {
+            var li = $(event.target).closest("li");
+            if(li && li.get(0) && $.data(li.get(0), "tokeninput")) {
+                toggle_select_token(li);
+            } else {
+                // Deselect selected token
+                if(selected_token) {
+                    deselect_token($(selected_token), POSITION.END);
+                }
+
+                // Focus input box
+                focus_with_timeout(input_box);
+            }
+        })
+        .mouseover(function (event) {
+            var li = $(event.target).closest("li");
+            if(li && selected_token !== this) {
+                li.addClass(settings.classes.highlightedToken);
+            }
+        })
+        .mouseout(function (event) {
+            var li = $(event.target).closest("li");
+            if(li && selected_token !== this) {
+                li.removeClass(settings.classes.highlightedToken);
+            }
+        })
+        .insertBefore(hidden_input);
+
+    // The token holding the input box
+    var input_token = $("<li />")
+        .addClass(settings.classes.inputToken)
+        .appendTo(token_list)
+        .append(input_box);
+
+    // The list to store the dropdown items in
+    var dropdown = $("<div>")
+        .addClass(settings.classes.dropdown)
+        .addClass(settings.classes.findSearchableByClass+"-"+input.id)
+        .appendTo("body")
+        .hide();
+
+    // Magic element to help us resize the text input
+    var input_resizer = $("<tester/>")
+        .insertAfter(input_box)
+        .css({
+            position: "absolute",
+            top: -9999,
+            left: -9999,
+            width: "auto",
+            fontSize: input_box.css("fontSize"),
+            fontFamily: input_box.css("fontFamily"),
+            fontWeight: input_box.css("fontWeight"),
+            letterSpacing: input_box.css("letterSpacing"),
+            whiteSpace: "nowrap"
+        });
+
+    // Pre-populate list if items exist
+    hidden_input.val("");
+    var li_data = settings.prePopulate || hidden_input.data("pre");
+    if(settings.processPrePopulate && $.isFunction(settings.onResult)) {
+        li_data = settings.onResult.call(hidden_input, li_data);
+    }
+    if(li_data && li_data.length) {
+        $.each(li_data, function (index, value) {
+            insert_token(value);
+            checkTokenLimit();
+        });
+    }
+
+    // Check if widget should initialize as disabled
+    if (settings.disabled) {
+        toggleDisabled(true);
+    }
+
+    // Initialization is done
+    if($.isFunction(settings.onReady)) {
+        settings.onReady.call();
+    }
+
+    //
+    // Public functions
+    //
+
+    this.clear = function() {
+        token_list.children("li").each(function() {
+            if ($(this).children("input").length === 0) {
+                delete_token($(this));
+            }
+        });
+    }
+
+    this.add = function(item) {
+        add_token(item);
+    }
+
+    this.remove = function(item) {
+        token_list.children("li").each(function() {
+            if ($(this).children("input").length === 0) {
+                var currToken = $(this).data("tokeninput");
+                var match = true;
+                for (var prop in item) {
+                    if (item[prop] !== currToken[prop]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    delete_token($(this));
+                }
+            }
+        });
+    }
+
+    this.getTokens = function() {
+        return saved_tokens;
+    }
+
+    this.toggleDisabled = function(disable) {
+        toggleDisabled(disable);
+    }
+
+    //
+    // Private functions
+    //
+
+    // Toggles the widget between enabled and disabled state, or according
+    // to the [disable] parameter.
+    function toggleDisabled(disable) {
+        if (typeof disable === 'boolean') {
+          settings.disabled = disable
+        } else {
+            settings.disabled = !settings.disabled;
+        }
+        input_box.prop('disabled', settings.disabled);
+        token_list.toggleClass(settings.classes.disabled, settings.disabled);
+        // if there is any token selected we deselect it
+        if(selected_token) {
+            deselect_token($(selected_token), POSITION.END);
+        }
+        hidden_input.prop('disabled', settings.disabled);
+    }
+
+    function checkTokenLimit() {
+        if(settings.tokenLimit !== null && token_count >= settings.tokenLimit) {
+            input_box.hide();
+            hide_dropdown();
+            return;
+        }
+    }
+
+    function resize_input() {
+        if(input_val === (input_val = input_box.val())) {return;}
+
+        // Enter new content into resizer and resize input accordingly
+        var escaped = input_val.replace(/&/g, '&amp;').replace(/\s/g,' ').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        input_resizer.html(escaped);
+        input_box.width(input_resizer.width() + 30);
+    }
+
+    function is_printable_character(keycode) {
+        return ((keycode >= 48 && keycode <= 90) ||     // 0-1a-z
+                (keycode >= 96 && keycode <= 111) ||    // numpad 0-9 + - / * .
+                (keycode >= 186 && keycode <= 192) ||   // ; = , - . / ^
+                (keycode >= 219 && keycode <= 222));    // ( \ ) '
+    }
+
+    // Inner function to a token to the list
+    function insert_token(item) {
+        var this_token = settings.tokenFormatter(item);
+        this_token = $(this_token)
+          .addClass(settings.classes.token)
+          .insertBefore(input_token);
+
+        // The 'delete token' button
+        $("<span>" + settings.deleteText + "</span>")
+            .addClass(settings.classes.tokenDelete)
+            .appendTo(this_token)
+            .click(function () {
+                if (!settings.disabled) {
+                    delete_token($(this).parent());
+                    hidden_input.change();
+                    return false;
+                }
+            });
+
+        // Store data on the token
+        var token_data = item;
+        $.data(this_token.get(0), "tokeninput", item);
+
+        // Save this token for duplicate checking
+        saved_tokens = saved_tokens.slice(0,selected_token_index).concat([token_data]).concat(saved_tokens.slice(selected_token_index));
+        selected_token_index++;
+
+        // Update the hidden input
+        update_hidden_input(saved_tokens, hidden_input);
+
+        token_count += 1;
+
+        // Check the token limit
+        if(settings.tokenLimit !== null && token_count >= settings.tokenLimit) {
+            input_box.hide();
+            hide_dropdown();
+        }
+
+        return this_token;
+    }
+
+    // Add a token to the token list based on user input
+    function add_token (item) {
+        var callback = settings.onAdd;
+
+        // See if the token already exists and select it if we don't want duplicates
+        if(token_count > 0 && settings.preventDuplicates) {
+            var found_existing_token = null;
+            token_list.children().each(function () {
+                var existing_token = $(this);
+                var existing_data = $.data(existing_token.get(0), "tokeninput");
+                if(existing_data && existing_data.id === item.id) {
+                    found_existing_token = existing_token;
+                    return false;
+                }
+            });
+
+            if(found_existing_token) {
+                select_token(found_existing_token);
+                input_token.insertAfter(found_existing_token);
+                focus_with_timeout(input_box);
+                return;
+            }
+        }
+
+        // Insert the new tokens
+        if(settings.tokenLimit == null || token_count < settings.tokenLimit) {
+            insert_token(item);
+            checkTokenLimit();
+        }
+
+        // Clear input box
+        input_box.val("");
+
+        // Don't show the help dropdown, they've got the idea
+        hide_dropdown();
+
+        // Execute the onAdd callback if defined
+        if($.isFunction(callback)) {
+            callback.call(hidden_input,item);
+        }
+    }
+
+    // Select a token in the token list
+    function select_token (token) {
+        if (!settings.disabled) {
+            token.addClass(settings.classes.selectedToken);
+            selected_token = token.get(0);
+
+            // Hide input box
+            input_box.val("");
+
+            // Hide dropdown if it is visible (eg if we clicked to select token)
+            hide_dropdown();
+        }
+    }
+
+    // Deselect a token in the token list
+    function deselect_token (token, position) {
+        token.removeClass(settings.classes.selectedToken);
+        selected_token = null;
+
+        if(position === POSITION.BEFORE) {
+            input_token.insertBefore(token);
+            selected_token_index--;
+        } else if(position === POSITION.AFTER) {
+            input_token.insertAfter(token);
+            selected_token_index++;
+        } else {
+            input_token.appendTo(token_list);
+            selected_token_index = token_count;
+        }
+
+        // Show the input box and give it focus again
+        focus_with_timeout(input_box);
+    }
+
+    // Toggle selection of a token in the token list
+    function toggle_select_token(token) {
+        var previous_selected_token = selected_token;
+
+        if(selected_token) {
+            deselect_token($(selected_token), POSITION.END);
+        }
+
+        if(previous_selected_token === token.get(0)) {
+            deselect_token(token, POSITION.END);
+        } else {
+            select_token(token);
+        }
+    }
+
+    // Delete a token from the token list
+    function delete_token (token) {
+        // Remove the id from the saved list
+        var token_data = $.data(token.get(0), "tokeninput");
+        var callback = settings.onDelete;
+
+        var index = token.prevAll().length;
+        if(index > selected_token_index) index--;
+
+        // Delete the token
+        token.remove();
+        selected_token = null;
+
+        // Show the input box and give it focus again
+        focus_with_timeout(input_box);
+
+        // Remove this token from the saved list
+        saved_tokens = saved_tokens.slice(0,index).concat(saved_tokens.slice(index+1));
+        if(index < selected_token_index) selected_token_index--;
+
+        // Update the hidden input
+        update_hidden_input(saved_tokens, hidden_input);
+
+        token_count -= 1;
+
+        if(settings.tokenLimit !== null) {
+            input_box
+                .show()
+                .val("");
+            focus_with_timeout(input_box);
+        }
+
+        // Execute the onDelete callback if defined
+        if($.isFunction(callback)) {
+            callback.call(hidden_input,token_data);
+        }
+    }
+
+    // Update the hidden input box value
+    function update_hidden_input(saved_tokens, hidden_input) {
+        var token_values = $.map(saved_tokens, function (el) {
+            if(typeof settings.tokenValue == 'function')
+              return settings.tokenValue.call(this, el);
+            
+            return el[settings.tokenValue];
+        });
+        hidden_input.val(token_values.join(settings.tokenDelimiter));
+
+    }
+
+    // Hide and clear the results dropdown
+    function hide_dropdown () {
+        dropdown.hide().empty();
+        selected_dropdown_item = null;
+    }
+
+    function show_dropdown() {
+        dropdown
+            .css({
+                position: "absolute",
+                top: $(token_list).offset().top + $(token_list).outerHeight(),
+                left: $(token_list).offset().left,
+                width: $(token_list).outerWidth(),
+                'z-index': settings.zindex
+            })
+            .show();
+    }
+
+    function show_dropdown_searching () {
+        if(settings.searchingText) {
+            dropdown.html("<p>"+settings.searchingText+"</p>");
+            show_dropdown();
+        }
+    }
+
+    function show_dropdown_hint () {
+        if(settings.hintText) {
+            dropdown.html("<p>"+settings.hintText+"</p>");
+            show_dropdown();
+        }
+    }
+
+    // Highlight the query part of the search term
+    function highlight_term(value, term) {
+        return value.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + term + ")(?![^<>]*>)(?![^&;]+;)", "gi"), "<b>$1</b>");
+    }
+
+    function find_value_and_highlight_term(template, value, term) {
+        return template.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + escape(value) + ")(?![^<>]*>)(?![^&;]+;)", "g"), highlight_term(escape(value), term));
+    }
+
+    // Populate the results dropdown with some results
+    function populate_dropdown (query, results) {
+        if(results && results.length) {
+            dropdown.empty();
+            
+            var dropdown_ul = $("<ul>")
+                .appendTo(dropdown)
+                .mouseover(function (event) {
+                    select_dropdown_item($(event.target).closest("li"));
+                })
+                .mousedown(function (event) {
+                    add_token($(event.target).closest("li").data("tokeninput"));
+                    hidden_input.change();
+                    return false;
+                })
+                .hide();
+
+            $.each(results, function(index, value) {
+                var this_li = settings.resultsFormatter(value);
+
+                this_li = find_value_and_highlight_term(this_li ,value[settings.propertyToSearch], query);
+
+                this_li = $(this_li).appendTo(dropdown_ul);
+
+                if(index % 2) {
+                    this_li.addClass(settings.classes.dropdownItem);
+                } else {
+                    this_li.addClass(settings.classes.dropdownItem2);
+                }
+
+                if(index === 0) {
+                    select_dropdown_item(this_li);
+                }
+
+                $.data(this_li.get(0), "tokeninput", value);
+            });
+
+            show_dropdown();
+
+            if(settings.animateDropdown) {
+                dropdown_ul.slideDown("fast");
+            } else {
+                dropdown_ul.show();
+            }
+        } else {
+            if(settings.noResultsText) {
+                dropdown.html("<p class='token-input-noResult'>"+settings.noResultsText+"</p>");
+                show_dropdown();
+            }
+        }
+    }
+
+    // Highlight an item in the results dropdown
+    function select_dropdown_item (item) {
+        if(item) {
+            if(selected_dropdown_item) {
+                deselect_dropdown_item($(selected_dropdown_item));
+            }
+
+            item.addClass(settings.classes.selectedDropdownItem);
+            selected_dropdown_item = item.get(0);
+        }
+    }
+
+    // Remove highlighting from an item in the results dropdown
+    function deselect_dropdown_item (item) {
+        item.removeClass(settings.classes.selectedDropdownItem);
+        selected_dropdown_item = null;
+    }
+
+    // Do a search and show the "searching" dropdown if the input is longer
+    // than settings.minChars
+    function do_search() {
+        var query = input_box.val();
+
+        if(query && query.length) {
+            if(selected_token) {
+                deselect_token($(selected_token), POSITION.AFTER);
+            }
+
+            if(query.length >= settings.minChars) {
+                show_dropdown_searching();
+                clearTimeout(timeout);
+
+                timeout = setTimeout(function(){
+                    run_search(query);
+                }, settings.searchDelay);
+            } else {
+                hide_dropdown();
+            }
+        }
+    }
+
+    // Do the actual search
+    function run_search(query) {
+        var cache_key = query + computeURL();
+        var cached_results = cache.get(cache_key);
+        if(cached_results) {
+            populate_dropdown(query, cached_results);
+        } else {
+            // Are we doing an ajax search or local data search?
+            if(settings.url) {
+                var url = computeURL();
+                // Extract exisiting get params
+                var ajax_params = {};
+                ajax_params.data = {};
+                if(url.indexOf("?") > -1) {
+                    var parts = url.split("?");
+                    ajax_params.url = parts[0];
+
+                    var param_array = parts[1].split("&");
+                    $.each(param_array, function (index, value) {
+                        var kv = value.split("=");
+                        ajax_params.data[kv[0]] = kv[1];
+                    });
+                } else {
+                    ajax_params.url = url;
+                }
+
+                // Prepare the request
+                if(settings.encode)
+                	ajax_params.data[settings.queryParam] = encodeURIComponent(query);
+                else
+                	ajax_params.data[settings.queryParam] = query;
+                ajax_params.type = settings.method;
+                ajax_params.dataType = settings.contentType;
+                if(settings.crossDomain) {
+                    ajax_params.dataType = "jsonp";
+                }
+
+                // Attach the success callback
+                ajax_params.success = function(results) {
+                  if($.isFunction(settings.onResult)) {
+                      results = settings.onResult.call(hidden_input, results);
+                  }
+                  cache.add(cache_key, settings.jsonContainer ? results[settings.jsonContainer] : results);
+
+                  // only populate the dropdown if the results are associated with the active search query
+                  if(input_box.val() === query) {
+                      populate_dropdown(query, settings.jsonContainer ? results[settings.jsonContainer] : results);
+                  }
+                };
+                
+                // #792701 - Abort previous running call to save server processing time, to resolve continues AJAX call triggers or long time processing.
+                if(settings.abortPrevCall==true){
+                	ajax_params.beforeSend = function(){
+                		for(var i=0;i<gAjaxCallAbortArr.length;i++){
+                			if(gAjaxCallAbortArr[i].readyState!=4 && gAjaxCallAbortArr[i].status==undefined){
+                				gAjaxCallAbortArr[i].abort();
+                			}
+                		}
+                	};
+                }
+                // Make the request
+                var ajaxObj = $.ajax(ajax_params);
+                ajaxObj;
+                if(settings.abortPrevCall==true){gAjaxCallAbortArr.push(ajaxObj);}
+            } else if(settings.local_data) {
+                // Do the search through local data
+                var results = $.grep(settings.local_data, function (row) {
+                    return row[settings.propertyToSearch].toLowerCase().indexOf(query.toLowerCase()) > -1;
+                });
+
+                if($.isFunction(settings.onResult)) {
+                    results = settings.onResult.call(hidden_input, results);
+                }
+                cache.add(cache_key, results);
+                populate_dropdown(query, results);
+            }
+        }
+    }
+
+    // compute the dynamic URL
+    function computeURL() {
+        var url = settings.url;
+        if(typeof settings.url == 'function') {
+            url = settings.url.call(settings);
+        }
+        return url;
+    }
+
+    // Bring browser focus to the specified object.
+    // Use of setTimeout is to get around an IE bug.
+    // (See, e.g., http://stackoverflow.com/questions/2600186/focus-doesnt-work-in-ie)
+    // 
+    // obj: a jQuery object to focus()
+    function focus_with_timeout(obj) {
+        setTimeout(function() { obj.focus(); }, 50);
+    }
+
+};
+
+// Really basic cache for the results
+$.TokenList.Cache = function (options) {
+    var settings = $.extend({
+        max_size: 500
+    }, options);
+
+    var data = {};
+    var size = 0;
+
+    var flush = function () {
+        data = {};
+        size = 0;
+    };
+
+    this.add = function (query, results) {
+        if(size > settings.max_size) {
+            flush();
+        }
+
+        if(!data[query]) {
+            size += 1;
+        }
+
+        data[query] = results;
+    };
+
+    this.get = function (query) {
+        return data[query];
+    };
+};
+}(jQuery));
+        Ï x ˇˇ     20250331133932-8lœ À¨¬/   https://erp.cmrit.ac.in/js/jquery.tokeninput.js      Uz  /*
+ * jQuery Plugin: Tokenizing Autocomplete Text Entry
+ * Version 1.6.0
+ *
+ * Copyright (c) 2009 James Smith (http://loopj.com)
+ * Licensed jointly under the GPL and MIT licenses,
+ * choose which one suits your project best!
+ *
+ */
+
+(function ($) {
+// Default settings
+var gAjaxCallAbortArr = new Array();
+var DEFAULT_SETTINGS = {
+    // Search settings
+    method: "GET",
+    queryParam: "q",
+    encode : false,
+    searchDelay: 300,
+    minChars: 1,
+    propertyToSearch: "name",
+    jsonContainer: null,
+    contentType: "json",
+
+	// Prepopulation settings
+    prePopulate: null,
+    processPrePopulate: false,
+
+    // Display settings
+    hintText: "Type in a search term",
+    noResultsText: "No results",
+    searchingText: "Searching...",
+    deleteText: "&times;",
+    placeholder: null,
+    animateDropdown: true,
+    theme: null,
+    zindex: 1105,
+    resultsFormatter: function(item){ return "<li>" + item[this.propertyToSearch]+ "</li>" },
+    tokenFormatter: function(item) { return "<li><p>" + item[this.propertyToSearch] + "</p></li>" },
+
+    // Tokenization settings
+    tokenLimit: null,
+    tokenDelimiter: ",",
+    preventDuplicates: false,
+    tokenValue: "id",
+
+    // Callbacks
+    onResult: null,
+    onAdd: null,
+    onDelete: null,
+    onReady: null,
+    addOnKeyEnter: false,// This will add given input string
+    abortPrevCall: false, // #792701 - Abort previous running call to save server processing time, to resolve continues AJAX call triggers or long time processing.
+    
+    // Other settings
+    idPrefix: "token-input-",
+
+    // Keep track if the input is currently in disabled mode
+    disabled: false
+};
+
+// Default classes to use when theming
+var DEFAULT_CLASSES = {
+    tokenList: "token-input-list",
+    token: "token-input-token",
+    tokenDelete: "token-input-delete-token",
+    selectedToken: "token-input-selected-token",
+    highlightedToken: "token-input-highlighted-token",
+    dropdown: "token-input-dropdown",
+    dropdownItem: "token-input-dropdown-item",
+    dropdownItem2: "token-input-dropdown-item2",
+    selectedDropdownItem: "token-input-selected-dropdown-item",
+    inputToken: "token-input-input-token",
+    findSearchableByClass: "token-input-remove-searchableById",
+    focused: "token-input-focused",
+    disabled: "token-input-disabled"
+};
+
+// Input box position "enum"
+var POSITION = {
+    BEFORE: 0,
+    AFTER: 1,
+    END: 2
+};
+
+// Keys "enum"
+var KEY = {
+    BACKSPACE: 8,
+    TAB: 9,
+    ENTER: 13,
+    ESCAPE: 27,
+    SPACE: 32,
+    PAGE_UP: 33,
+    PAGE_DOWN: 34,
+    END: 35,
+    HOME: 36,
+    LEFT: 37,
+    UP: 38,
+    RIGHT: 39,
+    DOWN: 40,
+    NUMPAD_ENTER: 108,
+    COMMA: 188
+};
+
+// Additional public (exposed) methods
+var methods = {
+    init: function(url_or_data_or_function, options) {
+        var settings = $.extend({}, DEFAULT_SETTINGS, options || {});
+
+        return this.each(function () {
+            $(this).data("tokenInputObject", new $.TokenList(this, url_or_data_or_function, settings));
+        });
+    },
+    clear: function() {
+        this.data("tokenInputObject").clear();
+        return this;
+    },
+    add: function(item) {
+        this.data("tokenInputObject").add(item);
+        return this;
+    },
+    remove: function(item) {
+        this.data("tokenInputObject").remove(item);
+        return this;
+    },
+    get: function() {
+        return this.data("tokenInputObject").getTokens();
+    },
+    toggleDisabled: function(disable) {
+        this.data("tokenInputObject").toggleDisabled(disable);
+        return this;
+    }
+}
+
+// Expose the .tokenInput function to jQuery as a plugin
+$.fn.tokenInput = function (method) {
+    // Method calling and initialization logic
+    if(methods[method]) {
+        return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
+    } else {
+        return methods.init.apply(this, arguments);
+    }
+};
+
+// TokenList class for each input
+$.TokenList = function (input, url_or_data, settings) {
+    //
+    // Initialization
+    //
+
+    // Configure the data source
+    if($.type(url_or_data) === "string" || $.type(url_or_data) === "function") {
+        // Set the url to query against
+        settings.url = url_or_data;
+
+        // If the URL is a function, evaluate it here to do our initalization work
+        var url = computeURL();
+
+        // Make a smart guess about cross-domain if it wasn't explicitly specified
+        if(settings.crossDomain === undefined && typeof url === "string") {
+            if(url.indexOf("://") === -1) {
+                settings.crossDomain = false;
+            } else {
+                settings.crossDomain = (location.href.split(/\/+/g)[1] !== url.split(/\/+/g)[1]);
+            }
+        }
+    } else if(typeof(url_or_data) === "object") {
+        // Set the local data to search through
+        settings.local_data = url_or_data;
+    }
+
+    // Build class names
+    if(settings.classes) {
+        // Use custom class names
+        settings.classes = $.extend({}, DEFAULT_CLASSES, settings.classes);
+    } else if(settings.theme) {
+        // Use theme-suffixed default class names
+        settings.classes = {};
+        $.each(DEFAULT_CLASSES, function(key, value) {
+            settings.classes[key] = value + "-" + settings.theme;
+        });
+    } else {
+        settings.classes = DEFAULT_CLASSES;
+    }
+
+
+    // Save the tokens
+    var saved_tokens = [];
+
+    // Keep track of the number of tokens in the list
+    var token_count = 0;
+
+    // Basic cache to save on db hits
+    var cache = new $.TokenList.Cache();
+
+    // Keep track of the timeout, old vals
+    var timeout;
+    var input_val;
+
+    // Create a new text input an attach keyup events
+    var input_box = $("<input type=\"text\"  autocomplete=\"off\">")
+        .css({
+            outline: "none"
+        })
+        .attr("id", settings.idPrefix + input.id)
+        .focus(function () {
+            if (settings.disabled) {
+                return false;
+            } else
+            if (settings.tokenLimit === null || settings.tokenLimit !== token_count) {
+                show_dropdown_hint();
+            }
+            token_list.addClass(settings.classes.focused);
+        })
+        .blur(function () {
+            hide_dropdown();
+            $(this).val("");
+            token_list.removeClass(settings.classes.focused);
+        })
+        .bind("keyup keydown blur update", resize_input)
+        .keydown(function (event) {
+            var previous_token;
+            var next_token;
+
+            switch(event.keyCode) {
+                case KEY.LEFT:
+                case KEY.RIGHT:
+                case KEY.UP:
+                case KEY.DOWN:
+                    if(!$(this).val()) {
+                        previous_token = input_token.prev();
+                        next_token = input_token.next();
+
+                        if((previous_token.length && previous_token.get(0) === selected_token) || (next_token.length && next_token.get(0) === selected_token)) {
+                            // Check if there is a previous/next token and it is selected
+                            if(event.keyCode === KEY.LEFT || event.keyCode === KEY.UP) {
+                                deselect_token($(selected_token), POSITION.BEFORE);
+                            } else {
+                                deselect_token($(selected_token), POSITION.AFTER);
+                            }
+                        } else if((event.keyCode === KEY.LEFT || event.keyCode === KEY.UP) && previous_token.length) {
+                            // We are moving left, select the previous token if it exists
+                            select_token($(previous_token.get(0)));
+                        } else if((event.keyCode === KEY.RIGHT || event.keyCode === KEY.DOWN) && next_token.length) {
+                            // We are moving right, select the next token if it exists
+                            select_token($(next_token.get(0)));
+                        }
+                    } else {
+                        var dropdown_item = null;
+
+                        if(event.keyCode === KEY.DOWN || event.keyCode === KEY.RIGHT) {
+                            dropdown_item = $(selected_dropdown_item).next();
+                        } else {
+                            dropdown_item = $(selected_dropdown_item).prev();
+                        }
+
+                        if(dropdown_item.length) {
+                            select_dropdown_item(dropdown_item);
+                        }
+                    }
+                    return false;
+                    break;
+
+                case KEY.BACKSPACE:
+                    previous_token = input_token.prev();
+
+                    if(!$(this).val().length) {
+                        if(selected_token) {
+                            delete_token($(selected_token));
+                            hidden_input.change();
+                        } else if(previous_token.length) {
+                            select_token($(previous_token.get(0)));
+                        }
+
+                        return false;
+                    } else if($(this).val().length === 1) {
+                        hide_dropdown();
+                    } else {
+                        // set a timeout just long enough to let this function finish.
+                        setTimeout(function(){do_search();}, 5);
+                    }
+                    break;
+
+                case KEY.TAB:
+                case KEY.ENTER:
+                	//This will add given input string - Kiran Badave 
+                	if(settings.addOnKeyEnter==true && $('.token-input-noResult').is(':visible')){
+                		add_token({id:'other-'+token_count,name:$(this).val()});
+                    	break;
+                	}
+                case KEY.NUMPAD_ENTER:
+                case KEY.COMMA:
+                  if(selected_dropdown_item) {
+                    add_token($(selected_dropdown_item).data("tokeninput"));
+                    hidden_input.change();
+                    return false;
+                  }
+                  break;
+
+                case KEY.ESCAPE:
+                  hide_dropdown();
+                  return true;
+
+                default:
+                    if(String.fromCharCode(event.which)) {
+                        // set a timeout just long enough to let this function finish.
+                        setTimeout(function(){do_search();}, 5);
+                    }
+                    break;
+            }
+        });
+
+    if (settings.placeholder)
+       input_box.attr("placeholder", settings.placeholder) 
+    // Keep a reference to the original input box
+    var hidden_input = $(input)
+                           .hide()
+                           .val("")
+                           .focus(function () {
+                               focus_with_timeout(input_box);
+                           })
+                           .blur(function () {
+                               input_box.blur();
+                           });
+
+    // Keep a reference to the selected token and dropdown item
+    var selected_token = null;
+    var selected_token_index = 0;
+    var selected_dropdown_item = null;
+
+    // The list to store the token items in
+    var token_list = $("<ul />")
+        .addClass(settings.classes.tokenList)
+        .click(function (event) {
+            var li = $(event.target).closest("li");
+            if(li && li.get(0) && $.data(li.get(0), "tokeninput")) {
+                toggle_select_token(li);
+            } else {
+                // Deselect selected token
+                if(selected_token) {
+                    deselect_token($(selected_token), POSITION.END);
+                }
+
+                // Focus input box
+                focus_with_timeout(input_box);
+            }
+        })
+        .mouseover(function (event) {
+            var li = $(event.target).closest("li");
+            if(li && selected_token !== this) {
+                li.addClass(settings.classes.highlightedToken);
+            }
+        })
+        .mouseout(function (event) {
+            var li = $(event.target).closest("li");
+            if(li && selected_token !== this) {
+                li.removeClass(settings.classes.highlightedToken);
+            }
+        })
+        .insertBefore(hidden_input);
+
+    // The token holding the input box
+    var input_token = $("<li />")
+        .addClass(settings.classes.inputToken)
+        .appendTo(token_list)
+        .append(input_box);
+
+    // The list to store the dropdown items in
+    var dropdown = $("<div>")
+        .addClass(settings.classes.dropdown)
+        .addClass(settings.classes.findSearchableByClass+"-"+input.id)
+        .appendTo("body")
+        .hide();
+
+    // Magic element to help us resize the text input
+    var input_resizer = $("<tester/>")
+        .insertAfter(input_box)
+        .css({
+            position: "absolute",
+            top: -9999,
+            left: -9999,
+            width: "auto",
+            fontSize: input_box.css("fontSize"),
+            fontFamily: input_box.css("fontFamily"),
+            fontWeight: input_box.css("fontWeight"),
+            letterSpacing: input_box.css("letterSpacing"),
+            whiteSpace: "nowrap"
+        });
+
+    // Pre-populate list if items exist
+    hidden_input.val("");
+    var li_data = settings.prePopulate || hidden_input.data("pre");
+    if(settings.processPrePopulate && $.isFunction(settings.onResult)) {
+        li_data = settings.onResult.call(hidden_input, li_data);
+    }
+    if(li_data && li_data.length) {
+        $.each(li_data, function (index, value) {
+            insert_token(value);
+            checkTokenLimit();
+        });
+    }
+
+    // Check if widget should initialize as disabled
+    if (settings.disabled) {
+        toggleDisabled(true);
+    }
+
+    // Initialization is done
+    if($.isFunction(settings.onReady)) {
+        settings.onReady.call();
+    }
+
+    //
+    // Public functions
+    //
+
+    this.clear = function() {
+        token_list.children("li").each(function() {
+            if ($(this).children("input").length === 0) {
+                delete_token($(this));
+            }
+        });
+    }
+
+    this.add = function(item) {
+        add_token(item);
+    }
+
+    this.remove = function(item) {
+        token_list.children("li").each(function() {
+            if ($(this).children("input").length === 0) {
+                var currToken = $(this).data("tokeninput");
+                var match = true;
+                for (var prop in item) {
+                    if (item[prop] !== currToken[prop]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    delete_token($(this));
+                }
+            }
+        });
+    }
+
+    this.getTokens = function() {
+        return saved_tokens;
+    }
+
+    this.toggleDisabled = function(disable) {
+        toggleDisabled(disable);
+    }
+
+    //
+    // Private functions
+    //
+
+    // Toggles the widget between enabled and disabled state, or according
+    // to the [disable] parameter.
+    function toggleDisabled(disable) {
+        if (typeof disable === 'boolean') {
+          settings.disabled = disable
+        } else {
+            settings.disabled = !settings.disabled;
+        }
+        input_box.prop('disabled', settings.disabled);
+        token_list.toggleClass(settings.classes.disabled, settings.disabled);
+        // if there is any token selected we deselect it
+        if(selected_token) {
+            deselect_token($(selected_token), POSITION.END);
+        }
+        hidden_input.prop('disabled', settings.disabled);
+    }
+
+    function checkTokenLimit() {
+        if(settings.tokenLimit !== null && token_count >= settings.tokenLimit) {
+            input_box.hide();
+            hide_dropdown();
+            return;
+        }
+    }
+
+    function resize_input() {
+        if(input_val === (input_val = input_box.val())) {return;}
+
+        // Enter new content into resizer and resize input accordingly
+        var escaped = input_val.replace(/&/g, '&amp;').replace(/\s/g,' ').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        input_resizer.html(escaped);
+        input_box.width(input_resizer.width() + 30);
+    }
+
+    function is_printable_character(keycode) {
+        return ((keycode >= 48 && keycode <= 90) ||     // 0-1a-z
+                (keycode >= 96 && keycode <= 111) ||    // numpad 0-9 + - / * .
+                (keycode >= 186 && keycode <= 192) ||   // ; = , - . / ^
+                (keycode >= 219 && keycode <= 222));    // ( \ ) '
+    }
+
+    // Inner function to a token to the list
+    function insert_token(item) {
+        var this_token = settings.tokenFormatter(item);
+        this_token = $(this_token)
+          .addClass(settings.classes.token)
+          .insertBefore(input_token);
+
+        // The 'delete token' button
+        $("<span>" + settings.deleteText + "</span>")
+            .addClass(settings.classes.tokenDelete)
+            .appendTo(this_token)
+            .click(function () {
+                if (!settings.disabled) {
+                    delete_token($(this).parent());
+                    hidden_input.change();
+                    return false;
+                }
+            });
+
+        // Store data on the token
+        var token_data = item;
+        $.data(this_token.get(0), "tokeninput", item);
+
+        // Save this token for duplicate checking
+        saved_tokens = saved_tokens.slice(0,selected_token_index).concat([token_data]).concat(saved_tokens.slice(selected_token_index));
+        selected_token_index++;
+
+        // Update the hidden input
+        update_hidden_input(saved_tokens, hidden_input);
+
+        token_count += 1;
+
+        // Check the token limit
+        if(settings.tokenLimit !== null && token_count >= settings.tokenLimit) {
+            input_box.hide();
+            hide_dropdown();
+        }
+
+        return this_token;
+    }
+
+    // Add a token to the token list based on user input
+    function add_token (item) {
+        var callback = settings.onAdd;
+
+        // See if the token already exists and select it if we don't want duplicates
+        if(token_count > 0 && settings.preventDuplicates) {
+            var found_existing_token = null;
+            token_list.children().each(function () {
+                var existing_token = $(this);
+                var existing_data = $.data(existing_token.get(0), "tokeninput");
+                if(existing_data && existing_data.id === item.id) {
+                    found_existing_token = existing_token;
+                    return false;
+                }
+            });
+
+            if(found_existing_token) {
+                select_token(found_existing_token);
+                input_token.insertAfter(found_existing_token);
+                focus_with_timeout(input_box);
+                return;
+            }
+        }
+
+        // Insert the new tokens
+        if(settings.tokenLimit == null || token_count < settings.tokenLimit) {
+            insert_token(item);
+            checkTokenLimit();
+        }
+
+        // Clear input box
+        input_box.val("");
+
+        // Don't show the help dropdown, they've got the idea
+        hide_dropdown();
+
+        // Execute the onAdd callback if defined
+        if($.isFunction(callback)) {
+            callback.call(hidden_input,item);
+        }
+    }
+
+    // Select a token in the token list
+    function select_token (token) {
+        if (!settings.disabled) {
+            token.addClass(settings.classes.selectedToken);
+            selected_token = token.get(0);
+
+            // Hide input box
+            input_box.val("");
+
+            // Hide dropdown if it is visible (eg if we clicked to select token)
+            hide_dropdown();
+        }
+    }
+
+    // Deselect a token in the token list
+    function deselect_token (token, position) {
+        token.removeClass(settings.classes.selectedToken);
+        selected_token = null;
+
+        if(position === POSITION.BEFORE) {
+            input_token.insertBefore(token);
+            selected_token_index--;
+        } else if(position === POSITION.AFTER) {
+            input_token.insertAfter(token);
+            selected_token_index++;
+        } else {
+            input_token.appendTo(token_list);
+            selected_token_index = token_count;
+        }
+
+        // Show the input box and give it focus again
+        focus_with_timeout(input_box);
+    }
+
+    // Toggle selection of a token in the token list
+    function toggle_select_token(token) {
+        var previous_selected_token = selected_token;
+
+        if(selected_token) {
+            deselect_token($(selected_token), POSITION.END);
+        }
+
+        if(previous_selected_token === token.get(0)) {
+            deselect_token(token, POSITION.END);
+        } else {
+            select_token(token);
+        }
+    }
+
+    // Delete a token from the token list
+    function delete_token (token) {
+        // Remove the id from the saved list
+        var token_data = $.data(token.get(0), "tokeninput");
+        var callback = settings.onDelete;
+
+        var index = token.prevAll().length;
+        if(index > selected_token_index) index--;
+
+        // Delete the token
+        token.remove();
+        selected_token = null;
+
+        // Show the input box and give it focus again
+        focus_with_timeout(input_box);
+
+        // Remove this token from the saved list
+        saved_tokens = saved_tokens.slice(0,index).concat(saved_tokens.slice(index+1));
+        if(index < selected_token_index) selected_token_index--;
+
+        // Update the hidden input
+        update_hidden_input(saved_tokens, hidden_input);
+
+        token_count -= 1;
+
+        if(settings.tokenLimit !== null) {
+            input_box
+                .show()
+                .val("");
+            focus_with_timeout(input_box);
+        }
+
+        // Execute the onDelete callback if defined
+        if($.isFunction(callback)) {
+            callback.call(hidden_input,token_data);
+        }
+    }
+
+    // Update the hidden input box value
+    function update_hidden_input(saved_tokens, hidden_input) {
+        var token_values = $.map(saved_tokens, function (el) {
+            if(typeof settings.tokenValue == 'function')
+              return settings.tokenValue.call(this, el);
+            
+            return el[settings.tokenValue];
+        });
+        hidden_input.val(token_values.join(settings.tokenDelimiter));
+
+    }
+
+    // Hide and clear the results dropdown
+    function hide_dropdown () {
+        dropdown.hide().empty();
+        selected_dropdown_item = null;
+    }
+
+    function show_dropdown() {
+        dropdown
+            .css({
+                position: "absolute",
+                top: $(token_list).offset().top + $(token_list).outerHeight(),
+                left: $(token_list).offset().left,
+                width: $(token_list).outerWidth(),
+                'z-index': settings.zindex
+            })
+            .show();
+    }
+
+    function show_dropdown_searching () {
+        if(settings.searchingText) {
+            dropdown.html("<p>"+settings.searchingText+"</p>");
+            show_dropdown();
+        }
+    }
+
+    function show_dropdown_hint () {
+        if(settings.hintText) {
+            dropdown.html("<p>"+settings.hintText+"</p>");
+            show_dropdown();
+        }
+    }
+
+    // Highlight the query part of the search term
+    function highlight_term(value, term) {
+        return value.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + term + ")(?![^<>]*>)(?![^&;]+;)", "gi"), "<b>$1</b>");
+    }
+
+    function find_value_and_highlight_term(template, value, term) {
+        return template.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + escape(value) + ")(?![^<>]*>)(?![^&;]+;)", "g"), highlight_term(escape(value), term));
+    }
+
+    // Populate the results dropdown with some results
+    function populate_dropdown (query, results) {
+        if(results && results.length) {
+            dropdown.empty();
+            
+            var dropdown_ul = $("<ul>")
+                .appendTo(dropdown)
+                .mouseover(function (event) {
+                    select_dropdown_item($(event.target).closest("li"));
+                })
+                .mousedown(function (event) {
+                    add_token($(event.target).closest("li").data("tokeninput"));
+                    hidden_input.change();
+                    return false;
+                })
+                .hide();
+
+            $.each(results, function(index, value) {
+                var this_li = settings.resultsFormatter(value);
+
+                this_li = find_value_and_highlight_term(this_li ,value[settings.propertyToSearch], query);
+
+                this_li = $(this_li).appendTo(dropdown_ul);
+
+                if(index % 2) {
+                    this_li.addClass(settings.classes.dropdownItem);
+                } else {
+                    this_li.addClass(settings.classes.dropdownItem2);
+                }
+
+                if(index === 0) {
+                    select_dropdown_item(this_li);
+                }
+
+                $.data(this_li.get(0), "tokeninput", value);
+            });
+
+            show_dropdown();
+
+            if(settings.animateDropdown) {
+                dropdown_ul.slideDown("fast");
+            } else {
+                dropdown_ul.show();
+            }
+        } else {
+            if(settings.noResultsText) {
+                dropdown.html("<p class='token-input-noResult'>"+settings.noResultsText+"</p>");
+                show_dropdown();
+            }
+        }
+    }
+
+    // Highlight an item in the results dropdown
+    function select_dropdown_item (item) {
+        if(item) {
+            if(selected_dropdown_item) {
+                deselect_dropdown_item($(selected_dropdown_item));
+            }
+
+            item.addClass(settings.classes.selectedDropdownItem);
+            selected_dropdown_item = item.get(0);
+        }
+    }
+
+    // Remove highlighting from an item in the results dropdown
+    function deselect_dropdown_item (item) {
+        item.removeClass(settings.classes.selectedDropdownItem);
+        selected_dropdown_item = null;
+    }
+
+    // Do a search and show the "searching" dropdown if the input is longer
+    // than settings.minChars
+    function do_search() {
+        var query = input_box.val();
+
+        if(query && query.length) {
+            if(selected_token) {
+                deselect_token($(selected_token), POSITION.AFTER);
+            }
+
+            if(query.length >= settings.minChars) {
+                show_dropdown_searching();
+                clearTimeout(timeout);
+
+                timeout = setTimeout(function(){
+                    run_search(query);
+                }, settings.searchDelay);
+            } else {
+                hide_dropdown();
+            }
+        }
+    }
+
+    // Do the actual search
+    function run_search(query) {
+        var cache_key = query + computeURL();
+        var cached_results = cache.get(cache_key);
+        if(cached_results) {
+            populate_dropdown(query, cached_results);
+        } else {
+            // Are we doing an ajax search or local data search?
+            if(settings.url) {
+                var url = computeURL();
+                // Extract exisiting get params
+                var ajax_params = {};
+                ajax_params.data = {};
+                if(url.indexOf("?") > -1) {
+                    var parts = url.split("?");
+                    ajax_params.url = parts[0];
+
+                    var param_array = parts[1].split("&");
+                    $.each(param_array, function (index, value) {
+                        var kv = value.split("=");
+                        ajax_params.data[kv[0]] = kv[1];
+                    });
+                } else {
+                    ajax_params.url = url;
+                }
+
+                // Prepare the request
+                if(settings.encode)
+                	ajax_params.data[settings.queryParam] = encodeURIComponent(query);
+                else
+                	ajax_params.data[settings.queryParam] = query;
+                ajax_params.type = settings.method;
+                ajax_params.dataType = settings.contentType;
+                if(settings.crossDomain) {
+                    ajax_params.dataType = "jsonp";
+                }
+
+                // Attach the success callback
+                ajax_params.success = function(results) {
+                  if($.isFunction(settings.onResult)) {
+                      results = settings.onResult.call(hidden_input, results);
+                  }
+                  cache.add(cache_key, settings.jsonContainer ? results[settings.jsonContainer] : results);
+
+                  // only populate the dropdown if the results are associated with the active search query
+                  if(input_box.val() === query) {
+                      populate_dropdown(query, settings.jsonContainer ? results[settings.jsonContainer] : results);
+                  }
+                };
+                
+                // #792701 - Abort previous running call to save server processing time, to resolve continues AJAX call triggers or long time processing.
+                if(settings.abortPrevCall==true){
+                	ajax_params.beforeSend = function(){
+                		for(var i=0;i<gAjaxCallAbortArr.length;i++){
+                			if(gAjaxCallAbortArr[i].readyState!=4 && gAjaxCallAbortArr[i].status==undefined){
+                				gAjaxCallAbortArr[i].abort();
+                			}
+                		}
+                	};
+                }
+                // Make the request
+                var ajaxObj = $.ajax(ajax_params);
+                ajaxObj;
+                if(settings.abortPrevCall==true){gAjaxCallAbortArr.push(ajaxObj);}
+            } else if(settings.local_data) {
+                // Do the search through local data
+                var results = $.grep(settings.local_data, function (row) {
+                    return row[settings.propertyToSearch].toLowerCase().indexOf(query.toLowerCase()) > -1;
+                });
+
+                if($.isFunction(settings.onResult)) {
+                    results = settings.onResult.call(hidden_input, results);
+                }
+                cache.add(cache_key, results);
+                populate_dropdown(query, results);
+            }
+        }
+    }
+
+    // compute the dynamic URL
+    function computeURL() {
+        var url = settings.url;
+        if(typeof settings.url == 'function') {
+            url = settings.url.call(settings);
+        }
+        return url;
+    }
+
+    // Bring browser focus to the specified object.
+    // Use of setTimeout is to get around an IE bug.
+    // (See, e.g., http://stackoverflow.com/questions/2600186/focus-doesnt-work-in-ie)
+    // 
+    // obj: a jQuery object to focus()
+    function focus_with_timeout(obj) {
+        setTimeout(function() { obj.focus(); }, 50);
+    }
+
+};
+
+// Really basic cache for the results
+$.TokenList.Cache = function (options) {
+    var settings = $.extend({
+        max_size: 500
+    }, options);
+
+    var data = {};
+    var size = 0;
+
+    var flush = function () {
+        data = {};
+        size = 0;
+    };
+
+    this.add = function (query, results) {
+        if(size > settings.max_size) {
+            flush();
+        }
+
+        if(!data[query]) {
+            size += 1;
+        }
+
+        data[query] = results;
+    };
+
+    this.get = function (query) {
+        return data[query];
+    };
+};
+}(jQuery));
+”ò¿ŸG  .       ˙Iu      gAjaxCallAbortArr      R¯/      DEFAULT_SETTINGS   Ωpwm      method     ≈ô¸
+      GET    ‰8ZY
+      queryParam     ç‘Æ      encode     ±zæ      searchDelay    óds      minChars   ãNaä      propertyToSearch	   [p∂@      jsonContainer
+      Yì      contentType    ◊G≤´      prePopulate    ˜?á      processPrePopulate     òÏw~      hintText   ’Ìı      Type in a search term      d¬M1      noResultsText      ˙O´
+      No results     ˇÑ«è      searchingText      ∞ÈùN      Searching...   bì-Ô
+      deleteText     ¢Ö      &times;    ﬁ∞π:      placeholder    ;£œ      animateDropdown    ¢rÿ      theme      •fa°      zindex     È_˙ì      resultsFormatter   ˝ÑÃ∫      item   "'      <li>   ˜Ó’∂      </li>      A≠*U      tokenFormatter     o’	      <li><p>    u∆·‚	      </p></li>       1s,
+      tokenLimit!     ∆Áˆy      tokenDelimiter"     ≈$ä      preventDuplicates#      ≠ŒN
+      tokenValue$     †Œ°      onResult%   ≈uU      onAdd&      =jF      onDelete'   ¥·4      onReady(    Å‰ÇQ      addOnKeyEnter)      èËÚ      abortPrevCall*      Ãœè†      idPrefix+   Wüìµ      token-input-,   ûzÉw      disabled-   ˚)È›      DEFAULT_CLASSES.    S+6«	      tokenList/      r ˇ«      token-input-list0   £Ì>      token1      £◊\      token-input-token2      £[;(      tokenDelete3    ÿ©µ®      token-input-delete-token4   s√.ü      selectedToken5      ’õˇœ      token-input-selected-token6     ∂ªÏ¿      highlightedToken7   #Öø      token-input-highlighted-token8      âòCl      dropdown9   :»      token-input-dropdown:   úªÛ      dropdownItem;   2ˆ√˝      token-input-dropdown-item<      L„2      dropdownItem2=      ≈È—&      token-input-dropdown-item2>     ≈∫¶      selectedDropdownItem?   nËj"      token-input-selected-dropdown-item@     'Ô)
+      inputTokenA     í©Tƒ      token-input-input-tokenB    f•ŸÖ      findSearchableByClassC      ¨Ó5®!      token-input-remove-searchableByIdD      “ÀJ≈      focusedE    ‰l«p      token-input-focusedF    ˘‰GÔ      token-input-disabledG   Z.ˇX      POSITIONH    WL      BEFOREI     i£ä      AFTERJ      Ib¶•      ENDK    ,@∏ÿ      KEYL    ¶TÚ≤	      BACKSPACEM      ]˛…      TABN    G9_«      ENTERO      cÕ‘z      ESCAPEP     S°ã”      SPACEQ      ˝lŒ      PAGE_UPR    Dé÷6	      PAGE_DOWNS      °û      HOMET   ù`hN      LEFTU   Y<W	      RIGHTV      î(      DOWNW   ö(È9      NUMPAD_ENTERX   óÁ(>      COMMAY      n-	      methodsZ    íu`      init[   º¯≥ß      url_or_data_or_function\     :yã      options]    —ôKö      settings^   ªl‡Ù      extend_     6ó(Å      data`   ∞L      tokenInputObjecta   ]˜.Ø	      TokenListb      ±/}Ó      clearc      *N∑∆      removed     ÌDäó	      getTokense      ÷÷«      toggleDisabledf     7ÖR      disableg    4‚
+      tokenInputh     ÿÖ Ã      slicei      €v@l      url_or_dataj    ÿÌ?
+      computeURLk     πa)√      crossDomainl    ⁄Eú¡      indexOfm    N°ºê      ://n    0+QA      locationo   ª©`X      hrefp   ?Ïù      \/+q    -Æ”Ç
+      local_datar     uw˝      classess    B¸ø;      keyt    EAÌ      saved_tokensu   Äs/      token_countv    
+É€,      cachew      VùvÀ      Cachex      ∑\o      timeouty    ‡ ó\	      input_valz      ≥Ωo7	      input_box{      ⁄ãòÉ'      <input type="text"  autocomplete="off">|    >ü      css}    "æ‹      outline~    ,Ω      none   A¢Ωê      attrÄ   KÃÌ      focusÅ      *≠º      show_dropdown_hintÇ     Í.k
+      token_listÉ     Bå|      addClassÑ   ƒ∫·%      blurÖ   ⁄yö      hide_dropdownÜ      &⁄õ      valá    ˆ+      removeClassà    ‡Õ      bindâ   ¡¨      keyup keydown blur updateä      :Ë      resize_inputã   ù∫”      keydownå    II∑P      eventç      Ê„∑·      previous_tokené     –
+      next_tokenè     ≠5      keyCodeê    t¥π-      input_tokenë    >∆ß"      preví   5N®X      selected_tokenì     ñˇΩê      deselect_tokenî     %VC‹      select_tokenï   }#      dropdown_itemñ      ·7D¥      selected_dropdown_itemó     W¡S      select_dropdown_itemò   ≈s<Æ      delete_tokenô   ^SùØ      hidden_inputö   Á˛¡      changeõ     3AtŸ
+      setTimeoutú     ‚êr˘	      do_searchù      Vì&V      .token-input-noResultû      SZK#      :visibleü   «Æ
+	      add_token†      xpÒ      other-°     £,2X
+      tokeninput¢     >¬≈      fromCharCode£   ≈∏0      which§      üvÙ}      hide•   t≤ªô      focus_with_timeout¶     Ö–õ≥      selected_token_indexß   ñ!g’      <ul />®     ü™‚X      click©      /ﬂ‰ï      closest™    äçT⁄      toggle_select_token´    y˜ãÑ	      mouseover¨      †©˝c      mouseout≠   ÂL…2      insertBeforeÆ   €¯      <li />Ø     †Á„V      appendTo∞   ‹B-      append±     Sï      <div>≤      òh;      body≥   ]]ê      input_resizer¥      Áç£*	      <tester/>µ      ää≥(      insertAfter∂    »Åí      position∑   H<*ê      absolute∏   $√Á      topπ    ı]á      left∫   ÎƒJ˚      widthª      z¡≤S      autoº   ˜ûe      fontSizeΩ   ±‘Qa
+      fontFamilyæ     `◊∑◊
+      fontWeightø     î!O      letterSpacing¿      aÿ˙à
+      whiteSpace¡     ó πE      nowrap¬     ∫ ·«      li_data√    ˙4û√      preƒ    ãè@i
+      isFunction≈     ÙJ›∏      insert_token∆   mÌ1g      checkTokenLimit«    
+}N      children»   WúÜQ	      currToken…      “P…ù      prop    ì˛(I      toggleClassÀ    „ â      escapedÃ    ˛À¿Ç      &amp;Õ      ®Ê1      \sŒ     a≈ @      &lt;œ   ª„“      &gt;–   ‘„X      html—   |∫y      is_printable_character“     3£˝¬      keycode”    ˜ß
+      this_token‘     º’$L      <span>’     ŸÂ°      </span>÷    ˛Ë˘2      parent◊     ƒâ>y
+      token_dataÿ     µØ‘Î      update_hidden_inputŸ    Ë€˘      callback⁄   ©ó∏w      found_existing_token€   ¸Ø%⁄      existing_token‹     «¡µ˘      existing_data›      ßáâm      previous_selected_tokenﬁ    °V8s      prevAllﬂ    HáíK      show‡   £≥†/      token_values·   9Ã      map‚    ∏™˝      empty„      ñæ      show_dropdown‰      k]2      outerHeightÂ    QÒ=i
+      outerWidthÊ     å/Í      z-indexÁ    Rêq≠      show_dropdown_searchingË    ·àí∆      <p>È    ˇ!      </p>Í   6íó˛      highlight_termÎ     WHâ#      termÏ   ¿a^      (?![^&;]+;)(?!<[^<>]*)(Ì    Z[Ô?      )(?![^<>]*>)(?![^&;]+;)Ó    h™äÜ	      <b>$1</b>Ô      ≠&,n      find_value_and_highlight_term      êséÍ      templateÒ   B∫≤[      populate_dropdownÚ      XN_ˇ      queryÛ      [<®e      dropdown_ulÙ    ÿRá      <ul>ı   ◊Dô	      mousedownˆ      C
+ÓR      this_li˜    #+≈ò	      slideDown¯      ˆï5û      fast˘   Æ)=:       <p class='token-input-noResult'>˙   < S≤      deselect_dropdown_item˚     QÔ8u      clearTimeout¸   ¡;Õ´
+      run_search˝     Bõ.º	      cache_key˛      T‡“E      cached_resultsˇ     ù™—.      ajax_params    !”T˜      parts     pˇ˙W      param_array   DoÄw      dataType  (Ï*ö      jsonp     …©\9      success   Ñ–ˇ
+      beforeSend    πUüï
+      readyState    xÿØí      ajaxObj   æd»ê      ajax	  Ñu2      push
+  0
+%9      grep  Ï%N¬      row   RâDo      toLowerCase   ﬂN#9      obj   <E’*      max_size  Â¿ò      flush     >Â/      jQuery    –“M∆      init/<    Éwå      $.fn.tokenInput   ÓDZŒ      $.TokenList   «{Ñ      $.TokenList/<     0ﬁ∫      $.TokenList/input_box<    ŒZ      $.TokenList/input_box</<  ßR9      $.TokenList/hidden_input<     ˜       $.TokenList/token_list<   á1öæ      $.TokenList/this.clear    °)∏f      $.TokenList/this.clear/<  ˘≥u      $.TokenList/this.add  qp      $.TokenList/this.remove   H÷jÁ      $.TokenList/this.remove/<     úëBg      $.TokenList/this.getTokens    ⁄ÚE      $.TokenList/this.toggleDisabled%   ç”,      $.TokenList/insert_token/<'    ü⁄§Û      $.TokenList/add_token/<-   ¿tª@-      $.TokenList/update_hidden_input/token_values<5     PÈ^^*      $.TokenList/populate_dropdown/dropdown_ul<6    ÇcÜò      $.TokenList/populate_dropdown/<:   ˆˇß      $.TokenList/do_search/timeout<<    ìO-      $.TokenList/run_search/<=  Ø*è
+*      $.TokenList/run_search/ajax_params.success>    ~f6∑-      $.TokenList/run_search/ajax_params.beforeSend?     ≥L†      $.TokenList/run_search/results<B   ák$§       $.TokenList/focus_with_timeout/<C  oég      $.TokenList.CacheE     ‚£®J      $.TokenList.Cache/this.addF    —ƒ\      $.TokenList.Cache/this.get     H   ß  H   H             Ô%,â                           	                                                                                                                                          	                 
+                              '                                      !                 "                 #                 $                 %                &                 '                 (                 )                 *                 +                 ,                 -                 .                 /                 0                 1                 2                 3                4      !           5      !           6      !           7                 8                 9                :      '           ;                <      )           =      )           >      )           ?      )           @                 A                B      /           C                                                                          4                 4                                                                                                                                        =                                                  @                                                             D      D           E      D           F      D           G      ≥Oåc                         $ `   P  P-  PG  PK  PY  P              ã                 ã               [  P\  ]  Pã                 ã                 ã                 ã                 ã                 ã               f  ã                    ã   ,              i  ]  Pã   î  Pÿ  P˙  Pô  P8  P¶  PÍ  P≥  Pt  Pñ  PJ  ¸  P≈  PÁ  Py  Pì  Pv  Pò  Pú  P•  Pê  Pj  P™  P„  Px  PÖ  PÒ  Pí  PÅ  PÔ  Pü  Pä  u  Pó  P—  Ç  P∆  P¬  z  Pe  P             f                                À               “                ”  ◊                ã                 PŸ  ⁄  P              €  ‹  ã                0               0  ∂              0  ›              0  ◊  Ÿ                t  ô  ‡              ï ã                                                                                P  Î                 P  Î               Ú  P‹  Û  P             å               å                P  ˆ                                               Ú  P                	            Ú  P˝  P˛  J  ˇ  P    ‹                P                ‹                i                              J                P                             s  P                                ã               å  ç  é  ï  ã                                                                               å  R             å  R ã               å  R ã                  P                                ã                                 P              »  Ÿ  …  ã                                f              \  ]  P_  P¯ ` Pã                                Ú  ‹               Ú  Ø¬0∞p     p     &     Õ     <     >     IÙ$KEÆ˙ö    †                  	  
+                             !  "  #  $  %  &  '  (  )  *  ,     A      .  0  2  4  6  8  :  <  >  @  B  D  ,          H  I  J     K   L  M  N  O  P  Q  R  J  S  T  3 U  V  W  X        Z  b     c  Œ   e                           ∂  ∏  π  ∫  Ê                                          }     
+     ç {  	   -    ∂  ∏  π  ∫  º  Ω  æ  ø  ¿                           á&’™ç!´!H   D    $ykïD                             m    ª   w ﬂ•@
+`FÄ ∞ˇˇˇˇPPÄ¨  ÿÔˇë¨  ¡  	              \       Ω  Œ   ﬂª   Ä„  Å  Œ   ﬂ9      <      <   <   ,<   <	   
+   <   <      <   <   <      <      <      <      <   <   <   <   Q<   m   <   m   <    <!   "   <#   <$   %   <&   <'   <(   <)   <*   <+   <,   -   <.   </   Œ   ﬂ90   1   <2   3   <4   5   <6   7   <8   9   <:   ;   <<   =   <>   ?   <@   A   <B   C   <D   E   <F   G   <H   I   </   Œ   ﬂ9J   <K   <L   <M   Œ   ﬂ9N   <O   	<P   <Q   <R    <S   !<T   "<U   #<M   $<V   %<W   &<X   '<Y   (<Z   l<[   º <\   Œ   ﬂ9]   m^   <_   m`   <a   mb   <c   md   <e   mf   <g   mh   <i   Œ   ﬂ¡   Jj   mk   Ll   ﬂ¡   mm   Ln   ﬂ¡   Jn   mo   Lp   ﬂ•I`ì `E**&(&*&J&F****&&&(*J&*&J%&&&&&F-J0L4`%************ê@E`%&&ML`%''''''''''''''N_`%JgJkJoJsJvê0}`ï0Ä  á`ê0Ä â`ï0Ä ¶PÄÄL   í¯<-L   !                       ﬁÕ   ﬂ   º  æ   J   K&   &¢•`î %QÄL   ·ª_úL   !                       ﬁÕ   ﬂ   º  æ   J   K&   &¢•	`î *QÄú   0«ú   [                       Ω  Œ   ﬂﬁÕ   ﬂ¡  ·J   ‰9   ¡  º ù   ó   ﬂ9   ó   s Œ   ﬂæ   ·J   ‰m   s ¢•/`	ò ˇˇˇ„PI	`ˇˇˇ˚PCQà   Loúà   D         
+               ﬁÕ   ﬂ¡   æ   s ·J   ‰   ¡  J   Äæ   ¡   ¡   „  Å w ﬂ•&`ˇˇˇˇP 	ˇˇˇ—PˇˇˇÁP$	PÄ\   ¶4á/\   *                        ﬁÕ   ﬂæ   ·J   ‰   s ·J   ‰w  ﬂæ   ¢•&	`ê P
+P$	`$QÄd   °ßí.d   -                       ﬁÕ   ﬂæ   ·J   ‰   s ·J   ‰º  w ﬂæ   ¢•&	`ê P
+ˇˇˇ¸P$	`$QÄd   Gd   -                       ﬁÕ   ﬂæ   ·J   ‰   s ·J   ‰º  w ﬂæ   ¢•&	`ê P
+ ˇˇˇ˘P$	`$QÄT   uSHgT   %                        ﬁÕ   ﬂæ   ·J   ‰   s ·J   ‰s  ¢•&	`ê P
+P#QÄd   ,ﬁ@)d   -                       ﬁÕ   ﬂæ   ·J   ‰   s ·J   ‰º  w ﬂæ   ¢•&	`ê P
+(ˇˇˇÒP$	`$QÄ‘   ˇ&Eƒ‘   Ç         	              ‹Õ   ﬂﬁÕ  ﬂ¡   º  KöE   ó   ¡   º  K·J   ‰æ  ª   J   J   ·J   ‰æ   s s ¢ô'   ó
+   ¡   J   ·J   ‰æ  æ   s ¢ó   •L`ì 	`ê ñ ˇˇˇ˚PˇˇˇﬁP3; 	`ë ˇˇˇÙP3VL
+  —†˛aL
+  œ               ⁄      Ω Œ   ﬂﬁÕ   ﬂm   Œ &  ﬂm   Œ $  ﬂm   Õ  ﬂm   Õ  ﬂm   Œ   ﬂm   Œ    ﬂm   Œ   ﬂm   Œ   ﬂm	   Œ   ﬂm
+   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ 	  ﬂm   Œ   ﬂm   Œ   ﬂm   Œ "  ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂ¡  ·J   ‰º s    ù#   ó   ﬂ¡  ·J   ‰º s    ó   öŒ   ó    ¡   º L   ﬂ¡    s  Õ  ﬂ¡   J    ú   ó%   ﬂæ  ó&   ö|   ó'   æ  ·J   ‰   s ˇö   ó+   ¡   L   ﬂôF   ó,   ¡   ª    J!   ·J"   ‰l#   s Kæ  ·J"   ‰l$   s KL   ﬂó6   ô'   ó6   º ö   ó8   ¡   º L%   ﬂó9   ¡   J&   ö=   ó;   ¡   ¡  ·J'   ‰9(   ¡  ¡   J&   s L&   ﬂôb   ó@   ¡   J)   ö9   óB   ¡   9*   L&   ﬂ¡  ·J+   ‰¡  m,   w ﬂô   óG   ¡   ¡  L&   ﬂóH   h    Œ   ﬂŒ !  ﬂ¡  J-   J.   Ä„  Å  Œ   ﬂ¡   /   s ·J0   ‰91   2   <3   s ·J4   ‰5   ¡   J6   º  J5   &s ·J7   ‰m8   s ·J9   ‰m:   s ·J;   ‰<   æ  s ·J=   ‰m>   s Œ %  ﬂ¡   J?   ö)   óc   ¡ %  ·J4   ‰?   ¡   J?   w ﬂóf   ¡   º  s ·J@   ‰s  ·JA   ‰B   s ·J7   ‰mC   s ·J9   ‰mD   s Œ   ﬂŒ   ﬂŒ   ﬂŒ   ﬂ¡   E   s ·JF   ‰¡   J&   JG   s ·JH   ‰mI   s ·JJ   ‰mK   s ·JL   ‰mM   s ·JN   ‰¡   s Œ #  ﬂ¡   O   s ·JF   ‰¡   J&   JP   s ·JQ   ‰¡ #  s ·JR   ‰¡ %  s Œ   ﬂ¡   S   s ·JF   ‰¡   J&   JT   s ·JF   ‰¡   J&   JU   V   &º  J5   &s ·JQ   ‰W   s ·J@   ‰s  Œ   ﬂ¡   X   s ·JY   ‰¡ %  s ·J0   ‰9Z   [   <\   Òÿˇˇ<]   Òÿˇˇ<^   _   <`   ¡ %  ·J0   ‰a   s <a   ¡ %  ·J0   ‰b   s <b   ¡ %  ·J0   ‰c   s <c   ¡ %  ·J0   ‰d   s <d   e   <f   s Œ 
+  ﬂ¡   ·JA   ‰B   w ﬂ¡   Jg   ù   óµ   ﬂ¡   ·Jh   ‰i   s ó∑   Õ  ﬂ¡   Jj   ú$   óπ   ﬂ¡  ·Jk   ‰¡   Jl   s óº   ö,   óΩ   ¡   Jl   ·Jm   ‰¡   æ  s Õ  ﬂó¿   æ  ú   ó¡   ﬂæ  Jn   ó¬   ö#   ó√   ¡  ·J+   ‰æ  mo   w ﬂó∆   ¡   Jp   ö   ó»   ¡ &   w ﬂó…   ¡  ·Jk   ‰¡   Jq   s ö   óÕ   ¡   Jq   ·Jm   ‰w  ﬂó–   æ   mr   Ls   ﬂæ   mt   Lu   ﬂæ   mv   Lw   ﬂæ   mx   Ly   ﬂæ   mz   L{   ﬂ•ˇˇó@`ˇˇˇ˚P† )ˇˇˇ˚Pò@	`N`N`
+ï `ê Pê `ñ `ñ ,ˇˇˇ˙P
+ˇˇˇ˙Põ@`O	`ì@`î@	`ë 
+ˇˇˇ‰Pì `î@ 	`ê 	`ˇˇˇÍP>$ 	`ï@*`K-`G0`ù03@7`P*%J8
+PJ;	ˇˇˇ·P*ˇˇˇ˙PJEˇˇˇ˚PJJ,	ˇˇˇﬁP*ˇˇˇ¯PIÄ  ß	`î `ë 
+ˇˇˇÏP `ˇˇˇˇP*P*U*#ˇˇˇ˙P "ˇˇˇ˚PIÄ  µ`' `'"` `P*ˇˇˇ˜P*ˇˇˇ˙PJÄ   ˇˇˇˆPJÄ  –ˇˇˇ˜PJÄ  ÷ˇˇˇÛP `P*ˇˇˇ˜P*ˇˇˇ˜P*ˇˇˇ˘P `P*ˇˇˇ˜P*ï +	ˇˇˇÃP*
+U*
+P `P*ˇˇˇÙP*%****ë P(ë P(ë P(ë P(JÄ  Ë
+PIÄ  ı`ë P$`¶ %P-`° ,
+ˇˇˇıPí 	`ë !ˇˇˇÌP `ß 	`	ˇˇˇÚPIÄ 	`î 	`P `
+ˇˇˇıP-	`ë PIÄ `OÄ ` `OÄ -` `?Ä ˇPP   t‹8éP   $                         ¡   J   º  º    &¡   J   &Nﬂ• `ñ &-	PÄÄÃ   ∫ˆkÃ   Ö                          ¡   J   ö   ó   ¢ôJ   ó   ¡   J   ù   ó   ﬂ¡   J   ¡ !  ó   ö   ó   ¡    w  ﬂó	   ¡ #  ·J   ‰¡   J   J   w ﬂ• `î `A	K`° 8ï `O`ˇˇˇ˜P$	PÄÄê   –ﬂÈ”ê   M                        ﬁÕ   ﬂ¡    w  ﬂ¡   æ   s ·J   ‰   w ﬂ¡ #  ·J   ‰¡   J   J   w ﬂ•&`*`ˇˇˇˇPP$`ˇˇˇÙP$	PÄÄÄú  ëo¬Ñú  j               ü       ﬁÕ  ﬂº  J   ·¡  J   ü’   ó   ·¡  J   üø   ó   ·¡  J   ü©   ó   ·¡  J   üì   ó	   ·¡  J   ü§  ó   ·¡  J   ü´  ó   ·¡  J   üï  ó   ·¡  J	   ü  ó   ·¡  J
+   üÒ  ó   ·¡  J   ü2  ó   †9  ó   ¡   æ  s ·J   ‰s  õJ  ó   ¡   ·J   ‰s  Õ   ﬂ¡   ·J   ‰s  Õ  ﬂæ   J   ú    ó   ﬂæ   ·J   ‰s ¡   ó"   ù4   ó#   ﬂæ  J   ú    ó%   ﬂæ  ·J   ‰s ¡   ó(   ö¢   ó)   º  J   ¡  J   ù   ó-   ﬂº  J   ¡  J   ó0   ö1   ó1   ¡    ¡   ¡   s ¡  J   w ﬂô,   ó4   ¡    ¡   ¡   s ¡  J   w ﬂó7   ô
+  ó7   º  J   ¡  J   ù   ó;   ﬂº  J   ¡  J   ó>   ú   ó?   ﬂæ   J   ó@   ö1   óA   ¡    ¡   æ   ·J   ‰s s w ﬂôÖ   óE   º  J   ¡  J   ù   óI   ﬂº  J   ¡  J   óL   ú   óM   ﬂæ  J   óN   ö,   óO   ¡    ¡   æ  ·J   ‰s s w ﬂóS   ô∫   óS   Õ  ﬂº  J   ¡  J   ù   óW   ﬂº  J   ¡  J   óZ   ö,   ó[   ¡   ¡   s ·J   ‰s  Õ  ﬂô'   ó^   ¡   ¡   s ·J   ‰s  Õ  ﬂóa   æ  J   ö   óc   ¡ "   æ  w ﬂód   ¢ôS  ód   ¡   ·J   ‰s  Õ   ﬂ¡   æ  s ·J   ‰s  J   õå   ók   ¡   ö7   ól   ¡    ¡   ¡   s w ﬂ¡   ·J   ‰w  ﬂô?   óp   æ   J   ö,   ór   ¡    ¡   æ   ·J   ‰s s w ﬂóv   ¢ôW   óv   ¡   æ  s ·J   ‰s  J   ö   ó|   ¡    w  ﬂô   ó}   ª    m   w ﬂóÄ   ô6  óÄ   ¡   J   ú(   óÉ   ﬂ¡      s ·J   ‰   s óÜ   öJ   óá   ¡     9      ¡ !  &<   ¡   æ  s ·J   ‰s  <   w ﬂôÆ   óè   ¡   öC   óê   ¡     ¡   ¡   s ·J   ‰   s w ﬂ¡   ·J   ‰w  ﬂ¢óñ   ôW   óñ   ¡    w  ﬂ¢óó   ª    ·J!   ‰º  J"   s ö   óú   ª    m#   w ﬂóü   ô   óü   •@`ññññ0+ñ0?ññ0Fññ0Oü0 `ˇˇˇ˛P
+P-`P(`PH`† (P∂ 4Pï@ `û ö !`ˇˇˇ˛P
+ˇˇˇÏP !`ˇˇˇ˛P
+ˇˇˇÏPì@$`û ≥@`PˇˇˇÔPˇˇˇˇP.$`û ≥@`PˇˇˇÛPˇˇˇˇPì0 -`F`û ö `ˇˇˇ˛P
+Pí `ˇˇˇ˛P
+PM$`ì `ˇˇˇˇPI(`AZ	A)`:+ `PH.`ˇˇˇ˛P
+Pí `/`ˇˇˇ˛PˇˇˇˇP$`P.#`ì `PˇˇˇÔPˇˇˇˇPI6`AZ	K7`ˇˇˇˇP
+Pî `î@;`ˇˇˇˇPI=`:?@B`¢  PPí `
+ˇˇˇ˛P
+PˇˇˇŸP$`:F `/`
+ˇˇˇ˛PPˇˇˇÂP$`P$`AZ	FM`:O `*`AZ	6S `ˇˇˇÛPMV`ˇˇˇˇPIX`JZ	PÄÄÄ4   kË4                             ¡    w  ﬂ• `
+PÄÄ4   kË4                             ¡    w  ﬂ• `
+PÄÄ@   Ä?ÛÏ@                             ¡    ¡ %  w ﬂ•  `ˇˇˇˇP$PÄ<   Ù3;<                             ¡ %  ·J   ‰w  ﬂ•  `
+P$PÄ\  †ˆé\  „                        ¡   º  J   s ·J   ‰   s Õ   ﬂæ   úH   ó   ﬂæ   ·J   ‰s ú.   ó   ﬂ¡  ·J   ‰æ   ·J   ‰s    s ó   ö   ó   ¡    æ   w ﬂôO   ó   ¡   ö,   ó   ¡    ¡   ¡   s ¡  J   w ﬂó   ¡    ¡ %  w ﬂó   • `ˇˇˇˇPP(`õ 	Pö Pˇˇˇ¯Pí `ˇˇˇˇP@`/`ˇˇˇ˛P
+ˇˇˇÏPI`ˇˇˇˇPI	PÄº   õ\º   w                       ﬁÕ  ﬂ¡   º  J   s ·J   ‰   s Õ   ﬂæ   ú   ó   ﬂ¡   æ  ó   ö(   ó   æ   ·J   ‰¡   J   J   w ﬂó   •&`ˇˇˇˇPP(`î î `ˇˇˇ˜PI	Pº   ì}º   w                       ﬁÕ  ﬂ¡   º  J   s ·J   ‰   s Õ   ﬂæ   ú   ó   ﬂ¡   æ  ó   ö(   ó   æ   ·J   ‰¡   J   J   w ﬂó   •&`ˇˇˇˇPP(`î î `ˇˇˇÙPI	PL   fÖnOL                            ¡    º w ﬂ¡ $   w  ﬂ• `ˇˇˇˇP$`*	PÄÄ\   ÷#\   %                          ¡ #  ·J   ‰   s ·J   ‰m   w ﬂ• 	`ë P
+ˇˇˇ˚PDPÄÄÄò   πz@¡ò   P                        ﬁÕ   ﬂ¡   æ   s ·J   ‰   s J   ö!   ó   ¡    ¡   æ   s w ﬂó   •&`ˇˇˇˇPPî `ˇˇˇ˛PˇˇˇˇPI	PÄ@   √Pµ@                            ¡     º  w ﬂ• 	`
+ˇˇˇˇP$PÄÄÄd   E«6öd   .   	                     Ω  Œ   ﬂ¡#  ·J   ‰   s ·J   ‰m   w ﬂ•)	`ë P
+ˇˇˇ˚PDPÄÄd  ´6NãT  €         	              ﬁÕ  ﬂ¡   æ  s ·J   ‰   s J   ö¨   ó   ¡   æ  s ·J   ‰   s Õ   ﬂÕ  ﬂ¡   ^ò
+   _`õB   ó   Õ  ¡   æ  Kæ   æ  Kö   ó   Õ  ﬂô   ó   ﬂôªˇˇˇó   aæ  ö!   ó   ¡   ¡   æ  s w ﬂó   •&`ˇˇˇˇPPî !`ˇˇˇˇPP(`&"`ò ˇˇˇÙ$`
+î `&`JL
+`.`ˇˇˇ˛PˇˇˇˇPI	PÄd        `   J   0   hz4®0                              ¡   ¢• 	`%QÄÄ@   ?;†-@                            ¡ &   º  w ﬂ• 	`ˇˇˇˇP$PÄÄÄT  —MZT  ‡                         º  ö   ó   ¡   º  L   ﬂô    ó   ¡   ¡   J   L   ﬂó   ¡ %  ·J   ‰   ¡   J   w ﬂ¡ #  ·J   ‰¡   J   J   ¡   J   w ﬂ¡   ö,   ó   ¡    ¡   ¡   s ¡  J   w ﬂó   ¡   ·J   ‰   ¡   J   w ﬂ• `/`ò `ñ@	`ë 
+ˇˇˇÔP$	`
+ˇˇˇŸPD	`/`ˇˇˇ˛P
+ˇˇˇÏPI	`ë 
+ˇˇˇÔP$PÄÄê   Ÿáê   X                  	        ¡   J   ú   ó   ﬂ¡ !  ¡   J    ó   ö&   ó   ¡ %  ·J   ‰w  ﬂ¡    w  ﬂ ¢ó	   • `ú /ö `
+P$`*`AV,  Ç,N,  º                         ¡   ¡ %  ·J   ‰s  Œ   ö   ó    ¢ó   ¡   ·J   ‰l      s ·J   ‰l      s ·J   ‰l      s ·J   ‰l	   
+   s Õ   ﬂ¡ 
+  ·J   ‰æ   w ﬂ¡ %  ·J   ‰¡ 
+  ·J   ‰s  &w ﬂ• `Pì 	`AF`
+ˇˇˇ¯P
+
+ˇˇˇ¯P
+
+ˇˇˇ¯P
+
+ˇˇˇ¯P(	`ˇˇˇ˚P$	`PˇˇˇÏP$P»   »\≈è»   ó                         º  0 ú   ó   ﬂº  Zó   ùt   ó   ﬂº  ` ú   ó   ﬂº  oó   ùM   ó   ﬂº  ∫  ú   ó
+   ﬂº  ¿ ó   ù$   ó   ﬂº  €  ú   ó   ﬂº  ﬁ ó   ¢• 	`ßß©û QÄÄÄà  Ñà%éà  ±                0       ¡   ·J   ‰º  s Õ   ﬂ¡   æ   s ·J   ‰¡   J   J   s ·J   ‰¡   s Õ   ﬂ¡      ¡   J   &   &s ·J   ‰¡   J   J	   s ·J
+   ‰æ   s ·J   ‰m   w ﬂº  Õ  ﬂ¡  ·J   ‰æ   ·J   ‰s    º  w ﬂ¡   ·J   ‰¡   s ·J   ‰h   æ  i    s ·J   ‰¡   ·J   ‰¡   s s Œ   ﬂ¡   0(Œ   ﬂ¡    ¡   ¡   w ﬂ¡ !  &.Œ !  ﬂ¡   J   ú   ó*   ﬂ¡ !  ¡   J    ó,   ö$   ó-   ¡ %  ·J   ‰w  ﬂ¡    w  ﬂó0   æ   ¢• `ˇˇˇÒP(	`ˇˇˇ˛P*ˇˇˇ˜P*ˇˇˇÛPH	`ë ˇˇˇÙP*ˇˇˇ˜P*ˇˇˇ˜P*ˇˇˇ˙PD`(	`Pˇˇˇ⁄PD	`$ˇˇˇ¯P
+%	ˇˇˇ¯P
+ˇˇˇ˙PˇˇˇÏP)	`M	`ˇˇˇÒPD	`N `ú /ö `
+P$`O%	`$QÄÄú   LK˝˜ú   S                        ﬁÕ   ﬂ¡   J   õ=   ó   ¡    ¡   æ   s ·J   ‰s  w ﬂ¡   ·J   ‰w  ﬂ¢ó   •&`î `ˇˇˇ˛P
+Pˇˇˇ˜P$`P$`AVÄ  pœ(  a  	                    Ω  Œ   ﬂ¡  J   Õ   ﬂ¡!  ú   ó   ﬂ¡  J   ó   öt   ó   Œ   ﬂ¡#  ·J   ‰s  ·J   ‰m   w ﬂ¡   ö?   ó   ¡   ¡   w ﬂ¡  ·J   ‰¡   w ﬂ¡   ¡%  w ﬂ ¢ó   ¡  J   ù   ó   ﬂ¡!  ¡  J   ó   ö#   ó   ¡   ¡   w ﬂ¡$   w  ﬂó   ¡%  ·J   ‰	   w ﬂ¡   w  ﬂ¡  ·J
+   ‰æ   s ö#   ó   æ   ·J   ‰¡  ¡   w ﬂó   •)`O`´ (`'`P
+ˇˇˇ˚PD`/`ˇˇˇˇP$`ˇˇˇÙP$`ˇˇˇˇP$`A'F`ú -ö `ˇˇˇˇP$`O	`ë 
+PD!	`J$`ˇˇˇıP-`ˇˇˇÓPI'PÄÄÄ–   ´í
+£–   Ñ                
+        ﬁÕ  ﬂ¡   æ  s Õ   ﬂ¡  ·J   ‰æ   ·J   ‰s    s Õ  ﬂæ  ú   ó   ﬂæ  J   ¡   J   ó	   ö   ó
+   æ   Œ   ﬂ¢ó
+   •&&`ˇˇˇˇP(%`PˇˇˇÏP(`ò &ö `*`AVÄ∞    ∞   j                         ¡   J   õZ   ó   º  ·J   ‰¡   J   J   w ﬂº  ·J   ‰s Œ   ﬂ¡ %  ·J   ‰   w ﬂ¡    w  ﬂó   • `î `
+ˇˇˇ˜P$`PI`ë 
+PD	`OPX  ‚ytX  ›                         º  ·J   ‰¡   J   J   w ﬂŒ   ﬂº ¡  J   ö/   ó   ¡   ·J   ‰º  w ﬂ¡   0)Œ   ﬂôl   ó   º ¡  J   ö/   ó   ¡   ·J   ‰º  w ﬂ¡   0(Œ   ﬂô*   ó   ¡   ·J   ‰¡ #  w ﬂ¡ !  Œ   ﬂó   ¡    ¡ %  w ﬂ• 	`
+ˇˇˇÙP$	`G`ï `ˇˇˇÛP$`ó `ï `ˇˇˇÙP$`ó `ˇˇˇ˜P$`ê@	`ˇˇˇˇP$PÄÄÙ   ≈ØäSÙ   ë                        ¡   Õ   ﬂ¡   ö,   ó   ¡    ¡   ¡   s ¡  J   w ﬂó   æ   º  ·J   ‰s ö&   ó   ¡    º  ¡  J   w ﬂô   ó
+   ¡    º  w ﬂó   • '`J`/`ˇˇˇ˛P
+ˇˇˇÏPI`P.`
+ˇˇˇ¯P `ˇˇˇˇPIPd  Ûã¬≤d  ö         	       )       ¡  ·J   ‰º  ·J   ‰s    s Õ   ﬂ¡   J   Õ  ﬂº  ·J   ‰s  J   Õ  ﬂæ  ¡   ö   ó
+   æ  0)Õ  ﬂó   º  ·J   ‰w  ﬂŒ   ﬂ¡    ¡ %  w ﬂ¡   ·J   ‰æ  s ·J	   ‰¡   ·J   ‰æ  &s s Œ   ﬂæ  ¡   ö   ó   ¡   0)Œ   ﬂó   ¡    ¡   ¡   w ﬂ¡ !  '.Œ !  ﬂ¡   J
+   ö8   ó   ¡ %  ·J   ‰s  ·J   ‰   w ﬂ¡    ¡ %  w ﬂó$   ¡  ·J   ‰æ  s ö"   ó'   æ  ·J   ‰¡   æ   w ﬂó)   •@`PˇˇˇıP(`O`
+P-`ê `ê@		`
+P$	`G	`ˇˇˇˇPD	`$ˇˇˇ¯P
+ˇˇˇ˙PˇˇˇÏP)`ê `í@	`ˇˇˇÒPD	`N`ñ `,P*U$`ˇˇˇˇPI `ˇˇˇıP-`ˇˇˇÓPI#PÄÄå   	∫‰Tå   C                        ¡  ·J   ‰º  m   s Õ   ﬂº ·J   ‰æ   ·J   ‰¡   J   s w ﬂ• `ˇˇˇÓPH	`
+
+ˇˇˇ˚PˇˇˇÔPD	PÄÄÄê   ªPnê   R                	       ﬁÕ   ﬂ¡   J      ö&   ó   ¡   J   ·J   ‰æ   º  s ¢ó   º  ¡   J   K¢•&`õ `ë  ˇˇˇıPC	F`.	QÄT   =∂≈T   "                          ¡   ·J   ‰s  ·J   ‰w  ﬂŒ   ﬂ• 	`	P
+P$	`'PÄÄ  /Û  ≥                          ¡   ·J   ‰9      <   ¡   ¡ #  s ·J   ‰s  J   ¡   ¡ #  s ·J   ‰s  &<   ¡   ¡ #  s ·J   ‰s  J   <   ¡   ¡ #  s ·J	   ‰s  <
+   ¡   J   <   s ·J   ‰w  ﬂ• 	`,%*ˇˇˇ˛P
+Pˇˇˇ˛P
+P)ˇˇˇ˛P
+P-	ˇˇˇ˛P
+P(OPJ	P$PÑ   ø•BÑ   J                          ¡   J   ö:   ó   ¡   ·J   ‰   ¡   J   &   &w ﬂ¡    w  ﬂó   • `î `ë ˇˇˇıP$`OPÑ   ø•BÑ   J                          ¡   J   ö:   ó   ¡   ·J   ‰   ¡   J   &   &w ﬂ¡    w  ﬂó   • `î `ë ˇˇˇıP$`OPp   q;≠Op   5                         º  ·J   ‰ª   Ä   º &   &   „  Å    s ¢• 	`
+ì ˇˇˇŸPˇˇˇ¯P#QÄ®   ¸
+=®   Q                         º  ·J   ‰ª   Ä   ª    º s &   &   „  Å ¡ 	   ª    º s º s s ¢• 	`
+ˇˇˇ˘Pì ˇˇˇŸPXˇˇˇ˘Pˇˇˇ‚Pˇˇˇ†P#QÄÿ  rökÿ  G  	              "       Ω  Œ   ﬂº ú   ó   ﬂº J   ó   ö‘   ó   ¡  ·J   ‰w  ﬂ¡      s ·J   ‰¡  s ·J   ‰m   s ·J   ‰m   s ·J	   ‰s  Œ   ﬂ¡  ·J
+   ‰º m   w ﬂ¡   w  ﬂ¡  J   ö$   ó   ¡   ·J   ‰   w ﬂô   ó   ¡   ·J   ‰w  ﬂó   ôN   ó   ¡  J   ö:   ó   ¡  ·J   ‰   ¡  J   &   &w ﬂ¡   w  ﬂó"   •)`• `	PD`P*ˇˇˇ˜P*ˇˇˇˆPJ	ˇˇˇˆPJPI`	ˇˇˇÚPD$`J&`î `ë P `Pì0+ `î `#ë ˇˇˇÿP$`O1PÄh   …”ü/h   +                         ¡"   ¡   º  J   s ·J   ‰   s w ﬂ• `ˇˇˇ˛PPˇˇˇÔP$PÄÄÄî   ∆0rî   L                  	       ¡    ¡   º  J   s ·J   ‰   s ·J   ‰   s w ﬂ¡  ·J   ‰w  ﬂ¢• `
+ˇˇˇ˛PPPˇˇˇ·P$`P$`!QÄÄî  3I&î                         ¡  ·J   ‰º s Õ   ﬂ¡   æ   º ¡  J   K¡   s Õ   ﬂ¡   æ   s ·J   ‰¡   s Õ   ﬂº  ,ö-   ó
+   æ   ·J   ‰¡  J   J   w ﬂô(   ó   æ   ·J   ‰¡  J   J   w ﬂó   º  ö   ó   ¡"   æ   w ﬂó   ¡  ·J   ‰æ   ·J	   ‰s 
+   º w ﬂ• `ˇˇˇÔPH`(	"ˇˇˇ∑PH`ˇˇˇ˛P
+ˇˇˇ˜PH`ê `ˇˇˇ˜P `ˇˇˇ˜PI`/`ˇˇˇˇPI`Pˇˇˇ›P$PÄÄÄ¿   Az&¿   p                  
+       º  ög   ó   ¡   ö"   ó   ¡    ¡   ¡   s w ﬂó   º  ·J   ‰¡   J   J   w ﬂº  ·J   ‰s Œ   ﬂó
+   • `-`/`ˇˇˇ˛PˇˇˇˇPI`
+ˇˇˇ˜P$`PN	PX   †EX   %                         º  ·J   ‰¡   J   J   w ﬂŒ   ﬂ• 	`
+ˇˇˇÙP$	`'PÄT  ¨m∫ûT  ‰                          ¡%  ·J   ‰s  Œ   ﬂ¡   ú   ó   ﬂ¡   J   ó   ö™   ó   ¡  ö,   ó   ¡   ¡   ¡  s ¡  J   w ﬂó	   ¡   J   ¡  J    öF   ó   ¡   w  ﬂª    ¡  w ﬂª    m   ¡  J   s Œ  ﬂô   ó   ¡   w  ﬂó   • `
+PI`© `/`ˇˇˇ˛P
+ˇˇˇÏPI`
+ï `*`ˇˇˇˇPD`EJPì0 `OP@   §0Ë`@                             ¡   ¡   w ﬂ• `ˇˇˇˇP$PÄT  VÚÅeT  3  	             J       Ω  Œ   ﬂ¡   ¡   s  &Œ   ﬂ¡  ·J   ‰¡   s Õ   ﬂæ   ö"   ó   ¡   ¡   æ   w ﬂô’  ó   ¡  J   ö  ó   ¡   s  Õ  ﬂ9   Œ   ﬂ¡   9   L   ﬂæ  ·J   ‰   s ˇök   ó   æ  ·J   ‰   s Õ  ﬂ¡   æ  KL   ﬂæ  K·J   ‰	   s Õ  ﬂ¡  ·J
+   ‰æ  m   w ﬂô   ó   ¡   æ  L   ﬂó   ¡  J   ö3   ó   ¡   J   ¡  J   ª    ¡   s Nﬂô%   ó"   ¡   J   ¡  J   ¡   Nﬂó%   ¡   ¡  J   L   ﬂ¡   ¡  J   L   ﬂ¡  J   ö   ó+   ¡      L   ﬂó,   ¡   m   L   ﬂ¡  J   ö   ó1   ¡   m   L   ﬂó3   ¡  ·J   ‰¡   s Õ  ﬂæ  ﬂ¡  J   ö   ó8   ¡  ·J   ‰æ  w ﬂó:   ô∑   ó:   ¡  J   ö£   ó<   ¡  ·J   ‰¡  J   m   s Õ  ﬂ¡  ·J   ‰¡  J    s ö,   óD   ¡  J    ·J!   ‰¡  æ  s Õ  ﬂóG   ¡  ·J"   ‰¡   æ  w ﬂ¡   ¡   æ  w ﬂóJ   •)`V*`
+ˇˇˇ¸P(`.`ˇˇˇ¯P@`î `N
+#`+`ê `ê Pê !`ê P(`ë@'`í 	P(`ˇˇˇÓP> `î@`î `ö ;ˇˇˇÌPO`† `ï `ï `î `ï@%`ê@2`ñ `ï@<`ˇˇˇ˚P(`%`ñ `ˇˇˇ˚Pì `î@A`
+ˇˇˇÊPHE`
+ˇˇˇıP-`ë !ˇˇˇÌPMH`
+ˇˇˇÒP$`ˇˇˇ¯PILPÄÄ`   Vä*U`   0                        º ·J   ‰   s Õ   ﬂ¡   J   æ   Kæ   KNﬂ• "`P(`ò PÄÄ`  â}Uñ`  ˘                         ¡  ·J   ‰¡  J   s ö*   ó   ¡  J   ·J   ‰¡  º  s Ã  ﬂó   ¡  ·J   ‰¡   ¡  J   ö   ó
+   º  ¡  J   Kô   ó   º  ó   w ﬂ¡%  ·J   ‰s  ¡   öM   ó   ¡   ¡   ¡  J   ö   ó   º  ¡  J   Kô   ó   º  ó   w ﬂó   • `
+ˇˇˇıP-`ë !ˇˇˇÌPL`
+¥ ˇˇˇÒPD`
+P
+ê `¥ ˇˇˇ¯PI
+PÄÄÏ   úi‹   í                        Õ   ﬂò    æ   ¡  J   öq   ó   ¡  æ   KJ   ú   ó   ﬂ¡  æ   KJ    ó
+   ö   ó   ¡  æ   K·J   ‰w  ﬂó   æ   0(Õ   ﬂôˇˇˇó   •  `fï `¨ Cë `ë PI:`ï@PÄÄÄÏ             Ü   l   oh+l   6                  	       º  ¡  J   K·J   ‰s  ·J   ‰¡   ·J   ‰s  s ˇ¢• `ï &P
+PˇˇˇÚP&Qê   (ÉFzê   S                         ¡   J   Õ   ﬂ¡   J      ö(   ó   ¡   J   ·J   ‰¡   s Õ   ﬂó   æ   ¢• `/`õ `ë ˇˇˇ˚PM	`$QÄÄL   Ûd>L      	                     Ω  Œ   ﬂª    m   2w ﬂ•)	`ˇˇˇˇP$PÄÄ<   (∞â<                             ¡   ·J   ‰w  ﬂ• `P	PÄ¨   ÿ^®5¨   g                
+      ﬁÕ   ﬂ¡  ·J   ‰9   Ù<   º  s Œ   ﬂ9   Œ   ﬂŒ   ﬂm   Œ   ﬂæ   m   L   ﬂæ   m   L	   ﬂ•&`	%	(CPI`+`G`K`O`?PÄ@   ,we˘@                             9   Œ   ﬂŒ   ﬂ• 	`+	`'PÄÄÄò   .Wopò   ]                         ¡   ¡   J   ö   ó   ¡    w  ﬂó   ¡   º  Kõ   ó   ¡   &.Œ   ﬂó   ¡   º  º Nﬂ• `ï `O`ì `ì@		`-PÄ4   ö•X4                            ¡   º  K¢• 	`)QÄÄ3ıÿ  `        `        `_  `  a    `^    @  @å     p  `_  `  b    `_  `       `_  `  c  	  `_  `  d  
+  `_  `  e    `   Ä  √  h  6   Z    `,  …     r  J    `   §    `Ü  ⁄    PÃ    P     PŒ    Pœ  –  ∫    `  `,  ÷  ö    `  É  r  0  ≠  ‘    ’  2  Ø  ®  %  p_  Œ   °  h  L      §    `_  Œ   °  ç   `%  "  «  å   '  pµ     Ü  ê   ƒ  6     `,  É  r  4  Œ   Ü  ê     `á  r  4  H  ≠  I  µ  Ø    `J  Œ     `_  Œ   °  &  ﬁ  I  c  h  L      ﬂ  Ü  ê   ƒ  6     `#  v  6     `·  -  pÜ  >  !    `§  ‚    `|    @∑  ∂  •  ∏  ‰  π  Â  ∫    Ê  ﬂ    `  –  Ë  È    `  –  Ë  È    `⁄  á  Ï  Ì   Ó     `⁄  á  Ï  ü   Ì  g  "  `  ©  R #  `  ©  R _  °  ö  $  `    Ø  É  r  :  <  _  Œ   °  !  `I  ‚  Ù  Ø  ´  5  pı  6  p§  å   7  p  ˜  ¯  ﬂ    –  ˘  È  %  `É  r  >  Œ   &  `á  r  >  (  `'  `Ü  I  I    ˚  õ  ;  p  *  `ﬁ  =  _  +  `ƒ  $  6      	  Ü  ,  `I         -  `   l  )  `Œ   J    @	  @_  l  ?  ﬁ  &  å   =  p    ì     0  
+   k   >  p )  ?  p  	 q  
+ @  pƒ  $  6      .  `J  v  6   0  `Ä  /  `õ  C  p1  `r  -    2  `,     É  r  D  3  `Ü  ê   á  r  D  5  `6  `4  `è  T  U  3 V  L  M  N  W  X  O  Ü  ë  Ç  I  Œ   H  I  ö  õ    p(  ù  ú û    @†  ç {  _  °  Ü  ¢  £    p7  `8  `Ñ  9  `  ©  R Œ   _  °  J  :  `  ©  R É  r  6  ;  `  ©  R á  r  6  <  `>  `«    I  =  `«  R å     p?  `A  `«    I  _  °  @  `«  R å     pB  `C  `  `   p!  p"  p#  p$  p&  p(  p)  p*  p+  p,  p.  p/  p0  p1  p2  p3  p4  p8  p9  p:  p<  pA  pB  p0  w  v  J  k  l  m  n  o  ﬁ     P  Pq  r  ^  
+  @    @å     pa  w  {  |    @~  }    ç *  ÌÌÄ    pÑ    pà  â  ã    p  §  Ü  ê     p  pß  É  .  ®    p´    p¨    p≠  Æ  @  Ø  ∞  ±  8  B  -  ≤  ¥  µ    @∑  ∂  ∏  π  ª  ∫  º  Ω  æ  ø  ¡  ¿    _  √    ƒ  $  6   I    p,  '    pb    p     pc    pd    pe  E  `  @F  ` G  `D  `^    @   @E  pF  p   G  pŒ     `Ä     @    q          {    	  B  
+                                p    p     ,  !  "  ç #  $  %  &  '  (  )  +  *  ,    @/  .  1  0  3  2  5  4  7  6  9  8  ;  :  =  <  ?  >  A  @  C  B  E  D  F    @H  I  J    @L  M  N  O  P  Q  R  S  T  3 U  V  W  X    @  pZ    pb    p     pc  	  pŒ   
+  pe  ◊   pg    pa  D  pw     `  p ˇXÑ§                3  q                                                Z                           b                             c              Œ         "      e        &             ®  |          A            E            K            S  $          Q            R            w            x            z            Ç            â            ê            ï            ë            ö            °            õ            ¶            ß            -      e        3      ∆        6      ä        C      —        H      ≈        D      %       a      ü        \      '       m      î        u   	   ì        ~      ™        Å      ò        ï      ÿ        ë      -       õ      Ö        û      „        ¨      Á        ±      Å        ∂      Í        Ω      Ô        ⁄      Ò        ƒ      5       »      5       œ      6       Ó      ó        Û      ˙        ¯   	   ú        ˜      :         #   ¸             <            =            >            ?       8     j        >     •        <     B       )  
+   C       $            &     E       (     F       ùH©¿      Uz      Uz                ÄÙ   Jz  Î   Jz                z  ∏  r  ∏  &              ÷    Œ    '             Ç≠
+  π  •
+  π  k              ;  ±  2  ±  n   #            Œ    ∆    r               /  É  '  É  v              ô    ë    z                G  ˚  G  ~               e     ]     Å              "        à             ÇP  "x  G  "x  í                  z    z  ≥   )            ‹    ”    Œ                 •    •  ◊              ˙  ≈(  Ò  ≈(  ›               K$  [$  C$  [$    ,             g(  w(  _(  w(  3  ,             Á)  F*  ﬁ)  F*  ?  ,             r*  ƒ*  i*  ƒ*  B  +             ,  ÷-  ˚+  ÷-  N             Ù-  π.  Î-  π.  \             ÷.  û/  Õ.  û/  b              ø4  5  ∂4  5  ç  "           I6  7  A6  7  °              }6  ˙6  u6  ˙6  ¢  0             7  B7  7  B7  ©            Ä^7  }9  V7  }9  ≠             ñ7  u9  é7  u9  Æ  0             ú9  √9  î9  √9  ø               Á9  :  ﬂ9  :  √  #            Ã:  ⁄<  µ:  ⁄<  Õ              ¯<  ¨=  ‡<  ¨=  ‹               «=  ,?  ≤=  ,?  ‰               Q?  Ä@  2?  Ä@  Ì  $           »@  ≈E  ≥@  ≈E  ı             LB  C  CB  C  ˇ             ÄF  TK  F  TK               6G  zH  -G  zH  $  1             òK  ÁL  ÇK  ÁL  H              /M  wO  M  wO  V              ŒO  Q  ≤O  Q  j  !            cQ  õU  MQ  õU  y             ÊU  GW   U  GW  ü  !           =V  ¯V  4V  ¯V  †  9            èW  ·W  xW  ·W  ´               ˝W  UY  ÁW  UY  ∞               |Y  Z  [Y  Z  º  &             4Z  ¿Z  Z  ¿Z  √  !             [  †[  ˘Z  †[  À              Ã[  â\  ¶[  â\  œ  +          Ä·\  Zc  ∆\  Zc  ‘               ∑]  ^  Æ]  ^  ⁄  %            A^  ˙^  8^  ˙^  ›  %            :_  æa  2_  æa  ‰  %            Øc  …d  ëc  …d    #            /e  •e  e  •e    %          Ä'f  Eh  f  Eh                 ùg  Ÿg  ïg  Ÿg  '  .           Äzh  Óu  gh  Óu  1              Gk  Ÿk  >k  Ÿk  B  2            gn  ±p  _n  ±p  V  /            ¬q  ◊r  ∫q  ◊r  d  3             Rt  ÷t  It  ÷t  r  D            &v  Õv  v  Õv  Ä             Ä›w  x  ¬w  x  ç                x  x  ¯w  x  é             Çhx  Gz  _x  Gz  î              ˘x  (y  x  (y  ú               Cy  ˛y  :y  ˛y  °              z  Dz  z  Dz  ≠            5°›ØF≤ÉPw‡‚1      g¯ﬁ˚g¯ﬁ˚HWg¯Âp   Y    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/js/jquery.tokeninput.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|3b74e2d9-8b04-636d-001f-25c4f33b65c2|
+Accept-Ranges: bytes
+ETag: W/"31317-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 31317
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|3b74e2d9-8b04-636d-001f-25c4f33b65c2|
+Accept-Ranges: bytes
+ETag: W/"31317-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 31317
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=93
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 322 net-response-time-onstop 352 alt-data 1;31317,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  ç]

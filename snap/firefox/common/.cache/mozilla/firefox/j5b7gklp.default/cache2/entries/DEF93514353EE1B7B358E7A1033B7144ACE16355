@@ -1,0 +1,3984 @@
+/* ===================================================
+ * bootstrap-transition.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#transitions
+ * ===================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+
+!function ($) {
+
+  $(function () {
+
+    "use strict"; // jshint ;_;
+
+
+    /* CSS TRANSITION SUPPORT (http://www.modernizr.com/)
+     * ======================================================= */
+
+    $.support.transition = (function () {
+
+      var transitionEnd = (function () {
+
+        var el = document.createElement('bootstrap')
+          , transEndEventNames = {
+               'WebkitTransition' : 'webkitTransitionEnd'
+            ,  'MozTransition'    : 'transitionend'
+            ,  'OTransition'      : 'oTransitionEnd'
+            ,  'msTransition'     : 'MSTransitionEnd'
+            ,  'transition'       : 'transitionend'
+            }
+          , name
+
+        for (name in transEndEventNames){
+          if (el.style[name] !== undefined) {
+            return transEndEventNames[name]
+          }
+        }
+
+      }())
+
+      return transitionEnd && {
+        end: transitionEnd
+      }
+
+    })()
+
+  })
+
+}(window.jQuery);
+/* =========================================================
+ * bootstrap-modal.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#modals
+ * =========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================= */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* MODAL CLASS DEFINITION
+  * ====================== */
+
+  var Modal = function (content, options) {
+    this.options = options
+    this.$element = $(content)
+      .delegate('[data-dismiss="modal"]', 'click.dismiss.modal', $.proxy(this.hide, this))
+  }
+
+  Modal.prototype = {
+
+      constructor: Modal
+
+    , toggle: function () {
+        return this[!this.isShown ? 'show' : 'hide']()
+      }
+
+    , show: function () {
+        var that = this
+          , e = $.Event('show')
+
+        this.$element.trigger(e)
+
+        if (this.isShown || e.isDefaultPrevented()) return
+
+        $('body').addClass('modal-open')
+
+        this.isShown = true
+
+        escape.call(this)
+        backdrop.call(this, function () {
+          var transition = $.support.transition && that.$element.hasClass('fade')
+
+          if (!that.$element.parent().length) {
+            that.$element.appendTo(document.body) //don't move modals dom position
+          }
+
+          that.$element
+            .show()
+
+          if (transition) {
+            that.$element[0].offsetWidth // force reflow
+          }
+
+          that.$element.addClass('in')
+
+          transition ?
+            that.$element.one($.support.transition.end, function () { that.$element.trigger('shown') }) :
+            that.$element.trigger('shown')
+
+        })
+      }
+
+    , hide: function (e) {
+        e && e.preventDefault()
+
+        var that = this
+
+        e = $.Event('hide')
+
+        this.$element.trigger(e)
+
+        if (!this.isShown || e.isDefaultPrevented()) return
+
+        this.isShown = false
+
+        $('body').removeClass('modal-open')
+
+        escape.call(this)
+
+        this.$element.removeClass('in')
+
+        $.support.transition && this.$element.hasClass('fade') ?
+          hideWithTransition.call(this) :
+          hideModal.call(this)
+      }
+
+  }
+
+
+ /* MODAL PRIVATE METHODS
+  * ===================== */
+
+  function hideWithTransition() {
+    var that = this
+      , timeout = setTimeout(function () {
+          that.$element.off($.support.transition.end)
+          hideModal.call(that)
+        }, 500)
+
+    this.$element.one($.support.transition.end, function () {
+      clearTimeout(timeout)
+      hideModal.call(that)
+    })
+  }
+
+  function hideModal(that) {
+    this.$element
+      .hide()
+      .trigger('hidden')
+
+    backdrop.call(this)
+  }
+
+  function backdrop(callback) {
+    var that = this
+      , animate = this.$element.hasClass('fade') ? 'fade' : ''
+
+    if (this.isShown && this.options.backdrop) {
+      var doAnimate = $.support.transition && animate
+
+      this.$backdrop = $('<div class="modal-backdrop ' + animate + '" />')
+        .appendTo(document.body)
+
+      if (this.options.backdrop != 'static') {
+        this.$backdrop.click($.proxy(this.hide, this))
+      }
+
+      if (doAnimate) this.$backdrop[0].offsetWidth // force reflow
+
+      this.$backdrop.addClass('in')
+
+      doAnimate ?
+        this.$backdrop.one($.support.transition.end, callback) :
+        callback()
+
+    } else if (!this.isShown && this.$backdrop) {
+      this.$backdrop.removeClass('in')
+
+      $.support.transition && this.$element.hasClass('fade')?
+        this.$backdrop.one($.support.transition.end, $.proxy(removeBackdrop, this)) :
+        removeBackdrop.call(this)
+
+    } else if (callback) {
+      callback()
+    }
+  }
+
+  function removeBackdrop() {
+    this.$backdrop.remove()
+    this.$backdrop = null
+  }
+
+  function escape() {
+    var that = this
+    if (this.isShown && this.options.keyboard) {
+      $(document).on('keyup.dismiss.modal', function ( e ) {
+        e.which == 27 && that.hide()
+      })
+    } else if (!this.isShown) {
+      $(document).off('keyup.dismiss.modal')
+    }
+  }
+
+
+ /* MODAL PLUGIN DEFINITION
+  * ======================= */
+
+  $.fn.modal = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('modal')
+        , options = $.extend({}, $.fn.modal.defaults, $this.data(), typeof option == 'object' && option)
+      if (!data) $this.data('modal', (data = new Modal(this, options)))
+      if (typeof option == 'string') data[option]()
+      else if (options.show) data.show()
+    })
+  }
+
+  $.fn.modal.defaults = {
+      backdrop: true
+    , keyboard: true
+    , show: true
+  }
+
+  $.fn.modal.Constructor = Modal
+
+
+ /* MODAL DATA-API
+  * ============== */
+
+  $(function () {
+    $('body').on('click.modal.data-api', '[data-toggle="modal"]', function ( e ) {
+      var $this = $(this), href
+        , $target = $($this.attr('data-target') || (href = $this.attr('href')) && href.replace(/.*(?=#[^\s]+$)/, '')) //strip for ie7
+        , option = $target.data('modal') ? 'toggle' : $.extend({}, $target.data(), $this.data())
+
+      e.preventDefault()
+      $target.modal(option)
+    })
+  })
+
+}(window.jQuery);
+/* ============================================================
+ * bootstrap-dropdown.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#dropdowns
+ * ============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================ */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* DROPDOWN CLASS DEFINITION
+  * ========================= */
+
+  var toggle = '[data-toggle="dropdown"]'
+    , Dropdown = function (element) {
+        var $el = $(element).on('click.dropdown.data-api', this.toggle)
+        $('html').on('click.dropdown.data-api', function () {
+          $el.parent().removeClass('open')
+        })
+      }
+
+  Dropdown.prototype = {
+
+    constructor: Dropdown
+
+  , toggle: function (e) {
+      var $this = $(this)
+        , $parent
+        , selector
+        , isActive
+
+      if ($this.is('.disabled, :disabled')) return
+
+      selector = $this.attr('data-target')
+
+      if (!selector) {
+        selector = $this.attr('href')
+        selector = selector && selector.replace(/.*(?=#[^\s]*$)/, '') //strip for ie7
+      }
+
+      $parent = $(selector)
+      $parent.length || ($parent = $this.parent())
+
+      isActive = $parent.hasClass('open')
+
+      clearMenus()
+
+      if (!isActive) $parent.toggleClass('open')
+
+      return false
+    }
+
+  }
+
+  function clearMenus() {
+    $(toggle).parent().removeClass('open')
+  }
+
+
+  /* DROPDOWN PLUGIN DEFINITION
+   * ========================== */
+
+  $.fn.dropdown = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('dropdown')
+      if (!data) $this.data('dropdown', (data = new Dropdown(this)))
+      if (typeof option == 'string') data[option].call($this)
+    })
+  }
+
+  $.fn.dropdown.Constructor = Dropdown
+
+
+  /* APPLY TO STANDARD DROPDOWN ELEMENTS
+   * =================================== */
+
+  $(function () {
+    $('html').on('click.dropdown.data-api', clearMenus)
+    $('body')
+      .on('click.dropdown', '.dropdown form', function (e) { e.stopPropagation() })
+      .on('click.dropdown.data-api', toggle, Dropdown.prototype.toggle)
+  })
+
+}(window.jQuery);
+/* =============================================================
+ * bootstrap-scrollspy.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#scrollspy
+ * =============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+  /* SCROLLSPY CLASS DEFINITION
+   * ========================== */
+
+  function ScrollSpy( element, options) {
+    var process = $.proxy(this.process, this)
+      , $element = $(element).is('body') ? $(window) : $(element)
+      , href
+    this.options = $.extend({}, $.fn.scrollspy.defaults, options)
+    this.$scrollElement = $element.on('scroll.scroll.data-api', process)
+    this.selector = (this.options.target
+      || ((href = $(element).attr('href')) && href.replace(/.*(?=#[^\s]+$)/, '')) //strip for ie7
+      || '') + ' .nav li > a'
+    this.$body = $('body')
+    this.refresh()
+    this.process()
+  }
+
+  ScrollSpy.prototype = {
+
+      constructor: ScrollSpy
+
+    , refresh: function () {
+        var self = this
+          , $targets
+
+        this.offsets = $([])
+        this.targets = $([])
+
+        $targets = this.$body
+          .find(this.selector)
+          .map(function () {
+            var $el = $(this)
+              , href = $el.data('target') || $el.attr('href')
+              , $href = /^#\w/.test(href) && $(href)
+            return ( $href
+              && href.length
+              && [[ $href.position().top, href ]] ) || null
+          })
+          .sort(function (a, b) { return a[0] - b[0] })
+          .each(function () {
+            self.offsets.push(this[0])
+            self.targets.push(this[1])
+          })
+      }
+
+    , process: function () {
+        var scrollTop = this.$scrollElement.scrollTop() + this.options.offset
+          , scrollHeight = this.$scrollElement[0].scrollHeight || this.$body[0].scrollHeight
+          , maxScroll = scrollHeight - this.$scrollElement.height()
+          , offsets = this.offsets
+          , targets = this.targets
+          , activeTarget = this.activeTarget
+          , i
+
+        if (scrollTop >= maxScroll) {
+          return activeTarget != (i = targets.last()[0])
+            && this.activate ( i )
+        }
+
+        for (i = offsets.length; i--;) {
+          activeTarget != targets[i]
+            && scrollTop >= offsets[i]
+            && (!offsets[i + 1] || scrollTop <= offsets[i + 1])
+            && this.activate( targets[i] )
+        }
+      }
+
+    , activate: function (target) {
+        var active
+          , selector
+
+        this.activeTarget = target
+
+        $(this.selector)
+          .parent('.active')
+          .removeClass('active')
+
+        selector = this.selector
+          + '[data-target="' + target + '"],'
+          + this.selector + '[href="' + target + '"]'
+
+        active = $(selector)
+          .parent('li')
+          .addClass('active')
+
+        if (active.parent('.dropdown-menu'))  {
+          active = active.closest('li.dropdown').addClass('active')
+        }
+
+        active.trigger('activate')
+      }
+
+  }
+
+
+ /* SCROLLSPY PLUGIN DEFINITION
+  * =========================== */
+
+  $.fn.scrollspy = function ( option ) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('scrollspy')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('scrollspy', (data = new ScrollSpy(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.scrollspy.Constructor = ScrollSpy
+
+  $.fn.scrollspy.defaults = {
+    offset: 10
+  }
+
+
+ /* SCROLLSPY DATA-API
+  * ================== */
+
+  $(function () {
+    $('[data-spy="scroll"]').each(function () {
+      var $spy = $(this)
+      $spy.scrollspy($spy.data())
+    })
+  })
+
+}(window.jQuery);
+/* ========================================================
+ * bootstrap-tab.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#tabs
+ * ========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ======================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* TAB CLASS DEFINITION
+  * ==================== */
+
+  var Tab = function ( element ) {
+    this.element = $(element)
+  }
+
+  Tab.prototype = {
+
+    constructor: Tab
+
+  , show: function () {
+      var $this = this.element
+        , $ul = $this.closest('ul:not(.dropdown-menu)')
+        , selector = $this.attr('data-target')
+        , previous
+        , $target
+        , e
+
+      if (!selector) {
+        selector = $this.attr('href')
+        selector = selector && selector.replace(/.*(?=#[^\s]*$)/, '') //strip for ie7
+      }
+
+      if ( $this.parent('li').hasClass('active') ) return
+
+      previous = $ul.find('.active a').last()[0]
+
+      e = $.Event('show', {
+        relatedTarget: previous
+      })
+
+      $this.trigger(e)
+
+      if (e.isDefaultPrevented()) return
+
+      $target = $(selector)
+
+      this.activate($this.parent('li'), $ul)
+      this.activate($target, $target.parent(), function () {
+        $this.trigger({
+          type: 'shown'
+        , relatedTarget: previous
+        })
+      })
+    }
+
+  , activate: function ( element, container, callback) {
+      var $active = container.find('> .active')
+        , transition = callback
+            && $.support.transition
+            && $active.hasClass('fade')
+
+      function next() {
+        $active
+          .removeClass('active')
+          .find('> .dropdown-menu > .active')
+          .removeClass('active')
+
+        element.addClass('active')
+
+        if (transition) {
+          element[0].offsetWidth // reflow for transition
+          element.addClass('in')
+        } else {
+          element.removeClass('fade')
+        }
+
+        if ( element.parent('.dropdown-menu') ) {
+          element.closest('li.dropdown').addClass('active')
+        }
+
+        callback && callback()
+      }
+
+      transition ?
+        $active.one($.support.transition.end, next) :
+        next()
+
+      $active.removeClass('in')
+    }
+  }
+
+
+ /* TAB PLUGIN DEFINITION
+  * ===================== */
+
+  $.fn.tab = function ( option ) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('tab')
+      if (!data) $this.data('tab', (data = new Tab(this)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.tab.Constructor = Tab
+
+
+ /* TAB DATA-API
+  * ============ */
+
+  $(function () {
+    $('body').on('click.tab.data-api', '[data-toggle="tab"], [data-toggle="pill"]', function (e) {
+      e.preventDefault()
+      $(this).tab('show')
+    })
+  })
+
+}(window.jQuery);
+/* ===========================================================
+ * bootstrap-tooltip.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#tooltips
+ * Inspired by the original jQuery.tipsy by Jason Frame
+ * ===========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* TOOLTIP PUBLIC CLASS DEFINITION
+  * =============================== */
+
+  var Tooltip = function (element, options) {
+    this.init('tooltip', element, options)
+  }
+
+  Tooltip.prototype = {
+
+    constructor: Tooltip
+
+  , init: function (type, element, options) {
+      var eventIn
+        , eventOut
+
+      this.type = type
+      this.$element = $(element)
+      this.options = this.getOptions(options)
+      this.enabled = true
+
+      if (this.options.trigger != 'manual') {
+        eventIn  = this.options.trigger == 'hover' ? 'mouseenter' : 'focus'
+        eventOut = this.options.trigger == 'hover' ? 'mouseleave' : 'blur'
+        this.$element.on(eventIn, this.options.selector, $.proxy(this.enter, this))
+        this.$element.on(eventOut, this.options.selector, $.proxy(this.leave, this))
+      }
+
+      this.options.selector ?
+        (this._options = $.extend({}, this.options, { trigger: 'manual', selector: '' })) :
+        this.fixTitle()
+    }
+
+  , getOptions: function (options) {
+      options = $.extend({}, $.fn[this.type].defaults, options, this.$element.data())
+
+      if (options.delay && typeof options.delay == 'number') {
+        options.delay = {
+          show: options.delay
+        , hide: options.delay
+        }
+      }
+
+      return options
+    }
+
+  , enter: function (e) {
+      var self = $(e.currentTarget)[this.type](this._options).data(this.type)
+
+      if (!self.options.delay || !self.options.delay.show) return self.show()
+
+      clearTimeout(this.timeout)
+      self.hoverState = 'in'
+      this.timeout = setTimeout(function() {
+        if (self.hoverState == 'in') self.show()
+      }, self.options.delay.show)
+    }
+
+  , leave: function (e) {
+      var self = $(e.currentTarget)[this.type](this._options).data(this.type)
+
+      if (this.timeout) clearTimeout(this.timeout)
+      if (!self.options.delay || !self.options.delay.hide) return self.hide()
+
+      self.hoverState = 'out'
+      this.timeout = setTimeout(function() {
+        if (self.hoverState == 'out') self.hide()
+      }, self.options.delay.hide)
+    }
+
+  , show: function () {
+      var $tip
+        , inside
+        , pos
+        , actualWidth
+        , actualHeight
+        , placement
+        , tp
+
+      if (this.hasContent() && this.enabled) {
+        $tip = this.tip()
+        this.setContent()
+
+        if (this.options.animation) {
+          $tip.addClass('fade')
+        }
+
+        placement = typeof this.options.placement == 'function' ?
+          this.options.placement.call(this, $tip[0], this.$element[0]) :
+          this.options.placement
+
+        inside = /in/.test(placement)
+
+        $tip
+          .remove()
+          .css({ top: 0, left: 0, display: 'block' })
+          .appendTo(inside ? this.$element : document.body)
+
+        pos = this.getPosition(inside)
+
+        actualWidth = $tip[0].offsetWidth
+        actualHeight = $tip[0].offsetHeight
+
+        switch (inside ? placement.split(' ')[1] : placement) {
+          case 'bottom':
+            tp = {top: pos.top + pos.height, left: pos.left + pos.width / 2 - actualWidth / 2}
+            break
+          case 'top':
+            tp = {top: pos.top - actualHeight, left: pos.left + pos.width / 2 - actualWidth / 2}
+            break
+          case 'left':
+            tp = {top: pos.top + pos.height / 2 - actualHeight / 2, left: pos.left - actualWidth}
+            break
+          case 'right':
+            tp = {top: pos.top + pos.height / 2 - actualHeight / 2, left: pos.left + pos.width}
+            break
+        }
+
+        $tip
+          .css(tp)
+          .addClass(placement)
+          .addClass('in')
+      }
+    }
+
+  , isHTML: function(text) {
+      // html string detection logic adapted from jQuery
+      return typeof text != 'string'
+        || ( text.charAt(0) === "<"
+          && text.charAt( text.length - 1 ) === ">"
+          && text.length >= 3
+        ) || /^(?:[^<]*<[\w\W]+>[^>]*$)/.exec(text)
+    }
+
+  , setContent: function () {
+      var $tip = this.tip()
+        , title = this.getTitle()
+
+      $tip.find('.tooltip-inner')[this.isHTML(title) ? 'html' : 'text'](title)
+      $tip.removeClass('fade in top bottom left right')
+    }
+
+  , hide: function () {
+      var that = this
+        , $tip = this.tip()
+
+      $tip.removeClass('in')
+
+      function removeWithAnimation() {
+        var timeout = setTimeout(function () {
+          $tip.off($.support.transition.end).remove()
+        }, 500)
+
+        $tip.one($.support.transition.end, function () {
+          clearTimeout(timeout)
+          $tip.remove()
+        })
+      }
+
+      $.support.transition && this.$tip.hasClass('fade') ?
+        removeWithAnimation() :
+        $tip.remove()
+    }
+
+  , fixTitle: function () {
+      var $e = this.$element
+      if ($e.attr('title') || typeof($e.attr('data-original-title')) != 'string') {
+        $e.attr('data-original-title', $e.attr('title') || '').removeAttr('title')
+      }
+    }
+
+  , hasContent: function () {
+      return this.getTitle()
+    }
+
+  , getPosition: function (inside) {
+      return $.extend({}, (inside ? {top: 0, left: 0} : this.$element.offset()), {
+        width: this.$element[0].offsetWidth
+      , height: this.$element[0].offsetHeight
+      })
+    }
+
+  , getTitle: function () {
+      var title
+        , $e = this.$element
+        , o = this.options
+
+      title = $e.attr('data-original-title')
+        || (typeof o.title == 'function' ? o.title.call($e[0]) :  o.title)
+
+      return title
+    }
+
+  , tip: function () {
+      return this.$tip = this.$tip || $(this.options.template)
+    }
+
+  , validate: function () {
+      if (!this.$element[0].parentNode) {
+        this.hide()
+        this.$element = null
+        this.options = null
+      }
+    }
+
+  , enable: function () {
+      this.enabled = true
+    }
+
+  , disable: function () {
+      this.enabled = false
+    }
+
+  , toggleEnabled: function () {
+      this.enabled = !this.enabled
+    }
+
+  , toggle: function () {
+      this[this.tip().hasClass('in') ? 'hide' : 'show']()
+    }
+
+  }
+
+
+ /* TOOLTIP PLUGIN DEFINITION
+  * ========================= */
+
+  $.fn.tooltip = function ( option ) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('tooltip')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('tooltip', (data = new Tooltip(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.tooltip.Constructor = Tooltip
+
+  $.fn.tooltip.defaults = {
+    animation: true
+  , placement: 'top'
+  , selector: false
+  , template: '<div class="tooltip"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
+  , trigger: 'hover'
+  , title: ''
+  , delay: 0
+  }
+
+}(window.jQuery);
+
+/* ===========================================================
+ * bootstrap-popover.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#popovers
+ * ===========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =========================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* POPOVER PUBLIC CLASS DEFINITION
+  * =============================== */
+
+  var Popover = function ( element, options ) {
+    this.init('popover', element, options)
+  }
+
+
+  /* NOTE: POPOVER EXTENDS BOOTSTRAP-TOOLTIP.js
+     ========================================== */
+
+  Popover.prototype = $.extend({}, $.fn.tooltip.Constructor.prototype, {
+
+    constructor: Popover
+
+  , setContent: function () {
+      var $tip = this.tip()
+        , title = this.getTitle()
+        , content = this.getContent()
+
+      $tip.find('.popover-title')[this.isHTML(title) ? 'html' : 'text'](title)
+      $tip.find('.popover-content > *')[this.isHTML(content) ? 'html' : 'text'](content)
+
+      $tip.removeClass('fade top bottom left right in')
+    }
+
+  , hasContent: function () {
+      return this.getTitle() || this.getContent()
+    }
+
+  , getContent: function () {
+      var content
+        , $e = this.$element
+        , o = this.options
+
+      content = $e.attr('data-content')
+        || (typeof o.content == 'function' ? o.content.call($e[0]) :  o.content)
+
+      return content
+    }
+
+  , tip: function () {
+      if (!this.$tip) {
+        this.$tip = $(this.options.template)
+      }
+      return this.$tip
+    }
+
+  })
+
+
+ /* POPOVER PLUGIN DEFINITION
+  * ======================= */
+
+  $.fn.popover = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('popover')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('popover', (data = new Popover(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.popover.Constructor = Popover
+
+  $.fn.popover.defaults = $.extend({} , $.fn.tooltip.defaults, {
+    placement: 'right'
+  , content: ''
+  , template: '<div class="popover"><div class="arrow"></div><div class="popover-inner"><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div></div>'
+  })
+
+}(window.jQuery);
+/* ==========================================================
+ * bootstrap-alert.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#alerts
+ * ==========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* ALERT CLASS DEFINITION
+  * ====================== */
+
+  var dismiss = '[data-dismiss="alert"]'
+    , Alert = function (el) {
+        $(el).on('click', dismiss, this.close)
+      }
+
+  Alert.prototype.close = function (e) {
+    var $this = $(this)
+      , selector = $this.attr('data-target')
+      , $parent
+
+    if (!selector) {
+      selector = $this.attr('href')
+      selector = selector && selector.replace(/.*(?=#[^\s]*$)/, '') //strip for ie7
+    }
+
+    $parent = $(selector)
+
+    e && e.preventDefault()
+
+    $parent.length || ($parent = $this.hasClass('alert') ? $this : $this.parent())
+
+    $parent.trigger(e = $.Event('close'))
+
+    if (e.isDefaultPrevented()) return
+
+    $parent.removeClass('in')
+
+    function removeElement() {
+      $parent
+        .trigger('closed')
+        .remove()
+    }
+
+    $.support.transition && $parent.hasClass('fade') ?
+      $parent.on($.support.transition.end, removeElement) :
+      removeElement()
+  }
+
+
+ /* ALERT PLUGIN DEFINITION
+  * ======================= */
+
+  $.fn.alert = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('alert')
+      if (!data) $this.data('alert', (data = new Alert(this)))
+      if (typeof option == 'string') data[option].call($this)
+    })
+  }
+
+  $.fn.alert.Constructor = Alert
+
+
+ /* ALERT DATA-API
+  * ============== */
+
+  $(function () {
+    $('body').on('click.alert.data-api', dismiss, Alert.prototype.close)
+  })
+
+}(window.jQuery);
+/* ============================================================
+ * bootstrap-button.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#buttons
+ * ============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================ */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* BUTTON PUBLIC CLASS DEFINITION
+  * ============================== */
+
+  var Button = function (element, options) {
+    this.$element = $(element)
+    this.options = $.extend({}, $.fn.button.defaults, options)
+  }
+
+  Button.prototype.setState = function (state) {
+    var d = 'disabled'
+      , $el = this.$element
+      , data = $el.data()
+      , val = $el.is('input') ? 'val' : 'html'
+
+    state = state + 'Text'
+    data.resetText || $el.data('resetText', $el[val]())
+
+    $el[val](data[state] || this.options[state])
+
+    // push to event loop to allow forms to submit
+    setTimeout(function () {
+      state == 'loadingText' ?
+        $el.addClass(d).attr(d, d) :
+        $el.removeClass(d).removeAttr(d)
+    }, 0)
+  }
+
+  Button.prototype.toggle = function () {
+    var $parent = this.$element.parent('[data-toggle="buttons-radio"]')
+
+    $parent && $parent
+      .find('.active')
+      .removeClass('active')
+
+    this.$element.toggleClass('active')
+  }
+
+
+ /* BUTTON PLUGIN DEFINITION
+  * ======================== */
+
+  $.fn.button = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('button')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('button', (data = new Button(this, options)))
+      if (option == 'toggle') data.toggle()
+      else if (option) data.setState(option)
+    })
+  }
+
+  $.fn.button.defaults = {
+    loadingText: 'loading...'
+  }
+
+  $.fn.button.Constructor = Button
+
+
+ /* BUTTON DATA-API
+  * =============== */
+
+  $(function () {
+    $('body').on('click.button.data-api', '[data-toggle^=button]', function ( e ) {
+      var $btn = $(e.target)
+      if (!$btn.hasClass('btn')) $btn = $btn.closest('.btn')
+      $btn.button('toggle')
+    })
+  })
+
+}(window.jQuery);
+/* =============================================================
+ * bootstrap-collapse.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#collapse
+ * =============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================ */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* COLLAPSE PUBLIC CLASS DEFINITION
+  * ================================ */
+
+  var Collapse = function (element, options) {
+    this.$element = $(element)
+    this.options = $.extend({}, $.fn.collapse.defaults, options)
+
+    if (this.options.parent) {
+      this.$parent = $(this.options.parent)
+    }
+
+    this.options.toggle && this.toggle()
+  }
+
+  Collapse.prototype = {
+
+    constructor: Collapse
+
+  , dimension: function () {
+      var hasWidth = this.$element.hasClass('width')
+      return hasWidth ? 'width' : 'height'
+    }
+
+  , show: function () {
+      var dimension
+        , scroll
+        , actives
+        , hasData
+
+      if (this.transitioning) return
+
+      dimension = this.dimension()
+      scroll = $.camelCase(['scroll', dimension].join('-'))
+      actives = this.$parent && this.$parent.find('> .accordion-group > .in')
+
+      if (actives && actives.length) {
+        hasData = actives.data('collapse')
+        if (hasData && hasData.transitioning) return
+        actives.collapse('hide')
+        hasData || actives.data('collapse', null)
+      }
+
+      this.$element[dimension](0)
+      this.transition('addClass', $.Event('show'), 'shown')
+      this.$element[dimension](this.$element[0][scroll])
+    }
+
+  , hide: function () {
+      var dimension
+      if (this.transitioning) return
+      dimension = this.dimension()
+      this.reset(this.$element[dimension]())
+      this.transition('removeClass', $.Event('hide'), 'hidden')
+      this.$element[dimension](0)
+    }
+
+  , reset: function (size) {
+      var dimension = this.dimension()
+
+      this.$element
+        .removeClass('collapse')
+        [dimension](size || 'auto')
+        [0].offsetWidth
+
+      this.$element[size !== null ? 'addClass' : 'removeClass']('collapse')
+
+      return this
+    }
+
+  , transition: function (method, startEvent, completeEvent) {
+      var that = this
+        , complete = function () {
+            if (startEvent.type == 'show') that.reset()
+            that.transitioning = 0
+            that.$element.trigger(completeEvent)
+          }
+
+      this.$element.trigger(startEvent)
+
+      if (startEvent.isDefaultPrevented()) return
+
+      this.transitioning = 1
+
+      this.$element[method]('in')
+
+      $.support.transition && this.$element.hasClass('collapse') ?
+        this.$element.one($.support.transition.end, complete) :
+        complete()
+    }
+
+  , toggle: function () {
+      this[this.$element.hasClass('in') ? 'hide' : 'show']();
+    //change by anil
+      if(this.$element.hasClass('in'))
+    	  this.$element.css('height','auto');
+    }
+
+  }
+
+
+ /* COLLAPSIBLE PLUGIN DEFINITION
+  * ============================== */
+
+  $.fn.collapse = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('collapse')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('collapse', (data = new Collapse(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.collapse.defaults = {
+    toggle: true
+  }
+
+  $.fn.collapse.Constructor = Collapse
+
+
+ /* COLLAPSIBLE DATA-API
+  * ==================== */
+
+  $(function () {
+    $('body').on('click.collapse.data-api', '[data-toggle=collapse]', function ( e ) {
+      var $this = $(this), href
+        , target = $this.attr('data-target')
+          || e.preventDefault()
+          || (href = $this.attr('href')) && href.replace(/.*(?=#[^\s]+$)/, '') //strip for ie7
+        , option = $(target).data('collapse') ? 'toggle' : $this.data()
+      $(target).collapse(option)
+    })
+  })
+
+}(window.jQuery);
+/* ==========================================================
+ * bootstrap-carousel.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#carousel
+ * ==========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* CAROUSEL CLASS DEFINITION
+  * ========================= */
+
+  var Carousel = function (element, options) {
+    this.$element = $(element)
+    this.options = options
+    this.options.slide && this.slide(this.options.slide)
+    this.options.pause == 'hover' && this.$element
+      .on('mouseenter', $.proxy(this.pause, this))
+      .on('mouseleave', $.proxy(this.cycle, this))
+  }
+
+  Carousel.prototype = {
+
+    cycle: function (e) {
+      if (!e) this.paused = false
+      this.options.interval
+        && !this.paused
+        && (this.interval = setInterval($.proxy(this.next, this), this.options.interval))
+      return this
+    }
+
+  , to: function (pos) {
+      var $active = this.$element.find('.active')
+        , children = $active.parent().children()
+        , activePos = children.index($active)
+        , that = this
+
+      if (pos > (children.length - 1) || pos < 0) return
+
+      if (this.sliding) {
+        return this.$element.one('slid', function () {
+          that.to(pos)
+        })
+      }
+
+      if (activePos == pos) {
+        return this.pause().cycle()
+      }
+
+      return this.slide(pos > activePos ? 'next' : 'prev', $(children[pos]))
+    }
+
+  , pause: function (e) {
+      if (!e) this.paused = true
+      clearInterval(this.interval)
+      this.interval = null
+      return this
+    }
+
+  , next: function () {
+      if (this.sliding) return
+      return this.slide('next')
+    }
+
+  , prev: function () {
+      if (this.sliding) return
+      return this.slide('prev')
+    }
+
+  , slide: function (type, next) {
+      var $active = this.$element.find('.active')
+        , $next = next || $active[type]()
+        , isCycling = this.interval
+        , direction = type == 'next' ? 'left' : 'right'
+        , fallback  = type == 'next' ? 'first' : 'last'
+        , that = this
+        , e = $.Event('slide')
+
+      this.sliding = true
+
+      isCycling && this.pause()
+
+      $next = $next.length ? $next : this.$element.find('.item')[fallback]()
+
+      if ($next.hasClass('active')) return
+
+      if ($.support.transition && this.$element.hasClass('slide')) {
+        this.$element.trigger(e)
+        if (e.isDefaultPrevented()) return
+        $next.addClass(type)
+        $next[0].offsetWidth // force reflow
+        $active.addClass(direction)
+        $next.addClass(direction)
+        this.$element.one($.support.transition.end, function () {
+          $next.removeClass([type, direction].join(' ')).addClass('active')
+          $active.removeClass(['active', direction].join(' '))
+          that.sliding = false
+          setTimeout(function () { that.$element.trigger('slid') }, 0)
+        })
+      } else {
+        this.$element.trigger(e)
+        if (e.isDefaultPrevented()) return
+        $active.removeClass('active')
+        $next.addClass('active')
+        this.sliding = false
+        this.$element.trigger('slid')
+      }
+
+      isCycling && this.cycle()
+
+      return this
+    }
+
+  }
+
+
+ /* CAROUSEL PLUGIN DEFINITION
+  * ========================== */
+
+  $.fn.carousel = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('carousel')
+        , options = $.extend({}, $.fn.carousel.defaults, typeof option == 'object' && option)
+      if (!data) $this.data('carousel', (data = new Carousel(this, options)))
+      if (typeof option == 'number') data.to(option)
+      else if (typeof option == 'string' || (option = options.slide)) data[option]()
+      else if (options.interval) data.cycle()
+    })
+  }
+
+  $.fn.carousel.defaults = {
+    interval: 5000
+  , pause: 'hover'
+  }
+
+  $.fn.carousel.Constructor = Carousel
+
+
+ /* CAROUSEL DATA-API
+  * ================= */
+
+  $(function () {
+    $('body').on('click.carousel.data-api', '[data-slide]', function ( e ) {
+      var $this = $(this), href
+        , $target = $($this.attr('data-target') || (href = $this.attr('href')) && href.replace(/.*(?=#[^\s]+$)/, '')) //strip for ie7
+        , options = !$target.data('modal') && $.extend({}, $target.data(), $this.data())
+      $target.carousel(options)
+      e.preventDefault()
+    })
+  })
+
+}(window.jQuery);
+/* =============================================================
+ * bootstrap-typeahead.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#typeahead
+ * =============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================ */
+
+
+!function($){
+
+  "use strict"; // jshint ;_;
+
+
+ /* TYPEAHEAD PUBLIC CLASS DEFINITION
+  * ================================= */
+
+  var Typeahead = function (element, options) {
+    this.$element = $(element)
+    this.options = $.extend({}, $.fn.typeahead.defaults, options)
+    this.matcher = this.options.matcher || this.matcher
+    this.sorter = this.options.sorter || this.sorter
+    this.highlighter = this.options.highlighter || this.highlighter
+    this.updater = this.options.updater || this.updater
+    this.$menu = $(this.options.menu).appendTo('body')
+    this.source = this.options.source
+    this.shown = false
+    this.listen()
+  }
+
+  Typeahead.prototype = {
+
+    constructor: Typeahead
+
+  , select: function () {
+      var val = this.$menu.find('.active').attr('data-value')
+      this.$element
+        .val(this.updater(val))
+        .change()
+      return this.hide()
+    }
+
+  , updater: function (item) {
+      return item
+    }
+
+  , show: function () {
+      var pos = $.extend({}, this.$element.offset(), {
+        height: this.$element[0].offsetHeight
+      })
+
+      this.$menu.css({
+        top: pos.top + pos.height
+      , left: pos.left
+      })
+
+      this.$menu.show()
+      this.shown = true
+      return this
+    }
+
+  , hide: function () {
+      this.$menu.hide()
+      this.shown = false
+      return this
+    }
+
+  , lookup: function (event) {
+      var that = this
+        , items
+        , q
+
+      this.query = this.$element.val()
+
+      if (!this.query) {
+        return this.shown ? this.hide() : this
+      }
+
+      items = $.grep(this.source, function (item) {
+        return that.matcher(item)
+      })
+
+      items = this.sorter(items)
+
+      if (!items.length) {
+        return this.shown ? this.hide() : this
+      }
+
+      return this.render(items.slice(0, this.options.items)).show()
+    }
+
+  , matcher: function (item) {
+      return ~item.toLowerCase().indexOf(this.query.toLowerCase())
+    }
+
+  , sorter: function (items) {
+      var beginswith = []
+        , caseSensitive = []
+        , caseInsensitive = []
+        , item
+
+      while (item = items.shift()) {
+        if (!item.toLowerCase().indexOf(this.query.toLowerCase())) beginswith.push(item)
+        else if (~item.indexOf(this.query)) caseSensitive.push(item)
+        else caseInsensitive.push(item)
+      }
+
+      return beginswith.concat(caseSensitive, caseInsensitive)
+    }
+
+  , highlighter: function (item) {
+      var query = this.query.replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, '\\$&')
+      return item.replace(new RegExp('(' + query + ')', 'ig'), function ($1, match) {
+        return '<strong>' + match + '</strong>'
+      })
+    }
+
+  , render: function (items) {
+      var that = this
+
+      items = $(items).map(function (i, item) {
+        i = $(that.options.item).attr('data-value', item)
+        i.find('a').html(that.highlighter(item))
+        return i[0]
+      })
+
+      items.first().addClass('active')
+      this.$menu.html(items)
+      return this
+    }
+
+  , next: function (event) {
+      var active = this.$menu.find('.active').removeClass('active')
+        , next = active.next()
+
+      if (!next.length) {
+        next = $(this.$menu.find('li')[0])
+      }
+
+      next.addClass('active')
+    }
+
+  , prev: function (event) {
+      var active = this.$menu.find('.active').removeClass('active')
+        , prev = active.prev()
+
+      if (!prev.length) {
+        prev = this.$menu.find('li').last()
+      }
+
+      prev.addClass('active')
+    }
+
+  , listen: function () {
+      this.$element
+        .on('blur',     $.proxy(this.blur, this))
+        .on('keypress', $.proxy(this.keypress, this))
+        .on('keyup',    $.proxy(this.keyup, this))
+
+      if ($.browser.webkit || $.browser.msie) {
+        this.$element.on('keydown', $.proxy(this.keypress, this))
+      }
+
+      this.$menu
+        .on('click', $.proxy(this.click, this))
+        .on('mouseenter', 'li', $.proxy(this.mouseenter, this))
+    }
+
+  , keyup: function (e) {
+      switch(e.keyCode) {
+        case 40: // down arrow
+        case 38: // up arrow
+          break
+
+        case 9: // tab
+        case 13: // enter
+          if (!this.shown) return
+          this.select()
+          break
+
+        case 27: // escape
+          if (!this.shown) return
+          this.hide()
+          break
+
+        default:
+          this.lookup()
+      }
+
+      e.stopPropagation()
+      e.preventDefault()
+  }
+
+  , keypress: function (e) {
+      if (!this.shown) return
+
+      switch(e.keyCode) {
+        case 9: // tab
+        case 13: // enter
+        case 27: // escape
+          e.preventDefault()
+          break
+
+        case 38: // up arrow
+          if (e.type != 'keydown') break
+          e.preventDefault()
+          this.prev()
+          break
+
+        case 40: // down arrow
+          if (e.type != 'keydown') break
+          e.preventDefault()
+          this.next()
+          break
+      }
+
+      e.stopPropagation()
+    }
+
+  , blur: function (e) {
+      var that = this
+      setTimeout(function () { that.hide() }, 150)
+    }
+
+  , click: function (e) {
+      e.stopPropagation()
+      e.preventDefault()
+      this.select()
+    }
+
+  , mouseenter: function (e) {
+      this.$menu.find('.active').removeClass('active')
+      $(e.currentTarget).addClass('active')
+    }
+
+  }
+
+
+  /* TYPEAHEAD PLUGIN DEFINITION
+   * =========================== */
+
+  $.fn.typeahead = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('typeahead')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('typeahead', (data = new Typeahead(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.typeahead.defaults = {
+    source: []
+  , items: 8
+  , menu: '<ul class="typeahead dropdown-menu"></ul>'
+  , item: '<li><a href="#"></a></li>'
+  }
+
+  $.fn.typeahead.Constructor = Typeahead
+
+
+ /* TYPEAHEAD DATA-API
+  * ================== */
+
+  $(function () {
+    $('body').on('focus.typeahead.data-api', '[data-provide="typeahead"]', function (e) {
+      var $this = $(this)
+      if ($this.data('typeahead')) return
+      e.preventDefault()
+      $this.typeahead($this.data())
+    })
+  })
+
+}(window.jQuery);        ®ﬂ x ˇˇ     20250331133932-8lãﬂ GÏƒ2   https://erp.cmrit.ac.in/studentMPW/js/bootstrap.js      /ƒ  /* ===================================================
+ * bootstrap-transition.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#transitions
+ * ===================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+
+!function ($) {
+
+  $(function () {
+
+    "use strict"; // jshint ;_;
+
+
+    /* CSS TRANSITION SUPPORT (http://www.modernizr.com/)
+     * ======================================================= */
+
+    $.support.transition = (function () {
+
+      var transitionEnd = (function () {
+
+        var el = document.createElement('bootstrap')
+          , transEndEventNames = {
+               'WebkitTransition' : 'webkitTransitionEnd'
+            ,  'MozTransition'    : 'transitionend'
+            ,  'OTransition'      : 'oTransitionEnd'
+            ,  'msTransition'     : 'MSTransitionEnd'
+            ,  'transition'       : 'transitionend'
+            }
+          , name
+
+        for (name in transEndEventNames){
+          if (el.style[name] !== undefined) {
+            return transEndEventNames[name]
+          }
+        }
+
+      }())
+
+      return transitionEnd && {
+        end: transitionEnd
+      }
+
+    })()
+
+  })
+
+}(window.jQuery);
+/* =========================================================
+ * bootstrap-modal.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#modals
+ * =========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================= */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* MODAL CLASS DEFINITION
+  * ====================== */
+
+  var Modal = function (content, options) {
+    this.options = options
+    this.$element = $(content)
+      .delegate('[data-dismiss="modal"]', 'click.dismiss.modal', $.proxy(this.hide, this))
+  }
+
+  Modal.prototype = {
+
+      constructor: Modal
+
+    , toggle: function () {
+        return this[!this.isShown ? 'show' : 'hide']()
+      }
+
+    , show: function () {
+        var that = this
+          , e = $.Event('show')
+
+        this.$element.trigger(e)
+
+        if (this.isShown || e.isDefaultPrevented()) return
+
+        $('body').addClass('modal-open')
+
+        this.isShown = true
+
+        escape.call(this)
+        backdrop.call(this, function () {
+          var transition = $.support.transition && that.$element.hasClass('fade')
+
+          if (!that.$element.parent().length) {
+            that.$element.appendTo(document.body) //don't move modals dom position
+          }
+
+          that.$element
+            .show()
+
+          if (transition) {
+            that.$element[0].offsetWidth // force reflow
+          }
+
+          that.$element.addClass('in')
+
+          transition ?
+            that.$element.one($.support.transition.end, function () { that.$element.trigger('shown') }) :
+            that.$element.trigger('shown')
+
+        })
+      }
+
+    , hide: function (e) {
+        e && e.preventDefault()
+
+        var that = this
+
+        e = $.Event('hide')
+
+        this.$element.trigger(e)
+
+        if (!this.isShown || e.isDefaultPrevented()) return
+
+        this.isShown = false
+
+        $('body').removeClass('modal-open')
+
+        escape.call(this)
+
+        this.$element.removeClass('in')
+
+        $.support.transition && this.$element.hasClass('fade') ?
+          hideWithTransition.call(this) :
+          hideModal.call(this)
+      }
+
+  }
+
+
+ /* MODAL PRIVATE METHODS
+  * ===================== */
+
+  function hideWithTransition() {
+    var that = this
+      , timeout = setTimeout(function () {
+          that.$element.off($.support.transition.end)
+          hideModal.call(that)
+        }, 500)
+
+    this.$element.one($.support.transition.end, function () {
+      clearTimeout(timeout)
+      hideModal.call(that)
+    })
+  }
+
+  function hideModal(that) {
+    this.$element
+      .hide()
+      .trigger('hidden')
+
+    backdrop.call(this)
+  }
+
+  function backdrop(callback) {
+    var that = this
+      , animate = this.$element.hasClass('fade') ? 'fade' : ''
+
+    if (this.isShown && this.options.backdrop) {
+      var doAnimate = $.support.transition && animate
+
+      this.$backdrop = $('<div class="modal-backdrop ' + animate + '" />')
+        .appendTo(document.body)
+
+      if (this.options.backdrop != 'static') {
+        this.$backdrop.click($.proxy(this.hide, this))
+      }
+
+      if (doAnimate) this.$backdrop[0].offsetWidth // force reflow
+
+      this.$backdrop.addClass('in')
+
+      doAnimate ?
+        this.$backdrop.one($.support.transition.end, callback) :
+        callback()
+
+    } else if (!this.isShown && this.$backdrop) {
+      this.$backdrop.removeClass('in')
+
+      $.support.transition && this.$element.hasClass('fade')?
+        this.$backdrop.one($.support.transition.end, $.proxy(removeBackdrop, this)) :
+        removeBackdrop.call(this)
+
+    } else if (callback) {
+      callback()
+    }
+  }
+
+  function removeBackdrop() {
+    this.$backdrop.remove()
+    this.$backdrop = null
+  }
+
+  function escape() {
+    var that = this
+    if (this.isShown && this.options.keyboard) {
+      $(document).on('keyup.dismiss.modal', function ( e ) {
+        e.which == 27 && that.hide()
+      })
+    } else if (!this.isShown) {
+      $(document).off('keyup.dismiss.modal')
+    }
+  }
+
+
+ /* MODAL PLUGIN DEFINITION
+  * ======================= */
+
+  $.fn.modal = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('modal')
+        , options = $.extend({}, $.fn.modal.defaults, $this.data(), typeof option == 'object' && option)
+      if (!data) $this.data('modal', (data = new Modal(this, options)))
+      if (typeof option == 'string') data[option]()
+      else if (options.show) data.show()
+    })
+  }
+
+  $.fn.modal.defaults = {
+      backdrop: true
+    , keyboard: true
+    , show: true
+  }
+
+  $.fn.modal.Constructor = Modal
+
+
+ /* MODAL DATA-API
+  * ============== */
+
+  $(function () {
+    $('body').on('click.modal.data-api', '[data-toggle="modal"]', function ( e ) {
+      var $this = $(this), href
+        , $target = $($this.attr('data-target') || (href = $this.attr('href')) && href.replace(/.*(?=#[^\s]+$)/, '')) //strip for ie7
+        , option = $target.data('modal') ? 'toggle' : $.extend({}, $target.data(), $this.data())
+
+      e.preventDefault()
+      $target.modal(option)
+    })
+  })
+
+}(window.jQuery);
+/* ============================================================
+ * bootstrap-dropdown.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#dropdowns
+ * ============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================ */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* DROPDOWN CLASS DEFINITION
+  * ========================= */
+
+  var toggle = '[data-toggle="dropdown"]'
+    , Dropdown = function (element) {
+        var $el = $(element).on('click.dropdown.data-api', this.toggle)
+        $('html').on('click.dropdown.data-api', function () {
+          $el.parent().removeClass('open')
+        })
+      }
+
+  Dropdown.prototype = {
+
+    constructor: Dropdown
+
+  , toggle: function (e) {
+      var $this = $(this)
+        , $parent
+        , selector
+        , isActive
+
+      if ($this.is('.disabled, :disabled')) return
+
+      selector = $this.attr('data-target')
+
+      if (!selector) {
+        selector = $this.attr('href')
+        selector = selector && selector.replace(/.*(?=#[^\s]*$)/, '') //strip for ie7
+      }
+
+      $parent = $(selector)
+      $parent.length || ($parent = $this.parent())
+
+      isActive = $parent.hasClass('open')
+
+      clearMenus()
+
+      if (!isActive) $parent.toggleClass('open')
+
+      return false
+    }
+
+  }
+
+  function clearMenus() {
+    $(toggle).parent().removeClass('open')
+  }
+
+
+  /* DROPDOWN PLUGIN DEFINITION
+   * ========================== */
+
+  $.fn.dropdown = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('dropdown')
+      if (!data) $this.data('dropdown', (data = new Dropdown(this)))
+      if (typeof option == 'string') data[option].call($this)
+    })
+  }
+
+  $.fn.dropdown.Constructor = Dropdown
+
+
+  /* APPLY TO STANDARD DROPDOWN ELEMENTS
+   * =================================== */
+
+  $(function () {
+    $('html').on('click.dropdown.data-api', clearMenus)
+    $('body')
+      .on('click.dropdown', '.dropdown form', function (e) { e.stopPropagation() })
+      .on('click.dropdown.data-api', toggle, Dropdown.prototype.toggle)
+  })
+
+}(window.jQuery);
+/* =============================================================
+ * bootstrap-scrollspy.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#scrollspy
+ * =============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+  /* SCROLLSPY CLASS DEFINITION
+   * ========================== */
+
+  function ScrollSpy( element, options) {
+    var process = $.proxy(this.process, this)
+      , $element = $(element).is('body') ? $(window) : $(element)
+      , href
+    this.options = $.extend({}, $.fn.scrollspy.defaults, options)
+    this.$scrollElement = $element.on('scroll.scroll.data-api', process)
+    this.selector = (this.options.target
+      || ((href = $(element).attr('href')) && href.replace(/.*(?=#[^\s]+$)/, '')) //strip for ie7
+      || '') + ' .nav li > a'
+    this.$body = $('body')
+    this.refresh()
+    this.process()
+  }
+
+  ScrollSpy.prototype = {
+
+      constructor: ScrollSpy
+
+    , refresh: function () {
+        var self = this
+          , $targets
+
+        this.offsets = $([])
+        this.targets = $([])
+
+        $targets = this.$body
+          .find(this.selector)
+          .map(function () {
+            var $el = $(this)
+              , href = $el.data('target') || $el.attr('href')
+              , $href = /^#\w/.test(href) && $(href)
+            return ( $href
+              && href.length
+              && [[ $href.position().top, href ]] ) || null
+          })
+          .sort(function (a, b) { return a[0] - b[0] })
+          .each(function () {
+            self.offsets.push(this[0])
+            self.targets.push(this[1])
+          })
+      }
+
+    , process: function () {
+        var scrollTop = this.$scrollElement.scrollTop() + this.options.offset
+          , scrollHeight = this.$scrollElement[0].scrollHeight || this.$body[0].scrollHeight
+          , maxScroll = scrollHeight - this.$scrollElement.height()
+          , offsets = this.offsets
+          , targets = this.targets
+          , activeTarget = this.activeTarget
+          , i
+
+        if (scrollTop >= maxScroll) {
+          return activeTarget != (i = targets.last()[0])
+            && this.activate ( i )
+        }
+
+        for (i = offsets.length; i--;) {
+          activeTarget != targets[i]
+            && scrollTop >= offsets[i]
+            && (!offsets[i + 1] || scrollTop <= offsets[i + 1])
+            && this.activate( targets[i] )
+        }
+      }
+
+    , activate: function (target) {
+        var active
+          , selector
+
+        this.activeTarget = target
+
+        $(this.selector)
+          .parent('.active')
+          .removeClass('active')
+
+        selector = this.selector
+          + '[data-target="' + target + '"],'
+          + this.selector + '[href="' + target + '"]'
+
+        active = $(selector)
+          .parent('li')
+          .addClass('active')
+
+        if (active.parent('.dropdown-menu'))  {
+          active = active.closest('li.dropdown').addClass('active')
+        }
+
+        active.trigger('activate')
+      }
+
+  }
+
+
+ /* SCROLLSPY PLUGIN DEFINITION
+  * =========================== */
+
+  $.fn.scrollspy = function ( option ) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('scrollspy')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('scrollspy', (data = new ScrollSpy(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.scrollspy.Constructor = ScrollSpy
+
+  $.fn.scrollspy.defaults = {
+    offset: 10
+  }
+
+
+ /* SCROLLSPY DATA-API
+  * ================== */
+
+  $(function () {
+    $('[data-spy="scroll"]').each(function () {
+      var $spy = $(this)
+      $spy.scrollspy($spy.data())
+    })
+  })
+
+}(window.jQuery);
+/* ========================================================
+ * bootstrap-tab.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#tabs
+ * ========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ======================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* TAB CLASS DEFINITION
+  * ==================== */
+
+  var Tab = function ( element ) {
+    this.element = $(element)
+  }
+
+  Tab.prototype = {
+
+    constructor: Tab
+
+  , show: function () {
+      var $this = this.element
+        , $ul = $this.closest('ul:not(.dropdown-menu)')
+        , selector = $this.attr('data-target')
+        , previous
+        , $target
+        , e
+
+      if (!selector) {
+        selector = $this.attr('href')
+        selector = selector && selector.replace(/.*(?=#[^\s]*$)/, '') //strip for ie7
+      }
+
+      if ( $this.parent('li').hasClass('active') ) return
+
+      previous = $ul.find('.active a').last()[0]
+
+      e = $.Event('show', {
+        relatedTarget: previous
+      })
+
+      $this.trigger(e)
+
+      if (e.isDefaultPrevented()) return
+
+      $target = $(selector)
+
+      this.activate($this.parent('li'), $ul)
+      this.activate($target, $target.parent(), function () {
+        $this.trigger({
+          type: 'shown'
+        , relatedTarget: previous
+        })
+      })
+    }
+
+  , activate: function ( element, container, callback) {
+      var $active = container.find('> .active')
+        , transition = callback
+            && $.support.transition
+            && $active.hasClass('fade')
+
+      function next() {
+        $active
+          .removeClass('active')
+          .find('> .dropdown-menu > .active')
+          .removeClass('active')
+
+        element.addClass('active')
+
+        if (transition) {
+          element[0].offsetWidth // reflow for transition
+          element.addClass('in')
+        } else {
+          element.removeClass('fade')
+        }
+
+        if ( element.parent('.dropdown-menu') ) {
+          element.closest('li.dropdown').addClass('active')
+        }
+
+        callback && callback()
+      }
+
+      transition ?
+        $active.one($.support.transition.end, next) :
+        next()
+
+      $active.removeClass('in')
+    }
+  }
+
+
+ /* TAB PLUGIN DEFINITION
+  * ===================== */
+
+  $.fn.tab = function ( option ) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('tab')
+      if (!data) $this.data('tab', (data = new Tab(this)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.tab.Constructor = Tab
+
+
+ /* TAB DATA-API
+  * ============ */
+
+  $(function () {
+    $('body').on('click.tab.data-api', '[data-toggle="tab"], [data-toggle="pill"]', function (e) {
+      e.preventDefault()
+      $(this).tab('show')
+    })
+  })
+
+}(window.jQuery);
+/* ===========================================================
+ * bootstrap-tooltip.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#tooltips
+ * Inspired by the original jQuery.tipsy by Jason Frame
+ * ===========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* TOOLTIP PUBLIC CLASS DEFINITION
+  * =============================== */
+
+  var Tooltip = function (element, options) {
+    this.init('tooltip', element, options)
+  }
+
+  Tooltip.prototype = {
+
+    constructor: Tooltip
+
+  , init: function (type, element, options) {
+      var eventIn
+        , eventOut
+
+      this.type = type
+      this.$element = $(element)
+      this.options = this.getOptions(options)
+      this.enabled = true
+
+      if (this.options.trigger != 'manual') {
+        eventIn  = this.options.trigger == 'hover' ? 'mouseenter' : 'focus'
+        eventOut = this.options.trigger == 'hover' ? 'mouseleave' : 'blur'
+        this.$element.on(eventIn, this.options.selector, $.proxy(this.enter, this))
+        this.$element.on(eventOut, this.options.selector, $.proxy(this.leave, this))
+      }
+
+      this.options.selector ?
+        (this._options = $.extend({}, this.options, { trigger: 'manual', selector: '' })) :
+        this.fixTitle()
+    }
+
+  , getOptions: function (options) {
+      options = $.extend({}, $.fn[this.type].defaults, options, this.$element.data())
+
+      if (options.delay && typeof options.delay == 'number') {
+        options.delay = {
+          show: options.delay
+        , hide: options.delay
+        }
+      }
+
+      return options
+    }
+
+  , enter: function (e) {
+      var self = $(e.currentTarget)[this.type](this._options).data(this.type)
+
+      if (!self.options.delay || !self.options.delay.show) return self.show()
+
+      clearTimeout(this.timeout)
+      self.hoverState = 'in'
+      this.timeout = setTimeout(function() {
+        if (self.hoverState == 'in') self.show()
+      }, self.options.delay.show)
+    }
+
+  , leave: function (e) {
+      var self = $(e.currentTarget)[this.type](this._options).data(this.type)
+
+      if (this.timeout) clearTimeout(this.timeout)
+      if (!self.options.delay || !self.options.delay.hide) return self.hide()
+
+      self.hoverState = 'out'
+      this.timeout = setTimeout(function() {
+        if (self.hoverState == 'out') self.hide()
+      }, self.options.delay.hide)
+    }
+
+  , show: function () {
+      var $tip
+        , inside
+        , pos
+        , actualWidth
+        , actualHeight
+        , placement
+        , tp
+
+      if (this.hasContent() && this.enabled) {
+        $tip = this.tip()
+        this.setContent()
+
+        if (this.options.animation) {
+          $tip.addClass('fade')
+        }
+
+        placement = typeof this.options.placement == 'function' ?
+          this.options.placement.call(this, $tip[0], this.$element[0]) :
+          this.options.placement
+
+        inside = /in/.test(placement)
+
+        $tip
+          .remove()
+          .css({ top: 0, left: 0, display: 'block' })
+          .appendTo(inside ? this.$element : document.body)
+
+        pos = this.getPosition(inside)
+
+        actualWidth = $tip[0].offsetWidth
+        actualHeight = $tip[0].offsetHeight
+
+        switch (inside ? placement.split(' ')[1] : placement) {
+          case 'bottom':
+            tp = {top: pos.top + pos.height, left: pos.left + pos.width / 2 - actualWidth / 2}
+            break
+          case 'top':
+            tp = {top: pos.top - actualHeight, left: pos.left + pos.width / 2 - actualWidth / 2}
+            break
+          case 'left':
+            tp = {top: pos.top + pos.height / 2 - actualHeight / 2, left: pos.left - actualWidth}
+            break
+          case 'right':
+            tp = {top: pos.top + pos.height / 2 - actualHeight / 2, left: pos.left + pos.width}
+            break
+        }
+
+        $tip
+          .css(tp)
+          .addClass(placement)
+          .addClass('in')
+      }
+    }
+
+  , isHTML: function(text) {
+      // html string detection logic adapted from jQuery
+      return typeof text != 'string'
+        || ( text.charAt(0) === "<"
+          && text.charAt( text.length - 1 ) === ">"
+          && text.length >= 3
+        ) || /^(?:[^<]*<[\w\W]+>[^>]*$)/.exec(text)
+    }
+
+  , setContent: function () {
+      var $tip = this.tip()
+        , title = this.getTitle()
+
+      $tip.find('.tooltip-inner')[this.isHTML(title) ? 'html' : 'text'](title)
+      $tip.removeClass('fade in top bottom left right')
+    }
+
+  , hide: function () {
+      var that = this
+        , $tip = this.tip()
+
+      $tip.removeClass('in')
+
+      function removeWithAnimation() {
+        var timeout = setTimeout(function () {
+          $tip.off($.support.transition.end).remove()
+        }, 500)
+
+        $tip.one($.support.transition.end, function () {
+          clearTimeout(timeout)
+          $tip.remove()
+        })
+      }
+
+      $.support.transition && this.$tip.hasClass('fade') ?
+        removeWithAnimation() :
+        $tip.remove()
+    }
+
+  , fixTitle: function () {
+      var $e = this.$element
+      if ($e.attr('title') || typeof($e.attr('data-original-title')) != 'string') {
+        $e.attr('data-original-title', $e.attr('title') || '').removeAttr('title')
+      }
+    }
+
+  , hasContent: function () {
+      return this.getTitle()
+    }
+
+  , getPosition: function (inside) {
+      return $.extend({}, (inside ? {top: 0, left: 0} : this.$element.offset()), {
+        width: this.$element[0].offsetWidth
+      , height: this.$element[0].offsetHeight
+      })
+    }
+
+  , getTitle: function () {
+      var title
+        , $e = this.$element
+        , o = this.options
+
+      title = $e.attr('data-original-title')
+        || (typeof o.title == 'function' ? o.title.call($e[0]) :  o.title)
+
+      return title
+    }
+
+  , tip: function () {
+      return this.$tip = this.$tip || $(this.options.template)
+    }
+
+  , validate: function () {
+      if (!this.$element[0].parentNode) {
+        this.hide()
+        this.$element = null
+        this.options = null
+      }
+    }
+
+  , enable: function () {
+      this.enabled = true
+    }
+
+  , disable: function () {
+      this.enabled = false
+    }
+
+  , toggleEnabled: function () {
+      this.enabled = !this.enabled
+    }
+
+  , toggle: function () {
+      this[this.tip().hasClass('in') ? 'hide' : 'show']()
+    }
+
+  }
+
+
+ /* TOOLTIP PLUGIN DEFINITION
+  * ========================= */
+
+  $.fn.tooltip = function ( option ) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('tooltip')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('tooltip', (data = new Tooltip(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.tooltip.Constructor = Tooltip
+
+  $.fn.tooltip.defaults = {
+    animation: true
+  , placement: 'top'
+  , selector: false
+  , template: '<div class="tooltip"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
+  , trigger: 'hover'
+  , title: ''
+  , delay: 0
+  }
+
+}(window.jQuery);
+
+/* ===========================================================
+ * bootstrap-popover.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#popovers
+ * ===========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =========================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* POPOVER PUBLIC CLASS DEFINITION
+  * =============================== */
+
+  var Popover = function ( element, options ) {
+    this.init('popover', element, options)
+  }
+
+
+  /* NOTE: POPOVER EXTENDS BOOTSTRAP-TOOLTIP.js
+     ========================================== */
+
+  Popover.prototype = $.extend({}, $.fn.tooltip.Constructor.prototype, {
+
+    constructor: Popover
+
+  , setContent: function () {
+      var $tip = this.tip()
+        , title = this.getTitle()
+        , content = this.getContent()
+
+      $tip.find('.popover-title')[this.isHTML(title) ? 'html' : 'text'](title)
+      $tip.find('.popover-content > *')[this.isHTML(content) ? 'html' : 'text'](content)
+
+      $tip.removeClass('fade top bottom left right in')
+    }
+
+  , hasContent: function () {
+      return this.getTitle() || this.getContent()
+    }
+
+  , getContent: function () {
+      var content
+        , $e = this.$element
+        , o = this.options
+
+      content = $e.attr('data-content')
+        || (typeof o.content == 'function' ? o.content.call($e[0]) :  o.content)
+
+      return content
+    }
+
+  , tip: function () {
+      if (!this.$tip) {
+        this.$tip = $(this.options.template)
+      }
+      return this.$tip
+    }
+
+  })
+
+
+ /* POPOVER PLUGIN DEFINITION
+  * ======================= */
+
+  $.fn.popover = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('popover')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('popover', (data = new Popover(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.popover.Constructor = Popover
+
+  $.fn.popover.defaults = $.extend({} , $.fn.tooltip.defaults, {
+    placement: 'right'
+  , content: ''
+  , template: '<div class="popover"><div class="arrow"></div><div class="popover-inner"><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div></div>'
+  })
+
+}(window.jQuery);
+/* ==========================================================
+ * bootstrap-alert.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#alerts
+ * ==========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* ALERT CLASS DEFINITION
+  * ====================== */
+
+  var dismiss = '[data-dismiss="alert"]'
+    , Alert = function (el) {
+        $(el).on('click', dismiss, this.close)
+      }
+
+  Alert.prototype.close = function (e) {
+    var $this = $(this)
+      , selector = $this.attr('data-target')
+      , $parent
+
+    if (!selector) {
+      selector = $this.attr('href')
+      selector = selector && selector.replace(/.*(?=#[^\s]*$)/, '') //strip for ie7
+    }
+
+    $parent = $(selector)
+
+    e && e.preventDefault()
+
+    $parent.length || ($parent = $this.hasClass('alert') ? $this : $this.parent())
+
+    $parent.trigger(e = $.Event('close'))
+
+    if (e.isDefaultPrevented()) return
+
+    $parent.removeClass('in')
+
+    function removeElement() {
+      $parent
+        .trigger('closed')
+        .remove()
+    }
+
+    $.support.transition && $parent.hasClass('fade') ?
+      $parent.on($.support.transition.end, removeElement) :
+      removeElement()
+  }
+
+
+ /* ALERT PLUGIN DEFINITION
+  * ======================= */
+
+  $.fn.alert = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('alert')
+      if (!data) $this.data('alert', (data = new Alert(this)))
+      if (typeof option == 'string') data[option].call($this)
+    })
+  }
+
+  $.fn.alert.Constructor = Alert
+
+
+ /* ALERT DATA-API
+  * ============== */
+
+  $(function () {
+    $('body').on('click.alert.data-api', dismiss, Alert.prototype.close)
+  })
+
+}(window.jQuery);
+/* ============================================================
+ * bootstrap-button.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#buttons
+ * ============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================ */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* BUTTON PUBLIC CLASS DEFINITION
+  * ============================== */
+
+  var Button = function (element, options) {
+    this.$element = $(element)
+    this.options = $.extend({}, $.fn.button.defaults, options)
+  }
+
+  Button.prototype.setState = function (state) {
+    var d = 'disabled'
+      , $el = this.$element
+      , data = $el.data()
+      , val = $el.is('input') ? 'val' : 'html'
+
+    state = state + 'Text'
+    data.resetText || $el.data('resetText', $el[val]())
+
+    $el[val](data[state] || this.options[state])
+
+    // push to event loop to allow forms to submit
+    setTimeout(function () {
+      state == 'loadingText' ?
+        $el.addClass(d).attr(d, d) :
+        $el.removeClass(d).removeAttr(d)
+    }, 0)
+  }
+
+  Button.prototype.toggle = function () {
+    var $parent = this.$element.parent('[data-toggle="buttons-radio"]')
+
+    $parent && $parent
+      .find('.active')
+      .removeClass('active')
+
+    this.$element.toggleClass('active')
+  }
+
+
+ /* BUTTON PLUGIN DEFINITION
+  * ======================== */
+
+  $.fn.button = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('button')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('button', (data = new Button(this, options)))
+      if (option == 'toggle') data.toggle()
+      else if (option) data.setState(option)
+    })
+  }
+
+  $.fn.button.defaults = {
+    loadingText: 'loading...'
+  }
+
+  $.fn.button.Constructor = Button
+
+
+ /* BUTTON DATA-API
+  * =============== */
+
+  $(function () {
+    $('body').on('click.button.data-api', '[data-toggle^=button]', function ( e ) {
+      var $btn = $(e.target)
+      if (!$btn.hasClass('btn')) $btn = $btn.closest('.btn')
+      $btn.button('toggle')
+    })
+  })
+
+}(window.jQuery);
+/* =============================================================
+ * bootstrap-collapse.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#collapse
+ * =============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================ */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* COLLAPSE PUBLIC CLASS DEFINITION
+  * ================================ */
+
+  var Collapse = function (element, options) {
+    this.$element = $(element)
+    this.options = $.extend({}, $.fn.collapse.defaults, options)
+
+    if (this.options.parent) {
+      this.$parent = $(this.options.parent)
+    }
+
+    this.options.toggle && this.toggle()
+  }
+
+  Collapse.prototype = {
+
+    constructor: Collapse
+
+  , dimension: function () {
+      var hasWidth = this.$element.hasClass('width')
+      return hasWidth ? 'width' : 'height'
+    }
+
+  , show: function () {
+      var dimension
+        , scroll
+        , actives
+        , hasData
+
+      if (this.transitioning) return
+
+      dimension = this.dimension()
+      scroll = $.camelCase(['scroll', dimension].join('-'))
+      actives = this.$parent && this.$parent.find('> .accordion-group > .in')
+
+      if (actives && actives.length) {
+        hasData = actives.data('collapse')
+        if (hasData && hasData.transitioning) return
+        actives.collapse('hide')
+        hasData || actives.data('collapse', null)
+      }
+
+      this.$element[dimension](0)
+      this.transition('addClass', $.Event('show'), 'shown')
+      this.$element[dimension](this.$element[0][scroll])
+    }
+
+  , hide: function () {
+      var dimension
+      if (this.transitioning) return
+      dimension = this.dimension()
+      this.reset(this.$element[dimension]())
+      this.transition('removeClass', $.Event('hide'), 'hidden')
+      this.$element[dimension](0)
+    }
+
+  , reset: function (size) {
+      var dimension = this.dimension()
+
+      this.$element
+        .removeClass('collapse')
+        [dimension](size || 'auto')
+        [0].offsetWidth
+
+      this.$element[size !== null ? 'addClass' : 'removeClass']('collapse')
+
+      return this
+    }
+
+  , transition: function (method, startEvent, completeEvent) {
+      var that = this
+        , complete = function () {
+            if (startEvent.type == 'show') that.reset()
+            that.transitioning = 0
+            that.$element.trigger(completeEvent)
+          }
+
+      this.$element.trigger(startEvent)
+
+      if (startEvent.isDefaultPrevented()) return
+
+      this.transitioning = 1
+
+      this.$element[method]('in')
+
+      $.support.transition && this.$element.hasClass('collapse') ?
+        this.$element.one($.support.transition.end, complete) :
+        complete()
+    }
+
+  , toggle: function () {
+      this[this.$element.hasClass('in') ? 'hide' : 'show']();
+    //change by anil
+      if(this.$element.hasClass('in'))
+    	  this.$element.css('height','auto');
+    }
+
+  }
+
+
+ /* COLLAPSIBLE PLUGIN DEFINITION
+  * ============================== */
+
+  $.fn.collapse = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('collapse')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('collapse', (data = new Collapse(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.collapse.defaults = {
+    toggle: true
+  }
+
+  $.fn.collapse.Constructor = Collapse
+
+
+ /* COLLAPSIBLE DATA-API
+  * ==================== */
+
+  $(function () {
+    $('body').on('click.collapse.data-api', '[data-toggle=collapse]', function ( e ) {
+      var $this = $(this), href
+        , target = $this.attr('data-target')
+          || e.preventDefault()
+          || (href = $this.attr('href')) && href.replace(/.*(?=#[^\s]+$)/, '') //strip for ie7
+        , option = $(target).data('collapse') ? 'toggle' : $this.data()
+      $(target).collapse(option)
+    })
+  })
+
+}(window.jQuery);
+/* ==========================================================
+ * bootstrap-carousel.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#carousel
+ * ==========================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+
+
+!function ($) {
+
+  "use strict"; // jshint ;_;
+
+
+ /* CAROUSEL CLASS DEFINITION
+  * ========================= */
+
+  var Carousel = function (element, options) {
+    this.$element = $(element)
+    this.options = options
+    this.options.slide && this.slide(this.options.slide)
+    this.options.pause == 'hover' && this.$element
+      .on('mouseenter', $.proxy(this.pause, this))
+      .on('mouseleave', $.proxy(this.cycle, this))
+  }
+
+  Carousel.prototype = {
+
+    cycle: function (e) {
+      if (!e) this.paused = false
+      this.options.interval
+        && !this.paused
+        && (this.interval = setInterval($.proxy(this.next, this), this.options.interval))
+      return this
+    }
+
+  , to: function (pos) {
+      var $active = this.$element.find('.active')
+        , children = $active.parent().children()
+        , activePos = children.index($active)
+        , that = this
+
+      if (pos > (children.length - 1) || pos < 0) return
+
+      if (this.sliding) {
+        return this.$element.one('slid', function () {
+          that.to(pos)
+        })
+      }
+
+      if (activePos == pos) {
+        return this.pause().cycle()
+      }
+
+      return this.slide(pos > activePos ? 'next' : 'prev', $(children[pos]))
+    }
+
+  , pause: function (e) {
+      if (!e) this.paused = true
+      clearInterval(this.interval)
+      this.interval = null
+      return this
+    }
+
+  , next: function () {
+      if (this.sliding) return
+      return this.slide('next')
+    }
+
+  , prev: function () {
+      if (this.sliding) return
+      return this.slide('prev')
+    }
+
+  , slide: function (type, next) {
+      var $active = this.$element.find('.active')
+        , $next = next || $active[type]()
+        , isCycling = this.interval
+        , direction = type == 'next' ? 'left' : 'right'
+        , fallback  = type == 'next' ? 'first' : 'last'
+        , that = this
+        , e = $.Event('slide')
+
+      this.sliding = true
+
+      isCycling && this.pause()
+
+      $next = $next.length ? $next : this.$element.find('.item')[fallback]()
+
+      if ($next.hasClass('active')) return
+
+      if ($.support.transition && this.$element.hasClass('slide')) {
+        this.$element.trigger(e)
+        if (e.isDefaultPrevented()) return
+        $next.addClass(type)
+        $next[0].offsetWidth // force reflow
+        $active.addClass(direction)
+        $next.addClass(direction)
+        this.$element.one($.support.transition.end, function () {
+          $next.removeClass([type, direction].join(' ')).addClass('active')
+          $active.removeClass(['active', direction].join(' '))
+          that.sliding = false
+          setTimeout(function () { that.$element.trigger('slid') }, 0)
+        })
+      } else {
+        this.$element.trigger(e)
+        if (e.isDefaultPrevented()) return
+        $active.removeClass('active')
+        $next.addClass('active')
+        this.sliding = false
+        this.$element.trigger('slid')
+      }
+
+      isCycling && this.cycle()
+
+      return this
+    }
+
+  }
+
+
+ /* CAROUSEL PLUGIN DEFINITION
+  * ========================== */
+
+  $.fn.carousel = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('carousel')
+        , options = $.extend({}, $.fn.carousel.defaults, typeof option == 'object' && option)
+      if (!data) $this.data('carousel', (data = new Carousel(this, options)))
+      if (typeof option == 'number') data.to(option)
+      else if (typeof option == 'string' || (option = options.slide)) data[option]()
+      else if (options.interval) data.cycle()
+    })
+  }
+
+  $.fn.carousel.defaults = {
+    interval: 5000
+  , pause: 'hover'
+  }
+
+  $.fn.carousel.Constructor = Carousel
+
+
+ /* CAROUSEL DATA-API
+  * ================= */
+
+  $(function () {
+    $('body').on('click.carousel.data-api', '[data-slide]', function ( e ) {
+      var $this = $(this), href
+        , $target = $($this.attr('data-target') || (href = $this.attr('href')) && href.replace(/.*(?=#[^\s]+$)/, '')) //strip for ie7
+        , options = !$target.data('modal') && $.extend({}, $target.data(), $this.data())
+      $target.carousel(options)
+      e.preventDefault()
+    })
+  })
+
+}(window.jQuery);
+/* =============================================================
+ * bootstrap-typeahead.js v2.0.4
+ * http://twitter.github.com/bootstrap/javascript.html#typeahead
+ * =============================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ============================================================ */
+
+
+!function($){
+
+  "use strict"; // jshint ;_;
+
+
+ /* TYPEAHEAD PUBLIC CLASS DEFINITION
+  * ================================= */
+
+  var Typeahead = function (element, options) {
+    this.$element = $(element)
+    this.options = $.extend({}, $.fn.typeahead.defaults, options)
+    this.matcher = this.options.matcher || this.matcher
+    this.sorter = this.options.sorter || this.sorter
+    this.highlighter = this.options.highlighter || this.highlighter
+    this.updater = this.options.updater || this.updater
+    this.$menu = $(this.options.menu).appendTo('body')
+    this.source = this.options.source
+    this.shown = false
+    this.listen()
+  }
+
+  Typeahead.prototype = {
+
+    constructor: Typeahead
+
+  , select: function () {
+      var val = this.$menu.find('.active').attr('data-value')
+      this.$element
+        .val(this.updater(val))
+        .change()
+      return this.hide()
+    }
+
+  , updater: function (item) {
+      return item
+    }
+
+  , show: function () {
+      var pos = $.extend({}, this.$element.offset(), {
+        height: this.$element[0].offsetHeight
+      })
+
+      this.$menu.css({
+        top: pos.top + pos.height
+      , left: pos.left
+      })
+
+      this.$menu.show()
+      this.shown = true
+      return this
+    }
+
+  , hide: function () {
+      this.$menu.hide()
+      this.shown = false
+      return this
+    }
+
+  , lookup: function (event) {
+      var that = this
+        , items
+        , q
+
+      this.query = this.$element.val()
+
+      if (!this.query) {
+        return this.shown ? this.hide() : this
+      }
+
+      items = $.grep(this.source, function (item) {
+        return that.matcher(item)
+      })
+
+      items = this.sorter(items)
+
+      if (!items.length) {
+        return this.shown ? this.hide() : this
+      }
+
+      return this.render(items.slice(0, this.options.items)).show()
+    }
+
+  , matcher: function (item) {
+      return ~item.toLowerCase().indexOf(this.query.toLowerCase())
+    }
+
+  , sorter: function (items) {
+      var beginswith = []
+        , caseSensitive = []
+        , caseInsensitive = []
+        , item
+
+      while (item = items.shift()) {
+        if (!item.toLowerCase().indexOf(this.query.toLowerCase())) beginswith.push(item)
+        else if (~item.indexOf(this.query)) caseSensitive.push(item)
+        else caseInsensitive.push(item)
+      }
+
+      return beginswith.concat(caseSensitive, caseInsensitive)
+    }
+
+  , highlighter: function (item) {
+      var query = this.query.replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, '\\$&')
+      return item.replace(new RegExp('(' + query + ')', 'ig'), function ($1, match) {
+        return '<strong>' + match + '</strong>'
+      })
+    }
+
+  , render: function (items) {
+      var that = this
+
+      items = $(items).map(function (i, item) {
+        i = $(that.options.item).attr('data-value', item)
+        i.find('a').html(that.highlighter(item))
+        return i[0]
+      })
+
+      items.first().addClass('active')
+      this.$menu.html(items)
+      return this
+    }
+
+  , next: function (event) {
+      var active = this.$menu.find('.active').removeClass('active')
+        , next = active.next()
+
+      if (!next.length) {
+        next = $(this.$menu.find('li')[0])
+      }
+
+      next.addClass('active')
+    }
+
+  , prev: function (event) {
+      var active = this.$menu.find('.active').removeClass('active')
+        , prev = active.prev()
+
+      if (!prev.length) {
+        prev = this.$menu.find('li').last()
+      }
+
+      prev.addClass('active')
+    }
+
+  , listen: function () {
+      this.$element
+        .on('blur',     $.proxy(this.blur, this))
+        .on('keypress', $.proxy(this.keypress, this))
+        .on('keyup',    $.proxy(this.keyup, this))
+
+      if ($.browser.webkit || $.browser.msie) {
+        this.$element.on('keydown', $.proxy(this.keypress, this))
+      }
+
+      this.$menu
+        .on('click', $.proxy(this.click, this))
+        .on('mouseenter', 'li', $.proxy(this.mouseenter, this))
+    }
+
+  , keyup: function (e) {
+      switch(e.keyCode) {
+        case 40: // down arrow
+        case 38: // up arrow
+          break
+
+        case 9: // tab
+        case 13: // enter
+          if (!this.shown) return
+          this.select()
+          break
+
+        case 27: // escape
+          if (!this.shown) return
+          this.hide()
+          break
+
+        default:
+          this.lookup()
+      }
+
+      e.stopPropagation()
+      e.preventDefault()
+  }
+
+  , keypress: function (e) {
+      if (!this.shown) return
+
+      switch(e.keyCode) {
+        case 9: // tab
+        case 13: // enter
+        case 27: // escape
+          e.preventDefault()
+          break
+
+        case 38: // up arrow
+          if (e.type != 'keydown') break
+          e.preventDefault()
+          this.prev()
+          break
+
+        case 40: // down arrow
+          if (e.type != 'keydown') break
+          e.preventDefault()
+          this.next()
+          break
+      }
+
+      e.stopPropagation()
+    }
+
+  , blur: function (e) {
+      var that = this
+      setTimeout(function () { that.hide() }, 150)
+    }
+
+  , click: function (e) {
+      e.stopPropagation()
+      e.preventDefault()
+      this.select()
+    }
+
+  , mouseenter: function (e) {
+      this.$menu.find('.active').removeClass('active')
+      $(e.currentTarget).addClass('active')
+    }
+
+  }
+
+
+  /* TYPEAHEAD PLUGIN DEFINITION
+   * =========================== */
+
+  $.fn.typeahead = function (option) {
+    return this.each(function () {
+      var $this = $(this)
+        , data = $this.data('typeahead')
+        , options = typeof option == 'object' && option
+      if (!data) $this.data('typeahead', (data = new Typeahead(this, options)))
+      if (typeof option == 'string') data[option]()
+    })
+  }
+
+  $.fn.typeahead.defaults = {
+    source: []
+  , items: 8
+  , menu: '<ul class="typeahead dropdown-menu"></ul>'
+  , item: '<li><a href="#"></a></li>'
+  }
+
+  $.fn.typeahead.Constructor = Typeahead
+
+
+ /* TYPEAHEAD DATA-API
+  * ================== */
+
+  $(function () {
+    $('body').on('focus.typeahead.data-api', '[data-provide="typeahead"]', function (e) {
+      var $this = $(this)
+      if ($this.data('typeahead')) return
+      e.preventDefault()
+      $this.typeahead($this.data())
+    })
+  })
+
+}(window.jQuery);”ò¿Ÿh  d      7÷È6      support    Ã∏
+      transition     |à@«      transitionEnd      ∏OÄ      document   DC      createElement      }~h	      bootstrap      ôb Â      transEndEventNames     Ö}Õ5      WebkitTransition   √a :      webkitTransitionEnd	    %}Ô      MozTransition
+      æ¿N˘      transitionend      ÁOE      OTransition    ‰n·¡      oTransitionEnd     û	¯L      msTransition   Û/Œ°      MSTransitionEnd    ¯2áâ      window     >Â/      jQuery     6õT      Modal      4W»      content     :yã      options    µ—ë      $element   €dAb      delegate   bÂÛW      [data-dismiss="modal"]     ÁèÓë      click.dismiss.modal    üvÙ}      hide   Ogµ      toggle     °Qé!      isShown    HáíK      show   ˆΩhy      that   tÇ3       Event      ˘!p¬      trigger    ò%–      isDefaultPrevented      òh;      body!   Bå|      addClass"   KŒüm
+      modal-open#     É]i      backdrop$   7ÑÉz      hasClass%   &oª7      fade&   ˛Ë˘2      parent'     †Á„V      appendTo(   ≥Z÷¶      offsetWidth)    oZÎë      shown*      B9∫¿      preventDefault+     ˆ+      removeClass,    G‡≠E      hideWithTransition-     Eı’	      hideModal.      ∑\o      timeout/    3AtŸ
+      setTimeout0     ˙¯Öﬂ      off1    QÔ8u      clearTimeout2   Ñ€ËW      hidden3     Ë€˘      callback4   ÷q1º      animate5    MôÂ@	      doAnimate6      b›Ï`	      $backdrop7      ñoı      <div class="modal-backdrop 8    ¬F1      " />9   ü™‚X      click:      Ÿ0è∞      removeBackdrop;     *N∑∆      remove<     a@      keyboard=    î∆X      keyup.dismiss.modal>    ≈∏0      which?       ∫˚      modal@      ⁄|`õ      optionA      Kı±      $thisB      6ó(Å      dataC   ªl‡Ù      extendD     $îüŒ      ConstructorE    1´/À      click.modal.data-apiF   ©±6      [data-toggle="modal"]G      ª©`X      hrefH   §é%q      $targetI    A¢Ωê      attrJ   ‚Ö      data-targetK    I°´3      .*(?=#[^\s]+$)L     ÎW+<      [data-toggle="dropdown"]M   çgO[      DropdownN   £Á”¢      $elO    ≥ígÔ      click.dropdown.data-apiP    ‘„X      htmlQ   óx5      openR   L¨.1      $parentS     _l$      selectorT   ÆA/      isActiveU   πlk'      .disabled, :disabledV   Â˝ª"      .*(?=#[^\s]*$)W     ËBTµ
+      clearMenusX     ì˛(I      toggleClassY    âòCl      dropdownZ   Ç      click.dropdown[     Û O      .dropdown form\     ı/F/      stopPropagation]    Cz™	      ScrollSpy^      8Jó      process_    ™8ù…	      scrollspy`      ¬‘’      $scrollElementa     Pµ´      scroll.scroll.data-apib     ‰;       .nav li > ac   1R∞Ç      $bodyd      ﬁÀ†»      refreshe    ¡§\l      selff   ’âz      $targetsg   –%      offsetsh    |4Ê      targetsi    9Ã      mapj    å÷"R      $hrefk      fıa‹      ^#\wl   »Åí      positionm   $√Á      topn    Ü}ÿ„      sorto   Ñu2      pushp   ìGÎ	      scrollTopq      LsAø      scrollHeightr   "Ô	      maxScrolls      ∑…≈      heightt     ¬œÑW      activeTargetu   æ’      lastv   Û4P      activatew   å®Px      activex     “ÙÙ;      .activey    Qﬁ≠7      [data-target="z     ëÕ)P      "],{    7=L.      [href="|    ı£Ø      "]}     ÌfUï      .dropdown-menu~     /ﬂ‰ï      closest    ø´ˇ&      li.dropdownÄ    d<`      [data-spy="scroll"]Å    t[       $spyÇ   R†Â/      TabÉ    á0Åÿ      $ulÑ    Ÿ˝ª[      ul:not(.dropdown-menu)Ö     V¨†ö      previousÜ   èı¸Q	      .active aá      &$˜0      relatedTargetà      -‚
+Ë	      containerâ      ∂6"      $activeä    ø◊˘˙	      > .activeã      ¿}‡ñ      > .dropdown-menu > .activeå     ûª◊!      tabç    ªMg      click.tab.data-apié     W2cË)      [data-toggle="tab"], [data-toggle="pill"]è      †ÿn•      Tooltipê    íu`      initë   /}ø8      tooltipí    Ê≈ä      eventInì    Tu.      eventOutî   •⁄‰
+      getOptionsï     hË?D      enabledñ    MÌÑ      manualó     d®§˙      hoverò      ôF 
+      mouseenterô     KÃÌ      focusö      fNæ
+      mouseleaveõ     ƒ∫·%      blurú   —êÁÀ      enterù      ˛;ä      leaveû      ->gg      _optionsü   {s[ß      fixTitle†   ãC±¿      delay°      ¸z◊Ω      currentTarget¢      ÷’!
+      hoverState£     ?Mv	      out§    Ü˜I      $tip•   X      inside¶     U,2ñ      posß    ∏Ãl      actualWidth®    t•∆À      actualHeight©   sÇc	      placement™      ª]¨t
+      hasContent´     J!ŸÍ      tip¨    f
+      setContent≠     kÔÂ^	      animationÆ      >ü      cssØ    ı]á      left∞   e}ü      display±    ü‡˚Å      block≤      ¢Í›      getPosition≥    Bãwå      offsetHeight¥   @»ˇ~      bottomµ     ÎƒJ˚      width∂       ë∏.      right∑      {å      isHTML∏     à3¿µ      textπ   våƒ      charAt∫     ≈3      ^(?:[^<]*<[\w\W]+>[^>]*$)ª      “E      titleº      .ﬁˆˇ      getTitleΩ   –2N      .tooltip-inneræ     Œ"´      fade in top bottom left rightø      '„z†      removeWithAnimation¿    â      data-original-title¡    Ûûí
+      removeAttr¬     êséÍ      template√   ˝ËS      validateƒ   •_œ”
+      parentNode≈     ˛˝ùd      enable∆     7ÖR      disable«    åÒ]Õ      toggleEnabled»      xÖ_]      <div class="tooltip"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>…      Ûs™!      Popover     4›Cõ      popoverÀ    œ~˝1
+      getContentÃ     6∑÷ú      .popover-titleÕ     ªÿ÷r      .popover-content > *Œ   Üé_∂      fade top bottom left right inœ      óÏo      data-content–   °S±¥û      <div class="popover"><div class="arrow"></div><div class="popover-inner"><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div></div>—     ﬁΩO      dismiss“    Ø†≥N      [data-dismiss="alert"]”     ∫…¥|      Alert‘      “Ô¢Z      alert’      ”Ôêù      removeElement÷      =Å˘ê      closed◊     Æµ∆      click.alert.data-apiÿ   G’†ÿ      ButtonŸ     ˙U~      button⁄     *∆Î      setState€   ûzÉw      disabled‹   &⁄õ      val›    ^≤«°      Textﬁ   øÀ@≈	      resetTextﬂ      ˛¶0R      loadingText‡    ëÊ      [data-toggle="buttons-radio"]·      Ø…(n
+      loading...‚     %&kø      click.button.data-api„      ():f      [data-toggle^=button]‰      YBF      $btnÂ   h_ò0      btnÊ    JÛW—      .btnÁ   ¿í\!      CollapseË   #ùÁ¢      collapseÈ   ∑6∑	      dimensionÍ      ˘î‘©      hasWidthÎ   \z˚      scrollÏ     ﬁ£      activesÌ    üœÒ      hasDataÓ    ò ne      transitioningÔ      ó®”—	      camelCase      ™∆X      > .accordion-group > .inÒ   ÛWÄπ      resetÚ      z¡≤S      autoÛ   Ωpwm      methodÙ     ﬁEŸ
+      startEventı     ∞≈˙ﬂ      completeEventˆ      Dï»á      complete˜   ¨›∂ü      click.collapse.data-api¯    -*      [data-toggle=collapse]˘     ¡B5      Carousel˙   ˇõ…‰      slide˚      Pu¨!      cycle¸      ûV¿      paused˝     szÇﬁ      interval˛   Ïà       setIntervalˇ    
+}N      children   âÂ˘9	      activePos     ¿Öc»      sliding   ¯=—ï      slid  >∆ß"      prev  bPk      clearInterval     	˜f      $next     …#©	      isCycling     Ë˜J◊      fallback  `~ﬂ      first	     ä6õÙ      .item
+     lrã       carousel  :Îü      click.carousel.data-api   d¬qÇ      [data-slide]  ƒa√w	      Typeahead     ¢¸ˇ∫	      typeahead     aK      matcher   5ﬁkO      sorter    :ú9      highlighter   ≠sõÌ      updater   ˝„q      $menu     ™€q      menu  ≥”¸Û      listen    1<Î      select    ì–¯Ó
+      data-value    Á˛¡      change    ˝ÑÃ∫      item  Ê∑NS      lookup    II∑P      event     §#`      items     XN_ˇ      query     0
+%9      grep  ‘ÍÕ˜      render     ÿÖ Ã      slice!     RâDo      toLowerCase"   ⁄Eú¡      indexOf#   ≠¡of
+      beginswith$    Ê¢Î’      caseSensitive%     Ú#µ      caseInsensitive&   Ç=äO      shift'     ÿ¶      [\-\[\]{}()*+?.,\\\^$|#\s](    {S˛8      \$&)   H é≤      <strong>*  ìÜr	      </strong>+     ®±V      keypress,  KH`      keyup-     “ßf∞      browser.   À˙√      webkit/    5∂™‰      msie0  ù∫”      keydown1   ≠5      keyCode2   ‡
+ï4)      <ul class="typeahead dropdown-menu"></ul>3     ‘‚V      <li><a href="#"></a></li>4     ¿Sñ      focus.typeahead.data-api5  ZŸW      [data-provide="typeahead"]6    ÓÊ~      $.support.transition<7     Ñ—ÙX      transitionEnd<8    p{÷`      show/<9    ¡v´€      show/</<:  ÛÒ`      hideWithTransition/timeout<;   yïÃj      hideWithTransition/<<  xÊ      escape/<=  ‘iä3
+      $.fn.modal>    -ÄOı      $.fn.modal/<?  †?“U
+      Dropdown/<@    …è/∑      $.fn.dropdownA     ª˙∑-      $.fn.dropdown/<B   h?ù‚      refresh/$targets<C     ¡oµ/      $.fn.scrollspyD    “«n€      $.fn.scrollspy/<F  '›õª      $.fn.tabG  ˜É+
+      $.fn.tab/<H    ç»d%      enter/this.timeout<I   ˆ£–V      leave/this.timeout<K   # ≤!      hide/removeWithAnimation/timeout<L     vOøì      hide/removeWithAnimation/<M    ‡ ¢       $.fn.tooltipN  ¿xO      $.fn.tooltip/<O    7–∑      $.fn.popoverP  ıÛñÕ      $.fn.popover/<Q    <€’F      Alert.prototype.closeS     (ÈÿT
+      $.fn.alertT    C÷>      $.fn.alert/<U  ‚G˝      Button.prototype.setStateV     †D€      Button.prototype.setState/<W   Õ¶eÂ      Button.prototype.toggleX   ¨ÅÕ)      $.fn.buttonY   ©]Æ£      $.fn.button/<[     ?1      $.fn.collapse\     <jÃ      $.fn.collapse/<]   ^&GR      to/<^  3¿€µ      slide/<_   ª"5˛	      slide/</<`     d∂      $.fn.carousela     €Î[µ      $.fn.carousel/<b   lw      lookup/items<c     ŒWFÃ      highlighter/<d     U¯      render/items<e     $Râ      blur/<f    êhƒd      $.fn.typeaheadg    âƒ≥p      $.fn.typeahead/<     °   “  °   °          .   Ô%,â                                                                                                 	                                                                                                                                                                                                            	                 
+                                                                                                                                                                                                                                                             !      !           "      !          #      #           $      #           %      #           &      !           '      !           (      !          )      )           *      !           +      +           ,                 -      -           .      -          /      /           0      -          1      1           2      -          3      3           4      -           5      5           6                 7      7           8      7           9      7           :      7          ;      ;           <      7          =      =           >      7           ?      7           @      7           A      7          B      B          C      C           D      C           E      7           F      7           G      7           H      7           I      7           J      7           K      7           L      7           M      7           N      7           O      7          P      P           Q                 R      R           S      R           T      R           U      R           V      R           W      R          X      X           Y                 Z      Z           [      Z          \      \           ]      Z          ^      ^           _      Z           `                 a      a           b      a          c      c           d      a           e      a          f      f           g      a           h      h           i                 j      j           k      j           l      j           m      j           n      j           o      j          p      p           q      j           r      j          s      s           t      j           u      u           v                 w      w           x      w           y      w          z      z           {      w           |      w           }      w           ~      w                           Ä      Ä           Å      w          Ç      Ç           É      w           Ñ      Ñ           Ö                 Ü      Ü           á      Ü           à      Ü           â      Ü           ä      Ü           ã      Ü          å      å           ç      Ü           é      Ü           è      Ü           ê      ê           ë      Ü          í      í           ì      Ü           î      Ü           ï      Ü           ñ      Ü           ó      Ü           ò      Ü          ô      ô           ö      Ü           õ      Ü           ú      Ü          ù      ù           û      Ü           ü      ü           †      ≥Oåc                         $ `                                              ï   {               $ `  P,  P-  P#  P:  Pü  `                P.  Pã                                                 ã               3    4  5  ã                 ã                   Pã                e                  ã                 ã                   Pe  ã                                               e    ã               @  Pã                 A  B    ã                               e  A  G  H  @  ã                $ `  PM  PW  P                            ç   N  Pã                               e  A  R  S  T  ã               @  Pã                 A  B  ã                                e               $ `]  P            ç     ^    G  ã                 e  Pf  ã                 N  G  j  ã                a  b                ã                 p  q  r  g  h  t  i  ã                 w  S  ã               @  Pã                 A  B    ã                                 Å  ã                $ `Ç  P            ç   ã                 A  PÉ  S  Ö  PH  e  ã                               ç  `à  3  Pâ  P  PÇ                              @  Pã                 A  B  ã                               e  ã                $ `è  P            ç     ã               0  ç     í  ì  ã                 ã               e  e  Pã                               e  e  Pã                                 §  •  ¶  ß  ®  ©  Y ã                ∏                §  ª  ã                   §  Pø  ã                  .  P                                              é ã                 ã               •  ã     ©ﬂV             ª  é o  ã                 ã                 ã                 ã                 ã                 ã                 ã               @  Pã                 A  B    ã                $ `…  P            ç     ã                 §  ª    ã                 ã                   é o  ã                 ã               @  Pã                 A  B    ã                $ `—  P”  P            ï ã               e  A  S  R  P’  ã                               @  Pã                 A  B  ã                                $ `ÿ  P            ç     ã                `d `N  PB  ‹  ã                                 R  ã               @  Pã                 A  B    ã                               e  ‰               $ `Á  P            ç     ã                 Í  ã                 È  Î  Ï  Ì  ã                 È  ã               ¯  È  ã               Û  Ù  Pı  P  Pˆ  ã                                 ã               @  Pã                 A  B    ã                               e  A  G    @  ã                $ `˘  P            ç     ã               e  ã               ¶  Pâ  ˇ      Pã                               e  ã                 ã                 ã   
+            0 `Ç  â  P P w  `   Pe  ã                                               @  Pã                 A  B    ã                               e  A  G  H    ã                $ ` P            ç     ã                 ‹  ã                               ¶  ã                 ã                  P q  ã                              ã                # $ %  ã                 ã                Å Ÿ                 Pã                i                w  Ç  ã                w   ã                 ã               e  ã               e  ã               e    Pã                               e  ã               e  ã               @  Pã                 A  B    ã                               e  A  ã   Ø¬0∞K      V      K      k      V      ó     ∫      V      K      K      '    IÙ$KEÆ˙ö           	                î           R                         #  <               
+      R                   R   d  ^  v           •          R     v        á     
+     0  á     _    R   ê  î  ú  ù    ∑  ¨    ü  ™  ≤  º  ´  √  ≈  ∆  «               
+        S             
+              m  Ø  ∞     
+   m  Ø     
+    m  Ø     
+    m  Ø     
+    m  Ø             
+   m  Ø     
+    µ  s     #    ≠  ©  S  ¬    ª  †                   R   ¨  ™  À  ´                 ©    ¬                   ﬂ             #    R   È      Ò                      ˚  X ≥  Ç   ˙             
+   ˝  ≥                     Z      R              Ç    , + õ  9  ò                s     
+     m  Ø         ˚     á&’™ç!´!°     D–øø  ˝                  <        m    ª   J   s ﬂm    ª   J   s ﬂm    ª   J   s ﬂm    ª   J   s ﬂm    ª   J   s ﬂm    ª   J   s ﬂm	    ª   J   s ﬂm
+    ª   J   s ﬂm    ª   J   s ﬂm    ª   J   s ﬂm    ª   J   s ﬂm    ª   J   s ﬂ•0`F<
+ˇˇˇˇP5Q`FÄ 
+ˇˇˇˇP5Ä +`FÄ z
+ˇˇˇˇP5Ä è`FÄ 
+ˇˇˇˇP5Ä &`FÄ ò
+ˇˇˇˇP5Ä Æ`FÄ ´
+ˇˇˇˇP5Ä ¡`FÄ 
+ˇˇˇˇP5Ä #`FÄ h
+ˇˇˇˇP5Ä }`FÄ »
+ˇˇˇˇP5Ä ›`FÄ h
+ˇˇˇˇP5Ä }`FÄ 
+ˇˇˇˇP5Ä &`FÄ .
+ˇˇˇˇPPL   z\_®L      	                     Ω  Œ   ﬂ¡    m   w ﬂ•I`ˇˇˇˇP4(PÄÄÄL   ^‡IWL                             ¡   J   m    s  M   ﬂ•0@`ê@"PI$PÄÄh   Bn>≤h   2                         m    s  Õ   ﬂæ   ú   ó   ﬂ9   æ   <   ó   ¢•@`FPH`î 	NQÄÄ  É°ñŸ¸   ®                        ª   ·J   ‰   s Õ   ﬂ9      <      <   	   <
+      <      <   Õ  ﬂæ  ^ò
+   _`õ?   ó   Õ  æ   J   æ  K ö   ó   æ  æ  K§a•ó   ﬂôæˇˇˇó   a•@`ë 	P("`%****O`õ `,`IH	LPÄÄÄ        Z   G   X  {•ïX  Ó   	                     Ω  Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂm   Œ   ﬂ¡   9   ¡   <   m	   <
+   m   <   m   <   M   ﬂ¡   J   m   M   ﬂ¡   J   J   9   <   <   <   M   ﬂ¡   J   J   ¡   M   ﬂ¡    m   w ﬂ•¿0@`K`JJJJ:ê@Ä  £`ï@Ä  Æ`î && `ö@Ä  ∫`ˇˇˇˇP4Ä  ≈P†   ÖÜVS†   Z         
+             ﬁÕ   ﬂæ   º M   ﬂæ   ¡    º  s ·J   ‰      ¡   ·J   ‰æ   J   æ   s s M   ﬂ•&`-`
+ˇˇˇ˛P*Bñ 	ˇˇˇÔPˇˇˇƒP)PÄl   ®Váìl   >                        ﬁÕ   ﬂæ   ·æ   J   õ   ó      ô   ó      ó   K‰s  ¢•&	`≥ ,P#QÄÄÄD  2‹˝RD  –                       ﬁÕ  ﬂæ  Œ   ﬂ¡  ·J   ‰   s Õ   ﬂæ  J   ·J   ‰æ   w ﬂæ  J   ù   ó   ﬂæ   ·J   ‰s  ó	   ö   ó
+    ¢ó
+   ¡      s ·J   ‰	   w ﬂæ  M   ﬂ¡  ·J
+   ‰æ  w ﬂ¡  ·J
+   ‰æ  m   w ﬂ•&`*`ë PH	`ê ˇˇˇ¯PD`ü Pí `A"F	`P	PD
+	`K	`ˇˇˇ˚P$	`ˇˇˇıPD"PÄÄ¨  Œﬂõˇ¨  =                %        ¡  J   J   ú$   ó   ﬂ¡   J   ·J   ‰   s ó   Õ   ﬂ¡   J   ·J   ‰s  J   õ)   ó   ¡   J   ·J   ‰ª	   J
+   w ﬂó   ¡   J   ·J   ‰w  ﬂæ   ö   ó   ¡   J   KJ   ﬂó   ¡   J   ·J   ‰   w ﬂæ   ö<   ó   ¡   J   ·J   ‰¡  J   J   J   m   w ô#   ó"   ¡   J   ·J   ‰   w ó%   ﬂ• `∞ &PM`ë Pí `ë 
+ˇˇˇ˜PI`ë PD
+`.`ó@`ñ PD`.• ˇˇˇ‚P-ñPI	PÄÄÄH   oÊ7wH                             ¡   J   ·J   ‰   w ﬂ• `ñ PPÄÄ¯  ªXqi¯  e               "      ﬁÕ  ﬂº  ú   ó   ﬂº  ·J   ‰w  ó   ﬂæ  Õ   ﬂ¡   ·J   ‰   s Ã  ﬂæ  J   ·J   ‰º  w ﬂæ  J   ù   ó   ﬂº  ·J   ‰s  ó   ö   ó    ¢ó   æ  M   ﬂ¡       s ·J	   ‰
+   w ﬂ¡   ·J   ‰æ  w ﬂæ  J   ·J	   ‰   w ﬂ¡   J   J   ú#   ó   ﬂæ  J   ·J   ‰   s ó   ö"   ó   ¡   ·J   ‰æ  w ô   ó    ¡   ·J   ‰æ  w ó"   ﬂ•&	`ò PI`I	`ë PG	`ê ˇˇˇ¯PD	`ü Pí `AF	`K	`P	PD	`ˇˇˇ˚PD	`ï PD	`Ø &Pí #ê ˇˇˇ˚P-ê ˇˇˇ˚P)PÄÄÄò   ≤b{èò   U                
+        ﬁÕ   ﬂæ   Œ   ﬂª    m   Ùs Œ   ﬂæ   J   ·J   ‰¡  J   J   J   m   w ﬂ•&`*`5CPI`ê î ˇˇˇ‚PDP|   óã‘û|   ?                          ¡   J   ·J   ‰¡  J   J   J   w ﬂ¡  ·J   ‰¡   w ﬂ• `ë î ˇˇˇ¸P$`ˇˇˇ˚P$	PÄ`   àí,q`   %                          ª    ¡   w ﬂ¡  ·J   ‰¡   w ﬂ• `ˇˇˇˇP$`ˇˇˇ˚P$PÄx   äÑLx   >                       ﬁÕ   ﬂæ   J   ·J   ‰s  ·J   ‰   w ﬂ¡   ·J   ‰æ   w ﬂ•&`ê P*UD`ˇˇˇ˚P$P†  :Ó‹—†  ÷               H      ﬁÕ  ﬂæ  Õ   ﬂæ  J   ·J   ‰   s ö   ó      ô   ó      ó   Õ  ﬂæ  J   ú   ó   ﬂæ  J   J   ó   öM  ó	   ¡   J   J	   ú   ó   ﬂæ  ó   Õ  ﬂæ  ¡    
+   æ  &   &s ·J   ‰ª   J   s M   ﬂæ  J   J      ö:   ó   æ  J   ·J   ‰¡   ·J   ‰æ  J   æ  s w ﬂó   æ  ö   ó   æ  J   KJ   ﬂó"   æ  J   ·J   ‰   w ﬂæ  ö9   ó&   æ  J   ·J   ‰¡   J   J	   J   º  w ô   ó,   º   w  ó-   ﬂô  ó-   æ  J   ú   ó0   ﬂæ  J   ó1   öÀ   ó2   æ  J   ·J   ‰   w ﬂ¡   J   J	   ú#   ó8   ﬂæ  J   ·J   ‰   s ó;   öN   ó<   æ  J   ·J   ‰¡   J   J	   J   ¡   ·J   ‰¡   æ  s w ô   óD   ¡   ·J   ‰æ  w óF   ﬂô   óF   º  ö   óG   º   w  ﬂóH   •&`)`ï P´@	`± `®@`
+ ˇˇˇﬁP*
+ˇˇˇ˜PI
+`û 	`ê 	ˇˇˇÔPˇˇˇ¯PI``ñ@`ï PD`.§ ˇˇˇ‚P-	Tì@`≠ `ï PD`Ø &Pí § ˇˇˇÍPˇˇˇ‡P-ê ˇˇˇ˚Pì@`-`M PÄÄT   CúÒT   &                       ﬁÕ   ﬂæ   J   ·J   ‰w  ﬂæ   M   ﬂ•&`ê P$`+P¯   ôh⁄¯   •                        ﬁÕ   ﬂæ   Œ   ﬂæ   J   ú   ó   ﬂæ   J   J   ó   ö2   ó   ¡   ª   s ·J   ‰   m   w ﬂô;   ó
+   æ   J   õ(   ó   ¡   ª   s ·J   ‰   w ﬂó   •&`*	`± `ˇˇˇˇP%ˇˇˇÊPN`ì `ˇˇˇˇPPI	PÄX   ƒÔËˇX   ,                         º  J   ú   ó   ﬂ¡   ·J   ‰w  ó   ﬂ• 	`¢ P)PÄT   Tà
+T   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PC	Qî  ∆ Éî                         ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡  ·J   ‰9   ¡  J   J   J   æ   ·J   ‰s  ¡   ú   ó   ﬂ¡   ó   s Õ  ﬂæ  õ7   ó   æ   ·J   ‰   ¡  Äæ  æ  „  Å Õ  w ﬂó   ¡   ö   ó   æ  ·¡   K‰w  ﬂô,   ó   æ  J   ö   ó   æ  ·J   ‰w  ﬂó   •&`ˇˇˇˇP(`ê P(`	î Pú ˇˇˇ“P(``ê ˇˇˇPˇˇˇÍP)`ë `P.`ì `P)PÄ`   a≠¡`   )                          ¡       s ·J   ‰      m   w ﬂ• `Pî =ˇˇˇÃPD	PÄÄÄÑ  ˙ûÿhÑ                        ﬁÕ  ﬂ¡    æ  s Õ   ﬂ¡    æ   ·J   ‰   s ùE   ó   ﬂæ   ·J   ‰   s Õ  ú#   ó   ﬂæ  ·J   ‰l      s ó	   s Õ  ﬂæ  ·J   ‰   s ö   ó   	   ô:   ó   ¡   ·J
+   ‰9   æ  ·J   ‰s  æ   ·J   ‰s  s ó   Õ  ﬂº  ·J   ‰w  ﬂæ  ·J   ‰æ  w ﬂ•&`ˇˇˇˇP(`ê Pû %Pù 
+ˇˇˇ¯PˇˇˇæP(`ê P® $PPˇˇˇﬂPM`
+P$`ˇˇˇ˙P$PÄÄ‹   AË(Ÿ‹   ç   	                     Ω  Œ   ﬂm   Œ   ﬂ   Œ   ﬂm   Œ   ﬂ¡   9   ¡   <   m   <   M   ﬂ¡   J	   m
+   M   ﬂ¡   J	   J   ¡   M   ﬂ¡    m   w ﬂ•î0@`+`K`JJê@9`ï@B`ö@H`ˇˇˇˇP4OPú   ˙˘ZÑú   T                       ﬁÕ   ﬂ¡   º  s ·J   ‰   æ   J   s Œ   ﬂ¡      s ·J   ‰   m   w ﬂ•&`ˇˇˇˇP(	ˇˇˇ‚P)	`P'ˇˇˇ‚PDPÄÄP   ÅÎ>ôP                              ¡   ·J   ‰s  ·J   ‰   w ﬂ• `P	P$	PÄÄÄ»  /`?™»  :        	              ﬁÕ  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰   s ö   ó    ¢ó   æ   ·J   ‰   s Õ  ﬂæ  õS   ó   æ   ·J   ‰   s Õ  ﬂæ  ú#   ó
+   ﬂæ  ·J   ‰l      s ó   Õ  ﬂó   ¡    æ  s Õ  ﬂæ  J	   ù   ó   ﬂæ   ·J
+   ‰s  Õ  ó   ﬂæ  ·J   ‰   s Õ  ﬂ¡    w  ﬂæ  õ   ó   æ  ·J   ‰   w ﬂó   ¢•&`ˇˇˇˇPH`ê P`AF`ê PH
+`.	`ê P(	`ö (
+ˇˇˇ¯Pí@`ˇˇˇ˛P(`ü #PM`ê PH`J``ê PI`!QÄÄÄ`   ≤Fí`   )                          ¡    ¡   s ·J   ‰s  ·J   ‰   w ﬂ• `ˇˇˇˇP
+	P	P$PÄÄT   `1T   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PCQ¸   Äááe¸   ú         
+               ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂæ  õ3   ó   æ   ·J   ‰   ¡  Äæ  „  Å Õ  w ﬂó   ¡   ö#   ó	   æ  ¡   K·J   ‰æ   w ﬂó   •&`ˇˇˇˇP(`ê P(``ê ˇˇˇÛPˇˇˇÁP)`ë `ë ˇˇˇ˚P)PÄÄÄº   ·Ê√≠º   o                          ¡       s ·J   ‰   ¡   w ﬂ¡       s ·J   ‰      m   s ·J   ‰   ¡   ¡   J   J	   w ﬂ• `P'ˇˇˇ‚P$`P*/ˇˇˇŸP*&
+ˇˇˇ⁄P$PÄÄÄ<   rï†&<                            º  ·J   ‰w  ﬂ• `
+PPÄÄÄ  w·é«  ¨   	                     Ω  Œ   ﬂm   Œ   ﬂ¡   9   ¡   <   m   <   m   <   m   <	   M
+   ﬂ¡   J   m   M   ﬂ¡   J   J   ¡   M   ﬂ¡   J   J   9   
+<   M   ﬂ¡    m   w ﬂ•î0@`JJJ2JHê@g`ï@q`ö@s`î M{`ˇˇˇˇP4Ä  ÇP(  ≠xd(  å        
+       &      ﬁÕ  ﬂ¡   ·J   ‰æ  J   æ  s Õ   ﬂ¡    º  s ·J   ‰   s ö   ó   ¡    ª   s ô   ó	   ¡    º  s ó
+   Õ  ﬂæ  ¡   ·J   ‰9   ¡   J   J	   J
+   º s M   ﬂæ  æ  ·J   ‰   æ   s M   ﬂæ  æ  J   J   ùb   ó   ﬂ¡    º  s ·J   ‰   s Õ  ú#   ó   ﬂæ  ·J   ‰l      s ó   ù   ó   ﬂ   ó      &M   ﬂæ  ¡       s M   ﬂæ  ·J   ‰w  ﬂæ  ·J   ‰w  ﬂ•&`	ˇˇˇÏP(`ˇˇˇˇP
+Pì ˇˇˇ˛Pì ˇˇˇ˛PM`ê î ˇˇˇ‹P)`î <ˇˇˇ„P)`ù 	ˇˇˇ˛PPù 
+ˇˇˇ¯Pìñ `P)`P$`P$PÙ   ‚ZôÙ   è                       ﬁÕ  ﬂæ  Œ   ﬂæ  ¡   h    s M   ﬂæ  ¡   h    s M   ﬂæ  J   ·J   ‰æ  J   s ·J   ‰m   s ·J   ‰m	   s ·J
+   ‰m   s Õ   ﬂ•&`J	`
+ˇˇˇ˛P)	`
+ˇˇˇ˛PI	`ê 	ˇˇˇ˚P*ˇˇˇ¸PJˇˇˇ˚P*ˇˇˇ˚PHPP  µ≥ı!P  Û                        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s ù   ó   ﬂæ   ·J   ‰   s ó   Õ  ﬂl   ·J   ‰æ  s ú   ó	   ﬂ¡   æ  s ó
+   Õ  ﬂæ  úO   ó   ﬂæ  J   ú;   ó   ﬂh   h   æ  ·J   ‰s  J	   i    æ  i   i    ó   ù   ó   ﬂó   ¢•&`ˇˇˇˇP(`ê Pû P-`ˇˇˇ˚Pî ˇˇˇ˛P-`î 
+P§ Q8   ŸzÚ8                            º  Kº K'¢• 	`QÄÄ|   )€™|   =                        ﬁÕ   ﬂ¡   J   ·J   ‰æ   Kw ﬂ¡   J   ·J   ‰æ   Kw ﬂ•&`ë ˇˇˇ˚P$`ë ˇˇˇ˚P$PÄÄÄL  ˛¬ú:<  ∏               2       ﬁÕ  ﬂæ  J   ·J   ‰s  æ  J   J   &Õ   ﬂæ  J   KJ   ù   ó
+   ﬂæ  J   KJ   ó   Õ  ﬂæ  æ  J   ·J   ‰s  'Õ  ﬂæ  J   Õ  ﬂæ  J	   Õ  ﬂæ  J
+   Õ  ﬂæ   æ   öF   ó   æ  æ  ·J   ‰s  KÕ  ú   ó   ﬂæ  ·J   ‰æ  s ó   ¢ó   æ  J   Õ  ﬂò   æ  0·)Õ  ﬂöï   ó!   æ  æ  æ  Kúr   ó$   ﬂæ   æ  æ  K úY   ó'   ﬂæ  æ  &Kù   ó+   ﬂæ   æ  æ  &Kó.   ú"   ó/   ﬂæ  ·J   ‰æ  æ  Kw ó2   ﬂô^ˇˇˇó2   •&`ê Pî `µ `ê P)`.`.`N	`/`Pï  ˇˇˇıPHF`fñ `ï ô õ  ú î ˇˇˇˆPì@PL           ß   Ä  ·µ—¥Ä  
+                     ﬁÕ  ﬂæ  º  M   ﬂ¡    æ  J   s ·J   ‰   s ·J   ‰   w ﬂæ  J      &º  &   &æ  J   &	   &º  &
+   &Õ  ﬂ¡    æ  s ·J   ‰   s ·J   ‰   s Õ   ﬂæ   ·J   ‰   s ö1   ó   æ   ·J   ‰   s ·J   ‰   s Õ   ﬂó   æ   ·J   ‰   w ﬂ•@	`M	`	ˇˇˇˇP*U*UD
+	`) ê ê O	`ˇˇˇ˛P*U*UH`ê P-`ê PPM	`ê P$PÄÄÄT   7˝’iT   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PCQ  e≥Q  ∏                        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡   ú   ó   ﬂ¡   ó   Õ  ﬂæ  õ7   ó   æ   ·J   ‰   ¡  Äæ  æ  „  Å Õ  w ﬂó	   ¡   ö   ó   æ  ·¡   K‰w  ﬂó   •&`ˇˇˇˇP(`ê P(`° ``ê ˇˇˇÏPˇˇˇÊP)`ë `P)PÄÄÄT   ·⁄[T                             ¡       s ·J   ‰m   w ﬂ• `P
+ˇˇˇ˚PDPÄÄt   ß–∫«t   6                        ﬁÕ  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰æ   ·J   ‰s  w ﬂ•&`ˇˇˇˇP(`PˇˇˇÒP$PÄ–   ê-*@–   Å   	                     Ω  Œ   ﬂm   Œ   ﬂ¡   9   ¡   <   m   <   m   <   M   ﬂ¡   J	   m
+   M   ﬂ¡   J	   J   ¡   M   ﬂ¡    m   w ﬂ•9@`K`JJJ4ê@\`ï@e`ö@k`ˇˇˇˇP4rPÄL   ∞d“¡L                         ﬁÕ   ﬂæ   ¡    º  s M   ﬂ•&`
+ˇˇˇ˛P)Px  °ˇs x  ∏        
+       (        ﬁÕ  ﬂæ  J   Œ   ﬂ¡   ·J   ‰   s Õ   ﬂ¡   ·J   ‰   s Õ  ﬂæ  õT   ó   ¡   ·J   ‰   s Õ  ﬂæ  ú#   ó	   ﬂæ  ·J   ‰l   	   s ó   Õ  ﬂó   ¡   ·J
+   ‰   s ·J   ‰   s ö   ó    ¢ó   æ   ·J   ‰   s ·J   ‰s  KŒ   ﬂ¡  ·J   ‰   9   ¡   <   s Õ  ﬂ¡   ·J   ‰æ  w ﬂæ  ·J   ‰s  ö   ó    ¢ó   ¡   æ  s Õ  ﬂæ  ·J   ‰¡   ·J
+   ‰   s æ   w ﬂæ  ·J   ‰æ  æ  ·J
+   ‰s  m   w ﬂ•&`/`ë P(`ë PH`.	`ë P(	`ö (
+ˇˇˇ¯Pí@`ë PP`A"F`ê P
+PK`ë %	JPH`ˇˇˇ¯PD`P`A"F`ˇˇˇ˛PH`ë Pˇˇˇ„P$`	P
+ˇˇˇ‹PD"P\   !ÃX\   *                          ¡   ·J   ‰9      <   ¡   <   w ﬂ• 	`%*JPDP0  J ˙ì0  ·                       Ω  Œ   ﬂΩ Œ   ﬂm   Õ   ﬂº ·J   ‰   s Œ   ﬂ¡   ú9   ó   ﬂ¡  J   J   ú   ó   ﬂ¡   ·J   ‰   s ó	   Œ   ﬂ¡   ö6   ó
+   ¡   ·J   ‰¡  J   J   J	   æ   w ô   ó   æ    w  ó   ﬂ¡   ·J
+   ‰   w ﬂ•ú `
+P)`êö ëPN`/† ˇˇˇ‚P-	UI `ë P$Pl  %˚äl                           ¡   ·J   ‰   s ·J   ‰   s ·J   ‰   w ﬂ¡   ·J   ‰   w ﬂ¡   ö1   ó	   ¡   KJ   ﬂ¡   ·J   ‰   w ﬂô   ó   ¡   ·J   ‰   w ﬂó   ¡   ·J	   ‰
+   s ö.   ó   ¡   ·J   ‰   s ·J   ‰   w ﬂó   ¡   ú   ó   ﬂ¡    w  ó   ﬂ• 	`,U*U*UD	`ë PD`/`-`ë P `ë PI`ë P-`ë PPI	`ñ P)PT   `1T   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PCQÏ   ä"…4Ï   ì         
+               ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂæ  õ3   ó   æ   ·J   ‰   ¡  Äæ  „  Å Õ  w ﬂó   ¡   ö   ó	   æ  ·¡   K‰w  ﬂó   •&`ˇˇˇˇP(`ê P(``ê ˇˇˇ¯PˇˇˇÏP)`ë `P)PÄÄ`   ∏≤?å`   )                          ¡       s ·J   ‰      m   w ﬂ• `Pî Oˇˇˇ∫PDPÄÄÄl   ^@l   2                       ﬁÕ   ﬂº  ·J   ‰w  ﬂ¡    æ   s ·J   ‰   w ﬂ•&`
+P$`ˇˇˇˇPP$PÄÄ  EÊ  f  	              9       Ω  Œ   ﬂm   Œ   ﬂ¡   9   ¡   <   m   <   m   <   m   <	   m
+   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m    <!   m"   <#   m$   <%   m&   <'   M(   ﬂ¡   J)   m*   M+   ﬂ¡   J)   J+   ¡   M,   ﬂ¡   J)   J+   9-   <.   /   <0   <1   2   <3   4   <5   6   <7   <8   M9   ﬂ•9@`K`JJJ%J2J>JJJÄ  ÅJÄ  äJÄ  íJÄ  ®JÄ  Ø JÄ  ∫JÄ  ≈ JÄ  —   ê@Ä  Á`ï@Ä  Ò`ö `î &*&***PT   èÖHôT   !                       ﬁÕ   ﬂæ   ·J   ‰   º  º w ﬂ•&`ê 	ˇˇˇÁP$PÄÑ  s?›Ñ  ‰               0      ﬁÕ  ﬂæ  º  M   ﬂæ  ¡    º s M   ﬂæ  æ  ·J   ‰º s M   ﬂæ  M   ﬂæ  J   J      ö  ó   æ  J   J      ö   ó   	   ô   ó   
+   ó   Õ   ﬂæ  J   J      ö   ó      ô   ó      ó   Õ  ﬂæ  J   ·J   ‰æ   æ  J   J   ¡   ·J   ‰æ  J   æ  s w ﬂæ  J   ·J   ‰æ  æ  J   J   ¡   ·J   ‰æ  J   æ  s w ﬂó#   æ  J   J   öN   ó&   æ  ¡   ·J   ‰9   æ  J   9      <      <   s M   ô   ó.   æ  ·J   ‰w  ó0   ﬂ•@`-`
+ˇˇˇ˛P)`ˇˇˇıP)`K	`û 	`º 	`º 	`ê 		ˇˇˇÓPˇˇˇ€P$	`ê 
+	ˇˇˇÓPˇˇˇ⁄PI`ò #ï 	
+
+ˇˇˇ“Pí [)PÄÄÄ   ë…ö   ∞                       ﬁÕ   ﬂ¡   ·J   ‰9   ¡   J   æ   J   KJ   º  æ   J   ·J   ‰s  s Ã  ﬂº  J   ú   ó   ﬂº  J   	   ó   ö2   ó   º  9
+   º  J   <   º  J   <   M   ﬂó   º  ¢•&`ô 	ê PˇˇˇƒPG`ì û 	`(-ò@
+`#QÄÄ\  ç⁄\  Ï                      ﬁÕ   ﬂ¡   º  J   s ·æ   J   K‰æ   J   s ·J   ‰æ   J   s Œ   ﬂ¡   J   J   ù    ó   ﬂ¡   J   J   J   ó   ö   ó   ¡   ·J   ‰s  ¢ó   ª    æ   J	   w ﬂ¡   
+   M   ﬂæ   ª    m   ¡   J   J   J   s M	   ﬂ•&`ˇˇˇˇP	ˇˇˇˇP
+	ˇˇˇ˚PI`õ § `PC
+F`	ˇˇˇˇP$`ê `
+E	
+î@PI
+PÄÄ`   gˆ~`   0                          ¡   J      ö   ó   ¡   ·J   ‰w  ﬂó   • `ö `P)PÄÄx  »zP±x                 !      ﬁÕ   ﬂ¡   º  J   s ·æ   J   K‰æ   J   s ·J   ‰æ   J   s Œ   ﬂæ   J   ö   ó   ª    æ   J   w ﬂó   ¡   J   J   ù    ó   ﬂ¡   J   J   J	   ó   ö   ó   ¡   ·J	   ‰s  ¢ó   ¡   
+   M   ﬂæ   ª    m   ¡   J   J   J	   s M   ﬂ•&`ˇˇˇˇP	ˇˇˇˇP
+	ˇˇˇ˚PI`ì `	ˇˇˇˇP)`õ § `PC
+F`ê `
+E	
+î@PI
+PÄÄ`   ·¥7`   0                          ¡   J      ö   ó   ¡   ·J   ‰w  ﬂó   • `ö `P)PÄÄ§  é•`"§  °               n        ﬁÕ  ﬂæ  ·J   ‰s  ú   ó   ﬂæ  J   ó   ön  ó   æ  ·J   ‰s  Õ   ﬂæ  ·J   ‰w  ﬂæ  J   J   ö   ó   æ   ·J   ‰   w ﬂó   æ  J   J	   
+   ö<   ó   æ  J   J	   ·J   ‰æ  æ   Kæ  J   Ks ô   ó   æ  J   J	   ó   Õ  ﬂl   ·J   ‰æ  s Õ  ﬂæ   ·J   ‰s  ·J   ‰9   <   <      <   s ·J   ‰æ  ö   ó(   æ  J   ô   ó)   ª   J   ó+   w ﬂæ  ·J   ‰æ  s Õ  ﬂæ   KJ   Õ  ﬂæ   KJ   Õ  ﬂæ  ö$   ó3   æ  ·J   ‰   s Kô   ó6   æ  ó6   ·   üB   ó7   ·   üÄ   ó8   ·   üπ   ó9   ·   üÚ   ó:   †7  ó:   9    æ  J   æ  J!   &<   æ  J   æ  J"   +&æ  +'<   Õ  ﬂôË   óF   9#   æ  J   æ  '<   æ  J   æ  J"   +&æ  +'<   Õ  ﬂôû   óQ   9$   æ  J   æ  J!   +&æ  +'<   æ  J   æ  '<   Õ  ﬂôT   ó\   9%   æ  J   æ  J!   +&æ  +'<   æ  J   æ  J"   &<   Õ  ﬂô   óh   æ   ·J   ‰æ  s ·J   ‰æ  s ·J   ‰&   w ﬂón   •@	`P¶ 	`P(	`PD`ò `ê PI	` ü 'ô 	ˇˇˇÏPò@	`ˇˇˇ˚PH	`+P*	
+ˇˇˇÈP*∞ ˇˇˇ˜PD	`ˇˇˇÙPH	`ê 	`ê@!`û PÊ `		í ` `	
+	í ` `		/` `		î `J0	`+ˇˇˇ¸P*ˇˇˇ˜P*UI5PÄ–   93¬Ò–   ã                         º  Éù   ó   ﬂº  ·J   ‰s    ú>   ó   ﬂº  ·J   ‰º  J   's    ú   ó   ﬂº  J    ó   ù   ó   ﬂl   ·J   ‰º  s ó   ¢•@` ê [î î ˇˇˇ¯Pîõ /ˇˇˇ˚P(QÄÄ‰   ûH“‰   î                        ﬁÕ  ﬂæ  ·J   ‰s  Õ   ﬂæ  ·J   ‰s  Õ  ﬂæ   ·J   ‰   s ·æ  ·J   ‰æ  s ö   ó	      ô   ó	      ó	   K‰æ  w ﬂæ   ·J   ‰	   w ﬂ•&`P(`PH`ê P#ˇˇˇ˘P® !ˇˇˇˇP$`ê P$P   áÊ1¨   ´                        ﬁÕ  ﬂm   Õ  ﬂæ  Õ   ﬂæ  ·J   ‰s  Œ   ﬂ¡   ·J   ‰   w ﬂ¡  J   J   ú#   ó   ﬂæ  J   ·J   ‰	   s ó   ö   ó   æ   w  ô   ó   ¡   ·J
+   ‰w  ó   ﬂ•ê `)`PI`ë PD`Ø "Pí 	U-\)PÄ   =~^&Ä   A                  	        ª    m   Ùs Œ   ﬂ¡  ·J   ‰¡  J   J   J   m   w ﬂ• `5C!PI	`	î ˇˇˇ‚PD	Pd   Æ∞o‰d   /                          ¡  ·J   ‰¡  J   J   J   s ·J   ‰w  ﬂ• `	î ˇˇˇ¸P
+P$	PÄÄX   1WΩtX                              ª    ¡   w ﬂ¡  ·J   ‰w  ﬂ• `ˇˇˇˇP$`P$	PÄÄÄ¯   5Z¯   ¨                        ﬁÕ  ﬂæ  J   Õ   ﬂæ   ·J   ‰   s ù%   ó   ﬂæ   ·J   ‰   s    ó   öU   ó	   æ   ·J   ‰   æ   ·J   ‰   s ù   ó   ﬂ   ó   s ·J   ‰   w ﬂó   •&`.`ê Pê 
+Pô 	`ê ê Pò ˇˇˇ·P4PIPÄÄ@   Ó≈Ô!@                           ﬁÕ   ﬂæ   ·J   ‰s  ¢•&`P#QÃ   6‘(bÃ   ã                       ﬁÕ   ﬂ¡   ·J   ‰9   º  ö    ó   9   <   <   ô   ó   æ   J   ·J   ‰s  ó	   9   æ   J   KJ	   <
+   æ   J   KJ   <   s ¢•&`í 
+† P%	ï 	ï@PCQ‹   ZÆÔ‹   ñ                        ﬁÕ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  ·J   ‰   s ùQ   ó   ﬂæ  J      ö(   ó	   æ  J   ·J   ‰æ  Ks ô   ó   æ  J   ó   Õ   ﬂæ   ¢• `.`N`ê P.™ ,ˇˇˇ˚P†@`$QÄÄÄt   å-Pt   A                       ﬁÕ   ﬂæ   æ   J   ù"   ó   ﬂ¡    æ   J   J   s ó   M   ¢•&`û "ˇˇˇ˛P-QÄÄÄÑ   R)
+Ñ   K                       ﬁÕ   ﬂæ   J   KJ   õ/   ó   æ   ·J   ‰w  ﬂæ   M   ﬂæ   M   ﬂó   •&`ö 	`P$	`+	`ê@PÄÄÄ<   `{?%<                          ﬁÕ   ﬂæ   M   ﬂ•&`+PÄÄÄ<   ˝Ò
+<                          ﬁÕ   ﬂæ   M   ﬂ•&`+PÄÄÄH   pxûH                          ﬁÕ   ﬂæ   æ   J   M   ﬂ•&`ê PÄÄÄÑ   |EWÑ   R                        ﬁÕ   ﬂæ   ·æ   ·J   ‰s  ·J   ‰   s ö   ó      ô   ó      ó   K‰w  ﬂ•&`ê 
+PP® !P$PT   7˝’iT   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PCQ  s–Q≠  ∏                        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡   ú   ó   ﬂ¡   ó   Õ  ﬂæ  õ7   ó   æ   ·J   ‰   ¡  Äæ  æ  „  Å Õ  w ﬂó	   ¡   ö   ó   æ  ·¡   K‰w  ﬂó   •&`ˇˇˇˇP(`ê P(`° ``ê ˇˇˇÓPˇˇˇËP)`ë `P)PÄÄÄ|  ûÇ˘√|    	              &       Ω  Œ   ﬂm   Œ   ﬂ¡   ¡   ·J   ‰9   ¡   J   J   J   J   9   ¡   <	   m
+   <   m   <   m   <   m   <   s M   ﬂ¡   J   m   M   ﬂ¡   J   J   ¡   M   ﬂ¡   J   J   ¡   ·J   ‰9   ¡   J   J   J   9      <      <      <   s M   ﬂ•9@`K`ë ô $EJJJ#J.JPI;`ï@E`ö@G`õ !î %**JGP9MPT   èÖHôT   !                       ﬁÕ   ﬂæ   ·J   ‰   º  º w ﬂ•&`ê 	ˇˇˇÁP$PÄl  ‘vl  ˙         	               ﬁÕ  ﬂæ  ·J   ‰s  Õ   ﬂæ  ·J   ‰s  Õ  ﬂæ  ·J   ‰s  Õ  ﬂæ   ·J   ‰   s ·æ  ·J   ‰æ  s ö   ó      ô   ó      ó   K‰æ  w ﬂæ   ·J   ‰	   s ·æ  ·J   ‰æ  s ö   ó      ô   ó      ó   K‰æ  w ﬂæ   ·J
+   ‰   w ﬂ•&`P(`P(`PH`ê P#ˇˇˇ˘P® !ˇˇˇˇP$`ê P)ˇˇˇ˘P® #ˇˇˇˇPD`ê P$PÄÄÄd   íR˜^d   4                        ﬁÕ   ﬂæ   ·J   ‰s  ù   ó   ﬂæ   ·J   ‰s  ó   ¢•&`Pô P(QÄÄ‹   ÅÕoÑ‹   ñ                        ﬁÕ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  ·J   ‰   s ùQ   ó   ﬂæ  J      ö(   ó	   æ  J   ·J   ‰æ  Ks ô   ó   æ  J   ó   Õ   ﬂæ   ¢• `.`N`ê P.™ 0ˇˇˇ˚P†@`$QÄÄÄÑ   ¡N€ Ñ   J                       ﬁÕ   ﬂæ   J   õ+   ó   æ   ¡    æ   J   J   s M   ﬂó   æ   J   ¢•&`ì 	`
+ˇˇˇ˛PN`)QÄÄÄT   7˝’iT   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PCQ  s–Q≠  ∏                        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡   ú   ó   ﬂ¡   ó   Õ  ﬂæ  õ7   ó   æ   ·J   ‰   ¡  Äæ  æ  „  Å Õ  w ﬂó	   ¡   ö   ó   æ  ·¡   K‰w  ﬂó   •&`ˇˇˇˇP(`ê P(`° ``ê ˇˇˇÓPˇˇˇËP)`ë `P)PÄÄÄº   ˆÇZº   s   	                     Ω  Œ   ﬂ   Œ   ﬂm   Œ   ﬂ¡   J   m   M   ﬂ¡   J   m   M   ﬂ¡   J   J   ¡   M	   ﬂ¡    m
+   w ﬂ•9@`+`K`ï@2`ï@;`ö@A`ˇˇˇˇP4EPÄl   -syl   1                       ﬁÕ   ﬂ¡    º  s ·J   ‰   ¡   æ   J   w ﬂ•&	`ˇˇˇˇP		ˇˇˇÎP$PÄÄ¨  Tº¨  ˇ        	       *       ﬁÕ  ﬂm   Õ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂæ  õS   ó   æ   ·J   ‰   s Õ  ﬂæ  ú#   ó   ﬂæ  ·J   ‰l      s ó
+   Õ  ﬂó
+   ¡   æ  s Œ   ﬂº  ú   ó   ﬂº  ·J   ‰w  ó   ﬂ¡   J	   ùN   ó   ﬂæ   ·J
+   ‰   s ö   ó   æ   ô   ó   æ   ·J   ‰s  ó   Œ   ó   ﬂ¡   ·J   ‰¡  ·J   ‰   s Ã  w ﬂº  ·J   ‰s  ö   ó    ¢ó   ¡   ·J   ‰   w ﬂ¡  J   J   ú   ó!   ﬂ¡   ·J
+   ‰   s ó#   ö6   ó$   ¡   ·J   ‰¡  J   J   J   æ  w ô   ó)   æ   w  ó*   ﬂ•ê `ˇˇˇˇP(`ê PH	`.`ê P(`ö (
+ˇˇˇ¯Pí@
+`ˇˇˇ˛PI`ò PI`• #P¶ "Pì@`ë PˇˇˇÚPD	`
+P`AF`ë PD`´  Pí † ˇˇˇ„P-U)PÄP   ÎÂÖP                              ¡   ·J   ‰   s ·J   ‰w  ﬂ• `,
+U*
+P$PÄÄÄT   `1T   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PCQ¸   bGCé¸   ú         
+               ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂæ  õ3   ó   æ   ·J   ‰   ¡  Äæ  „  Å Õ  w ﬂó   ¡   ö#   ó	   æ  ¡   K·J   ‰æ   w ﬂó   •&`ˇˇˇˇP(`ê P(``ê ˇˇˇˆPˇˇˇÍP)`ë `ë ˇˇˇ˚P)PÄÄÄh   #ãkçh   3                          ¡       s ·J   ‰   ¡   ¡   J   J   w ﬂ• `P$	ˇˇˇ‹P$PÄÙ   eKë≠Ù   °   	                     Ω  Œ   ﬂm   Œ   ﬂ¡   J   m   M   ﬂ¡   J   m   M   ﬂ¡   J   m   M	   ﬂ¡   J   J	   9
+      <   M   ﬂ¡   J   J	   ¡   M   ﬂ¡    m   w ﬂ•9@`K`ï@ `ï@.`ï@9`î ê@=`ö@C`ˇˇˇˇP4KPÄî   ;=∑‰î   R                	      ﬁÕ   ﬂæ   ¡    º  s M   ﬂæ   ¡   ·J   ‰9   ¡   J   J   J   º s M   ﬂ•&`
+ˇˇˇ˛P)`ê î ˇˇˇﬂP)PÄÄx  F◊©x          	              Ω  Œ   ﬂﬁÕ  ﬂ   Œ   ﬂæ  J   Œ   ﬂ¡   ·J   ‰s  Õ   ﬂ¡   ·J   ‰   s ö   ó      ô   ó      ó   Õ  ﬂ¡      &Œ   ﬂæ   J	   ù.   ó	   ﬂ¡   ·J   ‰	   ¡   ·æ  K‰s  w ó   ﬂ¡   ·æ  K‰æ   ¡   Kù   ó   ﬂæ  J
+   ¡   Kó   w ﬂª    m   w ﬂ•/`+`/`P(`ë P´@`ë `• (PˇˇˇÊPI	`	© ˇˇˇˇPD`5APDPÄ¿   :Ò'¿   q                  
+        ¡      ö7   ó   ¡   ·J   ‰¡   s ·J   ‰¡   ¡   w ô-   ó   ¡   ·J   ‰¡   s ·J   ‰¡   w ó
+   ﬂ• `ï ë ˇˇˇ˜P
+ˇˇˇ¯P-ë ˇˇˇÙP
+ˇˇˇıP)PÄÄÄ¥   ÉÚÈá¥   t                        ﬁÕ  ﬂæ  J   ·J   ‰   s Õ   ﬂæ   ú-   ó   ﬂæ   ·J   ‰   s ·J   ‰   w ó   ﬂæ  J   ·J   ‰   w ﬂ•&`ï PH`ö U*UI`ï P$PÄÄT   Tà
+T   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PC	QT  ™Ñ◊T  Ë                        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡   ú   ó   ﬂ¡   ó   Õ  ﬂæ  õ7   ó   æ   ·J   ‰   ¡  Äæ  æ  „  Å Õ  w ﬂó	   ¡      ö   ó   æ  ·J   ‰w  ﬂô-   ó   ¡   ö   ó   æ  ·J   ‰¡   w ﬂó   •&`ˇˇˇˇP(`ê P(`° ``ê ˇˇˇÔPˇˇˇÈP)`ï `P.``ˇˇˇ˜P)PÄ`   Ì2Ü`   )                          ¡       s ·J   ‰      m   w ﬂ• `Pî >ˇˇˇÀPDPÄÄÄ¨   öÅ±¨   e                 	       ¡    º  J   s Õ   ﬂæ   ·J   ‰   s õ"   ó   æ   ·J   ‰   s Õ   ﬂó   æ   ·J   ‰   w ﬂ• `ˇˇˇˇP(`ê P`ê P-`ê P$PÄÄÄ0  |H[y0  …   	                     Ω  Œ   ﬂm   Œ   ﬂ¡   9   ¡   <   m   <   m   <   m   <	   m
+   <   m   <   m   <   M   ﬂ¡   J   m   M   ﬂ¡   J   J   9   <   M   ﬂ¡   J   J   ¡   M   ﬂ¡    m   w ﬂ•9@`K`JJJJ4J=JJJ_ê@l`ï@v`î Lz`ö@Ä  Ä`ˇˇˇˇP4Ä  ãP  4ïóø  Ω                      ﬁÕ   ﬂæ   ¡    º  s M   ﬂæ   ¡   ·J   ‰9   ¡   J   J   J   º s M   ﬂæ   J   J   ö+   ó   æ   ¡    æ   J   J   s M	   ﬂó   æ   J   J
+   ú   ó   ﬂæ   ·J
+   ‰w  ó   ﬂ•&`
+ˇˇˇ˛P)`ê î ˇˇˇ›PI	`ò `
+ˇˇˇ˛PN`§ P)PÄÄÄ|   Ey+O|   L                        ﬁÕ  ﬂæ  J   ·J   ‰   s Õ   ﬂæ   ö   ó      ô   ó      ó   ¢•&`ï P(`ß QÄT  œCr∏T  ∫               (        ﬁÕ  ﬂæ  J   ö   ó    ¢ó   æ  ·J   ‰s  Õ   ﬂ¡   ·J   ‰h      i    æ   i   ·J   ‰   s s Õ  ﬂæ  J   ú#   ó   ﬂæ  J   ·J   ‰	   s ó   Õ  ﬂæ  ú   ó   ﬂæ  J
+   ó   öç   ó   æ  ·J   ‰   s Õ  ﬂæ  ú   ó   ﬂæ  J   ó   ö   ó    ¢ó   æ  ·J   ‰   w ﬂæ  ù   ó   ﬂæ  ·J   ‰   w ó   ﬂó   æ  J   ·æ   K‰w ﬂæ  ·J   ‰   ¡   ·J   ‰   s    w ﬂæ  J   ·æ   K‰æ  J   Kæ  Kw ﬂ•@`ì `AF`P(`ï Pˇˇˇ‡P(`© 'PM`ß 	`ê P(`ß "`AF	`ê P$	`† PN`ë P$`ê ë PˇˇˇÁP$`ê ê ˇˇˇˇP$PÄÙ   ªß‹$Ù   ò                        ﬁÕ  ﬂæ  J   ö   ó    ¢ó   æ  ·J   ‰s  Õ   ﬂæ  ·J   ‰æ  J   ·æ   K‰s  w ﬂæ  ·J   ‰   ¡   ·J   ‰   s 	   w ﬂæ  J   ·æ   K‰w ﬂ• `ì `AF`P(`ê Pˇˇˇ‚P$`ê ë Pˇˇˇ‰P$`ë P$PË   ”bÕ4Ë   û                       ﬁÕ  ﬂæ  ·J   ‰s  Õ   ﬂæ  J   ·J   ‰   s ·æ   K‰º  ù   ó   ﬂ   ó   s KJ   ﬂæ  J   ·º  ö   ó      ô   ó      ó   K‰   w ﬂæ  ¢•&`PH`ê 
+U$û ˇˇˇˇPH`π 9PD
+`$QÄÄx  ‘U¯x                       Ω Œ   ﬂΩ Œ   ﬂﬁÕ  ﬂæ  Œ   ﬂm   Õ   ﬂæ  J   ·J   ‰¡   w ﬂ¡   ·J   ‰s  ö   ó    ¢ó   æ  M   ﬂæ  J   ·º  K‰   w ﬂ¡  J   J   ú#   ó   ﬂæ  J   ·J	   ‰
+   s ó   ö:   ó   æ  J   ·J   ‰¡  J   J   J   æ   w ô   ó   æ    w  ó   ﬂ•ò `*`J`ê ˇˇˇ¯PD
+`P`AF`K`î PD`Ø &Pí § ˇˇˇ‚P-	U)PÄÄÄî   ÔËFÖî   V                  	        ¡   J      ö   ó   ¡   ·J   ‰w  ﬂó   ¡   M   ﬂ¡   J   ·J   ‰¡   w ﬂ• `ö `P)`,`ë ˇˇˇ¯P$PÄ–   ÷ ê–   í                        ﬁÕ   ﬂæ   ·æ   J   ·J   ‰   s ö   ó      ô   ó      ó   K‰w  ﬂæ   J   ·J   ‰   s ö(   ó
+   æ   J   ·J   ‰      w ﬂó   •&`ö P® !PD
+`ï P-`ö P)PT   7˝’iT   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PCQ   EWñ  ∏                        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡   ú   ó   ﬂ¡   ó   Õ  ﬂæ  õ7   ó   æ   ·J   ‰   ¡  Äæ  æ  „  Å Õ  w ﬂó	   ¡   ö   ó   æ  ·¡   K‰w  ﬂó   •&`ˇˇˇˇP(`ê P(`° ``ê ˇˇˇÌPˇˇˇÁP)`ë `P)PÄÄÄ`   n7≤`   )                          ¡       s ·J   ‰      m   w ﬂ• `Pî Aˇˇˇ»PD	PÄÄÄh  πv;h  ¸         	              ﬁÕ  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰   s ù]   ó   ﬂº  ·J   ‰s  ùE   ó   ﬂæ   ·J   ‰   s Õ  ú#   ó
+   ﬂæ  ·J   ‰l      s ó   Õ  ﬂ¡    æ  s ·J   ‰	   s ö   ó   
+   ô   ó   æ   ·J   ‰s  ó   Õ  ﬂ¡    æ  s ·J	   ‰æ  w ﬂ•&`ˇˇˇˇP(`ê P.Z.êPù 
+ˇˇˇ¯P-`ˇˇˇˇP	Pß $P-`ˇˇˇˇP
+ˇˇˇ˜P$PÄ4  ¬Ñ‹€4  À   	                     Ω  Œ   ﬂm   Œ   ﬂ¡   9   m   <   m   <   m   <   m	   <
+   m   <   m   <   M   ﬂ¡   J   m   M   ﬂ¡   J   J   9   à<      <   M   ﬂ¡   J   J   ¡   M   ﬂ¡    m   w ﬂ•9@`K`JJJ0J7J<JAê@s`ï@`î (ê `ö@Ä  ä`ˇˇˇˇP4Ä  îPÄT  z†îÌT  È                      ﬁÕ   ﬂæ   ¡    º  s M   ﬂæ   º M   ﬂæ   J   J   ú'   ó   ﬂæ   ·J   ‰æ   J   J   w ó
+   ﬂæ   J   J      új   ó   ﬂæ   J   ·J   ‰   ¡   ·J   ‰æ   J   æ   s s ·J   ‰	   ¡   ·J   ‰æ   J
+   æ   s w ó   ﬂ•&`
+ˇˇˇ˛P)`-`§ !ˇˇˇ˙P)`Ø ë 	ˇˇˇÓPˇˇˇÌP*ë 	ˇˇˇÓPˇˇˇÌP)PÄÄÄ‰   Ô©DÄ‰   ô                      ﬁÕ   ﬂº  õ   ó   æ   M   ﬂó   æ   J   J   ú\   ó   ﬂæ   J   úG   ó   ﬂæ   ª    ¡   ·J   ‰æ   J   æ   s æ   J   J   s M   ó   ﬂæ   ¢•&``ê `ô ï )ñ 	ˇˇˇÔPˇˇˇ⁄P.`$QÄÏ  ñ0ÇÏ  [               !       Ω  Œ   ﬂﬁÕ  ﬂæ  J   ·J   ‰   s Õ   ﬂæ   ·J   ‰s  ·J   ‰s  Õ  ﬂæ  ·J   ‰æ   s Õ  ﬂæ  Œ   ﬂ¡   æ  J   'ù   ó   ﬂ¡   ó   ö   ó    ¢ó   æ  J   ö(   ó   æ  J   ·J	   ‰
+   m   s ¢ó   æ  ¡   ö#   ó   æ  ·J   ‰s  ·J   ‰s  ¢ó   æ  ·J   ‰¡   æ  ö   ó      ô   ó      ó   ¡   æ  ¡   Ks s ¢•/`ï P(`P
+	P(`ˇˇˇ˙P(`J`≠ !`AF`ì 	`ï !ˇˇˇÙPCF`ê 	`P
+PCF`® 
+ˇˇˇ˛Pˇˇˇ◊P#QÄÄH   ¿IiQH                             ¡   ·J   ‰¡   w ﬂ• `ˇˇˇ˝P$	PÄÄÄÑ   {Õ©.Ñ   G                      ﬁÕ   ﬂº  õ   ó   æ   M   ﬂó   ª    æ   J   w ﬂæ   M   ﬂæ   ¢•&``ê `	ˇˇˇˇP$`+`$QÄl   úÜûl   5                        ﬁÕ   ﬂæ   J   ö   ó    ¢ó   æ   ·J   ‰   s ¢•&`ì `AF`ê P#QÄl   úÜûl   5                        ﬁÕ   ﬂæ   J   ö   ó    ¢ó   æ   ·J   ‰   s ¢•&`ì `AF`ê P#QÄ@  °˛å@  ?               H      Ω  Œ   ﬂﬁÕ  ﬂæ  J   ·J   ‰   s Œ   ﬂº ù   ó   ﬂ¡   ·¡   K‰s  ó   Œ   ﬂæ  J   Õ   ﬂ¡      ö   ó	      ô   ó	      ó	   Œ   ﬂ¡      ö   ó      ô   ó   	   ó   Õ  ﬂæ  Œ   ﬂ¡  ·J
+   ‰   s Õ  ﬂæ  M   ﬂæ   ú   ó   ﬂæ  ·J   ‰w  ó   ﬂ¡   J   ö   ó   ¡   ô,   ó   æ  J   ·J   ‰   s ·æ  K‰s  ó   Œ   ﬂ¡   ·J   ‰   s ö   ó    ¢ó   ¡  J   J   ú#   ó   ﬂæ  J   ·J   ‰   s ó!   öø   ó"   æ  J   ·J   ‰æ  w ﬂæ  ·J   ‰s  ö   ó(    ¢ó(   ¡   ·J   ‰¡   w ﬂ¡   KJ   ﬂ¡   ·J   ‰¡   w ﬂ¡   ·J   ‰¡   w ﬂæ  J   ·J   ‰¡  J   J   J   m   w ﬂôè   ó7   æ  J   ·J   ‰æ  w ﬂæ  ·J   ‰s  ö   ó=    ¢ó=   ¡   ·J   ‰   w ﬂ¡   ·J   ‰   w ﬂæ  M   ﬂæ  J   ·J   ‰   w ﬂóE   æ   ú   óF   ﬂæ  ·J   ‰w  óH   ﬂæ  ¢•/`ï P)`õ P.`.`¥ `≥ `*`ë PH	`K`ö PI`∏ -P
+PN`ë P`A*F`Ø &Pí 	`ê ˇˇˇ¯P$`P`A*F	`ˇˇˇ˜P$	`-	`ˇˇˇ˜P$	`ˇˇˇ˜P$	`ê î ˇˇˇ‚P> 	`ê ˇˇˇ¯P$`P`A*F!	`ë P$	`ë P$	`+	`ï PI'`ö PI)`$QÄ¯   !P≥Ô¯   ú                          ¡   ·J   ‰h   ¡   i    ¡   i   ·J   ‰   s s ·J   ‰   w ﬂ¡   ·J   ‰h      i    ¡   i   ·J   ‰   s w ﬂ¡   M   ﬂª    m   w ﬂ• `
+ñ Pˇˇˇ‚P)P$`ñ PˇˇˇﬁP$`,`ˇˇˇˇP$	PÄÄÄH   ∆€ßH                             ¡   J   ·J   ‰   w ﬂ• `ñ PPÄÄT   72^cT   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PC
+Q‹  ^5±‹  Y                       ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡  ·J   ‰9   ¡  J   J   J   ¡   ú   ó
+   ﬂ¡   ó
+   s Õ  ﬂæ  õ7   ó   æ   ·J   ‰   ¡  Äæ  æ  „  Å Õ  w ﬂó   ¡   ö#   ó   æ  ·J   ‰¡   w ﬂôu   ó   ¡   ù   ó   ﬂæ  J   Œ   ó   ö   ó   æ  ·¡   K‰w  ﬂô,   ó   æ  J	   ö   ó   æ  ·J
+   ‰w  ﬂó   •&`ˇˇˇˇP(`ê P(`	î ú ˇˇˇ›P(``ê ˇˇˇÌPˇˇˇÁP)`ë `ˇˇˇ˝P.`Ø 7`P.`ì `P)P`   o†Í«`   )                          ¡       s ·J   ‰      m   w ﬂ• `Pî 7ˇˇˇ“PDPÄÄÄt  Û®‡ˇt  ˛                       ﬁÕ  ﬂ¡    æ  s Õ   ﬂ¡    æ   ·J   ‰   s ùE   ó   ﬂæ   ·J   ‰   s Õ  ú#   ó   ﬂæ  ·J   ‰l      s ó	   s Õ  ﬂæ  ·J   ‰   s ú;   ó   ﬂ¡   ·J	   ‰9
+   æ  ·J   ‰s  æ   ·J   ‰s  s ó   Õ  ﬂæ  ·J   ‰æ  w ﬂº  ·J   ‰w  ﬂ•&`ˇˇˇˇP(`ê Pû %Pù 
+ˇˇˇ¯PˇˇˇæP(`ê 	Põ PPˇˇˇﬂP-`ˇˇˇ˜P$`
+P$P  XÙ  V  	              7       Ω  Œ   ﬂm   Œ   ﬂ¡   9   ¡   <   m   <   m   <   m   <	   m
+   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m   <   m    <!   m"   <#   m$   <%   M&   ﬂ¡   J'   m(   M)   ﬂ¡   J'   J)   9*   h    <+   <,   -   <.   /   <0   M1   ﬂ¡   J'   J)   ¡   M2   ﬂ¡    m3   w ﬂ•9@`K`JJJ!J%J4J:JRJVJeJlJzJÄ  ÖJÄ  êJÄ  üJÄ  ∏JÄ  “JÄ  ◊JÄ  ›ê@Ä  Ë`ï@Ä  Ú`î *'*ê `ö@Ä  ˇ`ˇˇˇˇP4Ä PÄÄÄ‰  ,Ij¥‰  x               )    	  ﬁÕ   ﬂæ   ¡    º  s M   ﬂæ   ¡   ·J   ‰9   ¡   J   J   J   º s M   ﬂæ   æ   J   J   ù   ó   ﬂæ   J   ó   M   ﬂæ   æ   J   J	   ù   ó   ﬂæ   J	   ó   M	   ﬂæ   æ   J   J
+   ù   ó   ﬂæ   J
+   ó   M
+   ﬂæ   æ   J   J   ù   ó   ﬂæ   J   ó   M   ﬂæ   ¡    æ   J   J   s ·J   ‰   s M   ﬂæ   æ   J   J   M   ﬂæ   M   ﬂæ   ·J   ‰w  ﬂ•&`
+ˇˇˇ˛P)`ê î ˇˇˇ‹P)`± `± `± `± `
+ˇˇˇ˛PP)`ò `+`P$PÄ¿   ´`è¢¿   r                        ﬁÕ  ﬂæ  J   ·J   ‰   s ·J   ‰   s Õ   ﬂæ  J   ·J   ‰æ  ·J   ‰æ   s s ·J	   ‰w  ﬂæ  ·J
+   ‰s  ¢•&`ï PP(`ê ˇˇˇ¯Pˇˇˇ˜P*
+P$`P#QÄÄÄ,   ∫e<,                             º  ¢• `#Q  ®Õ˘Ó  ∞         	              ﬁÕ  ﬂ¡   ·J   ‰9   æ  J   ·J   ‰s  9   æ  J   KJ   <   s Õ   ﬂæ  J   ·J	   ‰9
+   æ   J   æ   J   &<   æ   J   <   w ﬂæ  J   ·J   ‰w  ﬂæ  M   ﬂæ  ¢•&`	ê P
+%	ï@PH`ê %		/	NPD
+`ê P$`+`$QÄ\   >®!\   +                       ﬁÕ   ﬂæ   J   ·J   ‰w  ﬂæ   M   ﬂæ   ¢•&`ê P$`+`$Q∏  ÄbTì∏  7        	             ﬁÕ  ﬂæ  Œ   ﬂæ  æ  J   ·J   ‰s  M   ﬂæ  J   õ?   ó   æ  J   ö   ó   æ  ·J   ‰s  ô   ó
+   æ  ó
+   ¢ó
+   ¡  ·J   ‰æ  J   m   s Õ   ﬂæ  ·J	   ‰æ   s Õ   ﬂæ   J
+   õ?   ó   æ  J   ö   ó   æ  ·J   ‰s  ô   ó   æ  ó   ¢ó   æ  ·J   ‰æ   ·J   ‰æ  J   J   s s ·J   ‰s  ¢•&`J`î PI`ì 	`û Pñ@F`	ˇˇˇÓPH`ˇˇˇ˘PH`ì 	`û Pñ@F`ˇˇˇ˜PˇˇˇÛP
++P#QÄD   ”«ûTD                            ¡   ·J   ‰º  s ¢• 	`ˇˇˇ¯P#QÄl   æ3áWl   3                       ﬁÕ   ﬂº  ·J   ‰s  ·J   ‰æ   J   ·J   ‰s  s ¢•&` 
+P
+ê PˇˇˇÌP$QÄ®  ú©˛7ò          	             ﬁÕ  ﬂh    Õ   ﬂh    Õ  ﬂh    Õ  ﬂò   º  ·J   ‰s  Õ  ö∏   ó   æ  ·J   ‰s  ·J   ‰æ  J   ·J   ‰s  s õ"   ó   æ   ·J   ‰æ  w ﬂô\   ó   æ  ·J   ‰æ  J   s ö"   ó   æ  ·J   ‰æ  w ﬂô   ó   æ  ·J   ‰æ  w ﬂó   ô6ˇˇˇó   æ   ·J   ‰æ  æ  s ¢•&`*`*`Jf
+Pë `P
+ê PˇˇˇÌP#`ˇˇˇ˚P.`	ˇˇˇ¯P`ˇˇˇ˚P.`ˇˇˇ˚Pì@`ˇˇˇÍP#QÄÄ®         $   œ   ®   ∏ƒ+ı®   ^         	       
+       ﬁÕ  ﬂæ  J   ·J   ‰l      s Õ   ﬂº  ·J   ‰ª   Ä   æ   &   &   „  Å m	   s ¢•&`ê 
+ˇˇˇ¯P(`
+î ˇˇˇÔP%ˇˇˇ”PCQÄ<   71Ï&<                               º &   &¢• 	`*QÄÄ¿   ´»<¿   i                       ﬁÕ   ﬂæ   Œ   ﬂ¡   º  s ·J   ‰m   s Ã  ﬂº  ·J   ‰s  ·J   ‰   w ﬂæ   J   ·J   ‰º  w ﬂæ   ¢•&`J`
+ˇˇˇ˛P
+ˇˇˇ¸PG	`
+PP$`ê ˇˇˇ˚P$`$QÄÄÄ¥   òyK%¥   d                         ¡   ¡   J   J   s ·J   ‰   º s Ã  ﬂº  ·J   ‰   s ·J   ‰¡   ·J   ‰º s w ﬂº  K¢• 	`ˇˇˇ˛P(ˇˇˇÌP'	`P
+ˇˇˇÙPˇˇˇˆP$	`%QÏ   —”Ï   ö                       ﬁÕ  ﬂæ  J   ·J   ‰   s ·J   ‰   s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   õ2   ó	   ¡    æ  J   ·J   ‰   s Ks Õ  ﬂó   æ  ·J	   ‰   w ﬂ•&`ï PP(`PH`ì 	`	ï PˇˇˇÛPM`ê P$PÄÄ‰   øîÌ‰   ô                       ﬁÕ  ﬂæ  J   ·J   ‰   s ·J   ‰   s Õ   ﬂæ   ·J   ‰s  Õ  ﬂæ  J   õ1   ó	   æ  J   ·J   ‰   s ·J	   ‰s  Õ  ﬂó   æ  ·J
+   ‰   w ﬂ•&`ï PP(`PH`ì 	`ï P
+PM`ê P$P  îL˚»  i        	       '        ﬁÕ   ﬂæ   J   ·J   ‰   ¡   ·J   ‰æ   J   æ   s s ·J   ‰   ¡   ·J   ‰æ   J   æ   s s ·J   ‰   ¡   ·J   ‰æ   J   æ   s w ﬂ¡   J   J   ù   ó   ﬂ¡   J   J	   ó   ö?   ó   æ   J   ·J   ‰
+   ¡   ·J   ‰æ   J   æ   s w ﬂó   æ   J   ·J   ‰   ¡   ·J   ‰æ   J   æ   s s ·J   ‰      ¡   ·J   ‰æ   J   æ   s w ﬂ•&`ê ë 	ˇˇˇÔPˇˇˇÔP*ë 	ˇˇˇÎPˇˇˇÔP*ë 	ˇˇˇÓPˇˇˇÔPD`∏ 	`ï 	ˇˇˇÎPˇˇˇPI
+`ê ë 	ˇˇˇÓPˇˇˇÚP*!ñ 	ˇˇˇÈPˇˇˇÁP$Pp  2˜Çip  ˇ                       ﬁÕ   ﬂº  J   ·(üG   ó   ·&ü9   ó   ·	ü5   ó   ·ü'   ó   ·üL   ó   †u   ó   ô   ó   æ   J   õ   ó    ¢ó   æ   ·J   ‰w  ﬂôL   ó
+   æ   J   õ   ó    ¢ó   æ   ·J   ‰w  ﬂô   ó   æ   ·J   ‰w  ﬂó   º  ·J   ‰w  ﬂº  ·J   ‰w  ﬂ•&`ÿ `: `ì `AF	`P$`: `ì `AF`P$`: `PI`
+P$`
+P$PÄÄ®  =¿§®  1                      ﬁÕ   ﬂæ   J   õ   ó    ¢ó   º  J   ·	üG   ó   ·ü9   ó   ·ü+   ó   ·&ü5   ó   ·(üp   ó   †Ø   ó   º  ·J   ‰w  ﬂôó   ó
+   º  J      ö   ó   ôu   ó   º  ·J   ‰w  ﬂæ   ·J   ‰w  ﬂôN   ó   º  J      ö   ó   ô,   ó   º  ·J   ‰w  ﬂæ   ·J   ‰w  ﬂô   ó   º  ·J   ‰w  ﬂ•&`ì `AF`ÿ `
+P$`:
+ `ò `*`
+P$`P$`: `ò `*`
+P$`P$`J`
+P$PÄX   ù^X   #                       ﬁÕ   ﬂæ   Œ   ﬂª    m   ñ w ﬂ•&`*`ˇˇˇˇP$PÄÄÄ<   Y»§‚<                             ¡   ·J   ‰w  ﬂ• `PPÄh   f-h   2                       ﬁÕ   ﬂº  ·J   ‰w  ﬂº  ·J   ‰w  ﬂæ   ·J   ‰w  ﬂ•&`
+P$`
+P$`P$På   ≤∂ÙVå   P                	       ﬁÕ   ﬂæ   J   ·J   ‰   s ·J   ‰   w ﬂ¡    º  J   s ·J   ‰   w ﬂ•&`ï PP$`ˇˇˇˇPP$PT   7˝’iT   $                       Ω  Œ   ﬂﬁÕ   ﬂæ   ·J   ‰m   s ¢•/`ˇˇˇ˚PCQ  e≥Q  ∏                        ﬁÕ  ﬂ¡   æ  s Õ   ﬂæ   ·J   ‰   s Õ  ﬂ¡   ú   ó   ﬂ¡   ó   Õ  ﬂæ  õ7   ó   æ   ·J   ‰   ¡  Äæ  æ  „  Å Õ  w ﬂó	   ¡   ö   ó   æ  ·¡   K‰w  ﬂó   •&`ˇˇˇˇP(`ê P(`° ``ê ˇˇˇÏPˇˇˇÊP)`ë `P)PÄÄÄ`   2ˆ°`   )                          ¡       s ·J   ‰      m   w ﬂ• `Pî Fˇˇˇ√PDPÄÄÄº   Ë¥Uº   h                
+       ﬁÕ  ﬂ¡    æ  s Õ   ﬂæ   ·J   ‰   s ö   ó    ¢ó   º  ·J   ‰w  ﬂæ   ·J   ‰æ   ·J   ‰s  w ﬂ•&`ˇˇˇˇP(`ê P`AF`
+P$`PˇˇˇP$PÄÄÄ3ıÿ  `         @    
+  	            
+    `  p  @î     `     p    `  p  `  0       î   6     `1  6     `/    p  ®       î     p	  `      2  6   
+  `  $  %  ê       #       7  8  '       6    9  ƒ    (  !  ó ®  î   +  6     `6  ;    `>      `    <     =    p0    `        ƒ        `        `    )    `       $  %  &  I  '         (  !  ó ®  î   
+  p  )    `               !  "  6   	  p  `*                 +  "  6   ó      $  %    `B  ?  C    @◊ n       `å     p  `I  J  G  ⁄     Pê   B  ?    C    @*    `    E  F    p  `  p  p  p  p  p  p  @R     p    p    p  √  ◊   p?    @#  <  n   D    p  `&  +  Q    `&  +  Q    ` O    P    p  `ú U  I  J  G  ⁄    Pê   I  &  $  Q  X    `B  Y  6     `å     p   `\    `P   O     Z  [     p√      `  pL    p  @R     p  √  ◊   pY  D    p"  `ƒ  ^  ú      C    @◊ _  n      a  `    I  G  ⁄    Pê   b  S  c  d  $  `B    I  G    P  I  l  m  %  `&  `g  o  h  #  `g  h  c  ∞   S  i  $  pn  %  på   &  p'  ``  p    •  q  c  s  g  h  t  u  v  I  (  `t  S  &  x  +  w  y  z  {  |  R !  }  ~      v  *  `B  _  )  `å   *  p,  `_  B  +  `Ä  å   ,  p!  `"  p  @R   #  pd  '  p^  (  pv  √  ◊ )  p_  D  	  @•  n   +  p.  `ç   0  `    @)  0  á  /  `ç   ~  Ñ  I  J  G  ⁄    Pê   &  R $  w  ∞   Ü  u        @á      v  0  p2  `+  w  ∞   ã  !  (  ó %  &  }  ~    1  `2  p∞   ä       $  %  ®  î   +  ó 4  `B  å  3  `å   4  p6  `*  å    5  `    ç  é  6  p-  `.  p
+  @R   /  p  1  pv  √  ◊ 3  på  D  5  p8  `ê  ë  9  `0    î    ï    ñ  ó  ò  ô  ö  õ   S  ƒ  ú  ù  C    @  @ê   û  ü  :  `C    @◊ 0  n     B  †  x    @    <  `¢  ó   ;  `°  0  û  B    †    1  .  ó ¢  /  <  p>  `¢  £    =  `°  0  û  B  .  1    †    £  ¢  /  >  p?  `™  ï  ´  ¨    ≠  !  %  ©  v  6       P  ;  Æ    @m  Ø  ±  ∞  '       ≤  (  ≥  ﬁ     ¥  ∂    @s  µ    @  @  @ó @  `π  <  I  >    P°   A  `´  º  ∞   Ω  ∑  P  ∏  +  æ  D  `0       î   ;  E  `1  ;  C  `/  D  p®       î   E  pB  `C  p´  +  ó      §  $  %  ;  F  `  I  ª  ¿  w  ê   ¡  G  `º  H  `C    @  @m  Ø    •    @(  µ  ≥  s  I  `    I  ¿  ª  v  6   J  `§    ¬  K  `  ƒ      L  `ï  M  `ï  N  `ï  O  `´  $  ó     Q  `B  ë  P  `å   Q  p7  `8  p  @R   9  pê  :  pî  ;  pú  =  pù  ?  p  @  p∑  A  p¨  B  p  F  pü  G  p™  H  p≤  I  pº  J  p´  K  p√  L  p≈  M  p∆  N  p«  O  p  √  ◊ P  pë  D    @≠  m  ©  S  »  ¬  ó    ê   ª  †  n   S  `ê     T  `´  º  À  ∞   Ã  ∑  P  ∏  Õ  +  Œ  U  `º  À  V  `    I  œ    v  6   W  `§    ¬  Y  `B     X  `å   Y  pR  `S  pC    @◊ ë  D  √    @R   T  p¨  U  p™  V  pÀ  W  p´  X  p     @n     @∂  ©  ê     –  ¬  [  ` 9  C   ]  `  ÷  ;  \  `]  pI  J  G  ⁄    Pê   *  I  $  ‘  &      C     +  ó      %   î   _  `B  ‘  6   ^  `å   _  p`  `    ◊  √  C   Z  `“  [  p√  \  pC   ◊ ^  p‘  D  `  pb  `  C    @◊ Ÿ  n     d  `ﬂ  !  I  +  ¡  c  `€    B  ú   ‹  P  ›  ﬁ    /  d  pe  `  &  ‡  ∞   x  +  w  X  g  `B  Ÿ    ⁄  f  `å   g  pi  `  $  Â  ~  Ê  Ÿ    h  `    ‚  „  i  pa  `b  p√  c  p⁄  e  p  ◊ f  pŸ     @·  ﬂ  n   D  h  pk  `  C  !  @◊ Ë  n     &  R    l  `  $  µ  s  m  `Ó  È  Ô  Î  >  -  R  ∞     I  B  Ë        !      )  n  `Ó  È  Ò      +      2  o  `È    +  Ë  Ú  (  !  q  `0    Ò  Ó      p  `q  p      Ó  ó      $  Ë  ®  î   r  `  $  ó     Æ  s  Ú  t  `B  Ë  s  `å   t  pv  `I  J  *  G  ⁄    Pê   B  Ë    u  `    ˜  ¯  v  pj  `k  p"  @R   l  pÈ  m  p  n  p  o  pÒ  p  p  r  p  √  ◊ s  pË  #  @n   D  u  px  `    ˙  ≥  ó   ò  ƒ  ö  ˚  y  `¸    ˝  ˛  ƒ  Ç  {  `X z  `  ∞   x  &  ˇ    I   ®   {  p≥  ˚  ˙  Ç   |  `¸   ˝  }  ` ˙  Ç  ~  ` ˙   Å  `     Ä  `+  >     !  w   /  Å  p  `  ∞   x  ˝  Ç  Ø  ∂   u    ˙   ≥  I  	 $  w           !  (  ®  î   Ä  p+   ˚  É  `B  
+ C  %  @◊ n   X ˙  ˝  ˚  Ç  `å   É  pÖ  `I  J  G  ⁄  	  Pê   B  ?  C  '  @
+ *  Ñ  `      Ö  pw  `x  p$  @y  p˚  z  pX |  p≥  }  pÇ  ~  p   p˙  √  ◊ Ç  p
+ &  @˝  ó  n   D  Ñ  pá  `  C  (  @◊  n          '      ˚  )   à  ` ∞   x  I     ‹      â  `ä  `C  *  @  •  +  @≥  s   Æ  ,  @m  Ø    )  ã  `   )  ç  ` å  `  ‹   )     ˚  ç  p I          é  `! "  è  `& ! "  o  L   ë  `) * ê  ` ⁄  
+  P( á  (  )  ê ë  pì  `   I   ∞   a  P   í  `i  ì  p !  w   P  î  ` ∞   x  +  w  Ç  I  R !  ï  ` ∞   x  +  w   I  R u  !  ñ  `   õ  ƒ  + , - . / 0  9  ò  R ó  `1 )      \  *  ò  `)  1 *  0  0  Ç  \  ö  `  ô  `/  ö  põ  `\  *   ú  ` ∞   x  +  w  °  !  û  `B   ù  `å   û  p†  `B   *  ü  `    4 5 †  pÜ  `á  p)  @R   à  p â  p ä  p  ã  p  å  p é  p è  p ê  p í  p î  pÇ  ï  p ñ  p ó  p, ò  p+ ô  põ  õ  p9  ú  pò  √  ◊ ù  p -  @˚   2  3  n   D  ü  p   `  p      p  p!  p-  p7  pR  pZ  pa  pj  pw  pÜ  pˇXÑ√                                                      6              7       ª                \              d              Ä              l      8       h      9       å              #   	   ,              :              ;       ,      -        2      #        M      :        S   	   ü         P      <       •      =       ù      >       µ                ®                               ‹      M        ÿ      ?       ‚              ‘      W        Ù      @             A       ˘   
+             ˜                r                    ]        9     d        *  
+   B       4     B       5     B       E     ^        S     v        h     C       e     D       n               k               œ               Ö     Ç        ç             á     8       ≥     v        ¶     Ç        ¬     F       ø     G       …               ≈               ∑  :             ›     è        ‡     ê        ¯     î        	     ú             H            ù             I       )  '           P     ∑        W  
+   ¨        r             j     ø        a     K       g     L       }     ü        Ö     ™        á     ≤        î     º        ú     ´        †     √        •     ≈        ß     ∆        ©     «        ´             ¥     M       ±     N                      Ò     …        Ù     ¨              ™             À             ´             O            P       _               2     ”        :     Q       6     ’        V     S       R     T       Y               §               j     ÿ        x     U       r     V       Ö  	   W       ì     X       é     Y       û               ñ                              ¥     Á        ø     È        ƒ             ÿ  
+           ‚     Ò        Ò             Í     ˆ        ˛  	           
+     [            \                                     ≥               6     ˘        A     ˚        J     X       H     ]       [     ≥        _     Ç        c            t     ˙        k  	   ^       g     _       ù     `       í     a       ≠               †               è  4             Ã            ﬂ            Í            Î             ˙                          ˛     b                                 
+               c       1            (  	   d       9  
+   Ç        C            N            ]     ,       e  	   +       p     õ        n     e       s     9        w     ò        Ç     f            g       â               Ö               ùH©¿      /ƒ      /ƒ                Äj  ˘  a  ˘                 ~  ı  u  ı                  H  Ì  ?  Ì     &             r  ü  i  ü  !   %           Ä u
+  '  l
+  '  R              Ì
+  ö  ‰
+  ö  Z              ‰  '  €  '  d              Ç >  æ  5  æ  h                `  µ  W  µ  u   &             W  |  N  |  Ü   B            ’  ±  Ã  ±  å             Ç   7  Û  7  ™                M  ∞  D  ∞  ¨   '             Ò  2  Ë  2  ±   :            M  ´  ;  ´  ∑              ¿  {  Ø  {  ø              ñ  ‘    ‘  ·              Ç Á  Ú  ÿ  Ú  Ê                f  ö  ]  ö  È   6          Ç I  Œ  @  Œ  ı              r  …  i  …  ˆ                Ñ  #  {  #                ‘    À      L          Ä ≤   –'  ©   –'  ,            Ç ]!  ,"  T!  ,"  5              Í!  #"  ·!  #"  7  :            x"  ¶$  o"  ¶$  @              ¬$  ı$  Ø$  ı$  ]             Ç W%  T&  N%  T&  e             Ä%  O&  w%  O&  f               ‚&  Ã'  Ÿ&  Ã'  t               d'  '  ['  '  w  8          Ä `+  Ë8  W+  Ë8  ê             ﬂ+  Í-  Õ+  Í-  ò            Ç =.  œ0  4.  œ0  ™               /  0  ˜.  0  ≥               00  M0  '0  M0  ª             h0  ∆0  _0  ∆0  º              È0  ›3  ‡0  ›3  ¬              ¯3  +6  Ô3  +6  ÿ            Ç ì6  Ã7  ä6  Ã7  ˜             æ6  «7  µ6  «7  ¯               j8  ‰8  a8  ‰8                ö8  ﬂ8  ë8  ﬂ8    ,           Ä ]<  !F  T<  !F  '             œ<  ˛<  ∆<  ˛<  /            Ç >=  ~@  5=  ~@  7               @  w@  @  w@  S  9           Ä ó@  ÈC  é@  ÈC  [              iA  iC  \A  iC  a             Ç >D  $E  5D  $E  É             iD  E  `D  E  Ñ               xE  F  oE  F  í              ⁄E  F  —E  F  ì  ^          Ä ﬁI  d  ’I  d  Ø             jJ  ≠J  aJ  ≠J  ∑             ıJ  ≈M  ÏJ  ≈M  ø             ‡M  O  ◊M  O  ‘            Ç O  ÇP  O  ÇP  ·              %P  bP  P  bP  Ë  )           Ç òP  R  èP  R  Ì              µQ  ÛQ  ≠Q  ÛQ  Ù  )            (R  X  R  X  ˘               5X  KY  -X  KY  0             fY  6Z  ]Y  6Z  9             Ç KZ  9\  BZ  9\  A             Ä √Z  ¡[  ßZ  ¡[  G  #             ÚZ  6[  ÈZ  6[  H  +             r[  ∏[  i[  ∏[  L  5            R\  (]  I\  (]  W              C]  j]  :]  j]  ^              Ü]  L^  }]  L^  b             e^  D_  \^  D_  i              X_  °_  O_  °_  t              ∫_  C`  ±_  C`  x              Z`  ~`  Q`  ~`  Ä              ñ`  ª`  ç`  ª`  Ñ              Ÿ`  a  –`  a  à              a  aa  a  aa  å             Ç √a  ˆb  ∫a  ˆb  ñ             Óa  Òb  Âa  Òb  ó             Ä ¢g  Wo  ôg  Wo  ¬             .h  sh  %h  sh                Wi  ßj  Ni  ßj  ÷              ¬j  ˛j  πj  ˛j  ·              k  ˝k  k  ˝k  Â              l  l  l  l               Ç ‡l  n  ◊l  n  ˝             	m  n   m  n  ˛             Ä ÷r  ∞x  Õr  ∞x  $             ws  ¥s  ns  ¥s  -            Ç Ÿs  ¥v  –s  ¥v  1  $            ·u  &v  Àu  &v  G             Ç w  ˇw  w  ˇw  V             4w  ˙w  +w  ˙w  W               [x  ¨x  Rx  ¨x  e             Ä 7|  JÉ  .|  JÉ  ~             ¿|  6}  ∑|  6}  Ü            Ç _}  6  V}  6  ã  (            ∑~  .  Æ~  .  ó              ]  "Ä  T  "Ä  û  &           Ç |Ä  œÅ  sÄ  œÅ  ¨             •Ä   Å  úÄ   Å  ≠               mÇ  FÉ  dÇ  FÉ  ¡               æÇ  AÉ  µÇ  AÉ  ¬  M          Ä ÷Ü  ·î  ÕÜ  ·î  ﬁ             eá  Yà  \á  Yà  Ê             ®à  â  üà  â  ı              'â  …ã  â  …ã  ˙              ﬁã  ”å  ’ã  ”å                Èå  ç  ‡å  ç              Ç é  ;ê  é  ;ê  (              eé  è  \é  è  *              Rê  ë  Iê  ë  =             Ç më  °í  dë  °í  J             ñë  úí  çë  úí  K               Bì  ›î  9ì  ›î  ^              ñì  ÿî  çì  ÿî  _  P          Ä eò  |®  \ò  |®  ~             Êò  
+ö  ›ò  
+ö  Ü             :ö  õ  1ö  õ  ë            Ç õ  ù  õ  ù  ô              Pú  uú  Gú  uú  ¢  3            3ù  Øù  *ù  Øù  Æ             ƒù  û  ªù  û  µ              "û  kû  û  kû  ∫             Ç Åû  Ò£  xû  Ò£  ø               °  …¢  ¡°  …¢  ◊  >             ó¢  ª¢  é¢  ª¢  €             Ç V§  4¶  M§  4¶  Ò             §  /¶  v§  /¶  Ú               ‰¶  x®  €¶  x®                .ß  s®  %ß  s®  	  F          Ä 	¨  ƒ  ¨  ƒ  '  
+           ö¨  ÇÆ  ë¨  ÇÆ  /             –Æ  wØ  «Æ  wØ  @               èØ  ØØ  ÜØ  ØØ  H             ƒØ  Ÿ∞  ªØ  Ÿ∞  L              Ó∞  ;±  Â∞  ;±  [             Ç R±  &≥  I±  &≥  a              3≤  e≤  *≤  e≤  l  ,           >≥  è≥  5≥  è≥  y             ¶≥  Nµ  ù≥  Nµ  }             jµ  S∂  aµ  S∂  å              ∂  L∂  ˛µ  L∂  é  I          Ç j∂  ü∑  a∂  ü∑  ì              Ø∂  A∑  ¶∂  A∑  ñ  %           ¥∑  ì∏  ´∑  ì∏  °             ®∏  àπ  ü∏  àπ  ¨             üπ  Uª  ñπ  Uª  ∑              kª   Ω  bª   Ω  ∆             9Ω  /ø  0Ω  /ø  ﬂ            Ç Dø  òø  ;ø  òø  ˘              zø  åø  qø  åø  ˚              Æø   ¿  •ø   ¿  ˛             ¿  â¿  ¿  â¿              Ç Û¿  *¬  Í¿  *¬               ¡  %¬  ¡  %¬                 1√  ƒ  (√  ƒ  &              ä√  ƒ  Å√  ƒ  '  U          5°›gB≤êh&lÌã      g¯ﬁ˚g¯ﬁ˚H≈tg¯Âp   \    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/studentMPW/js/bootstrap.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|94ff22c4-1004-ce5d-001f-25c4e6f27eb5|
+Accept-Ranges: bytes
+ETag: W/"50223-1744298494000"
+Last-Modified: Thu, 10 Apr 2025 15:21:34 GMT
+Content-Type: application/javascript
+Content-Length: 50223
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|94ff22c4-1004-ce5d-001f-25c4e6f27eb5|
+Accept-Ranges: bytes
+ETag: W/"50223-1744298494000"
+Last-Modified: Thu, 10 Apr 2025 15:21:34 GMT
+Content-Type: application/javascript
+Content-Length: 50223
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=100
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 126 net-response-time-onstop 185 alt-data 1;50223,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  £Û

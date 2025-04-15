@@ -1,0 +1,491 @@
+/*! fancyBox v2.0.6 fancyapps.com | fancyapps.com/fancybox/#license */
+(function(s,l,d,t){var m=d(s),q=d(l),a=d.fancybox=function(){a.open.apply(this,arguments)},u=!1,k=l.createTouch!==t,o=function(a){return"string"===d.type(a)},n=function(b,c){c&&o(b)&&0<b.indexOf("%")&&(b=a.getViewport()[c]/100*parseInt(b,10));return Math.round(b)+"px"};d.extend(a,{version:"2.0.5",defaults:{padding:15,margin:20,width:800,height:600,minWidth:100,minHeight:100,maxWidth:9999,maxHeight:9999,autoSize:!0,autoResize:!k,autoCenter:!k,fitToView:!0,aspectRatio:!1,topRatio:0.5,fixed:!1,scrolling:"auto",
+wrapCSS:"",arrows:!0,closeBtn:!0,closeClick:!1,nextClick:!1,mouseWheel:!0,autoPlay:!1,playSpeed:3E3,preload:3,modal:!1,loop:!0,ajax:{dataType:"html",headers:{"X-fancyBox":!0}},keys:{next:[13,32,34,39,40],prev:[8,33,37,38],close:[27]},tpl:{wrap:'<div class="fancybox-wrap"><div class="fancybox-skin"><div class="fancybox-outer"><div class="fancybox-inner"></div></div></div></div>',image:'<img class="fancybox-image" src="{href}" alt="" />',iframe:'<iframe class="fancybox-iframe" name="fancybox-frame{rnd}" frameborder="0" hspace="0"'+
+(d.browser.msie?' allowtransparency="true"':"")+"></iframe>",swf:'<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="100%" height="100%"><param name="wmode" value="transparent" /><param name="allowfullscreen" value="true" /><param name="allowscriptaccess" value="always" /><param name="movie" value="{href}" /><embed src="{href}" type="application/x-shockwave-flash" allowfullscreen="true" allowscriptaccess="always" width="100%" height="100%" wmode="transparent"></embed></object>',error:'<p class="fancybox-error">The requested content cannot be loaded.<br/>Please try again later.</p>',
+closeBtn:'<div title="Close" class="fancybox-item fancybox-close"></div>',next:'<a title="Next" class="fancybox-nav fancybox-next"><span></span></a>',prev:'<a title="Previous" class="fancybox-nav fancybox-prev"><span></span></a>'},openEffect:"fade",openSpeed:300,openEasing:"swing",openOpacity:!0,openMethod:"zoomIn",closeEffect:"fade",closeSpeed:300,closeEasing:"swing",closeOpacity:!0,closeMethod:"zoomOut",nextEffect:"elastic",nextSpeed:300,nextEasing:"swing",nextMethod:"changeIn",prevEffect:"elastic",
+prevSpeed:300,prevEasing:"swing",prevMethod:"changeOut",helpers:{overlay:{speedIn:0,speedOut:300,opacity:0.8,css:{cursor:"pointer"},closeClick:!0},title:{type:"float"}}},group:{},opts:{},coming:null,current:null,isOpen:!1,isOpened:!1,player:{timer:null,isActive:!1},ajaxLoad:null,imgPreload:null,transitions:{},helpers:{},open:function(b,c){a.close(!0);b&&!d.isArray(b)&&(b=b instanceof d?d(b).get():[b]);a.isActive=!0;a.opts=d.extend(!0,{},a.defaults,c);d.isPlainObject(c)&&c.keys!==t&&(a.opts.keys=c.keys?
+d.extend({},a.defaults.keys,c.keys):!1);a.group=b;a._start(a.opts.index||0)},cancel:function(){a.coming&&!1===a.trigger("onCancel")||(a.coming=null,a.hideLoading(),a.ajaxLoad&&a.ajaxLoad.abort(),a.ajaxLoad=null,a.imgPreload&&(a.imgPreload.onload=a.imgPreload.onabort=a.imgPreload.onerror=null))},close:function(b){a.cancel();a.current&&!1!==a.trigger("beforeClose")&&(a.unbindEvents(),!a.isOpen||b&&!0===b[0]?(d(".fancybox-wrap").stop().trigger("onReset").remove(),a._afterZoomOut()):(a.isOpen=a.isOpened=
+!1,d(".fancybox-item, .fancybox-nav").remove(),a.wrap.stop(!0).removeClass("fancybox-opened"),a.inner.css("overflow","hidden"),a.transitions[a.current.closeMethod]()))},play:function(b){var c=function(){clearTimeout(a.player.timer)},e=function(){c();a.current&&a.player.isActive&&(a.player.timer=setTimeout(a.next,a.current.playSpeed))},f=function(){c();d("body").unbind(".player");a.player.isActive=!1;a.trigger("onPlayEnd")};if(a.player.isActive||b&&!1===b[0])f();else if(a.current&&(a.current.loop||
+a.current.index<a.group.length-1))a.player.isActive=!0,d("body").bind({"afterShow.player onUpdate.player":e,"onCancel.player beforeClose.player":f,"beforeLoad.player":c}),e(),a.trigger("onPlayStart")},next:function(){a.current&&a.jumpto(a.current.index+1)},prev:function(){a.current&&a.jumpto(a.current.index-1)},jumpto:function(b){a.current&&(b=parseInt(b,10),1<a.group.length&&a.current.loop&&(b>=a.group.length?b=0:0>b&&(b=a.group.length-1)),a.group[b]!==t&&(a.cancel(),a._start(b)))},reposition:function(b,
+c){var e;a.isOpen&&(e=a._getPosition(c),b&&"scroll"===b.type?(delete e.position,a.wrap.stop(!0,!0).animate(e,200)):a.wrap.css(e))},update:function(b){a.isOpen&&(u||setTimeout(function(){var c=a.current,e=!b||b&&"orientationchange"===b.type;if(u&&(u=!1,c)){if(!b||"scroll"!==b.type||e)c.autoSize&&"iframe"!==c.type&&(a.inner.height("auto"),c.height=a.inner.height()),(c.autoResize||e)&&a._setDimension(),c.canGrow&&"iframe"!==c.type&&a.inner.height("auto");(c.autoCenter||e)&&a.reposition(b);a.trigger("onUpdate")}},
+200),u=!0)},toggle:function(){a.isOpen&&(a.current.fitToView=!a.current.fitToView,a.update())},hideLoading:function(){q.unbind("keypress.fb");d("#fancybox-loading").remove()},showLoading:function(){a.hideLoading();q.bind("keypress.fb",function(b){27===b.keyCode&&(b.preventDefault(),a.cancel())});d('<div id="fancybox-loading"><div></div></div>').click(a.cancel).appendTo("body")},getViewport:function(){return{x:m.scrollLeft(),y:m.scrollTop(),w:k&&s.innerWidth?s.innerWidth:m.width(),h:k&&s.innerHeight?
+s.innerHeight:m.height()}},unbindEvents:function(){a.wrap&&a.wrap.unbind(".fb");q.unbind(".fb");m.unbind(".fb")},bindEvents:function(){var b=a.current,c=b.keys;b&&(m.bind("resize.fb orientationchange.fb"+(b.autoCenter&&!b.fixed?" scroll.fb":""),a.update),c&&q.bind("keydown.fb",function(b){var f;f=b.target||b.srcElement;if(!b.ctrlKey&&!b.altKey&&!b.shiftKey&&!b.metaKey&&(!f||!f.type&&!d(f).is("[contenteditable]")))f=b.keyCode,-1<d.inArray(f,c.close)?(a.close(),b.preventDefault()):-1<d.inArray(f,c.next)?
+(a.next(),b.preventDefault()):-1<d.inArray(f,c.prev)&&(a.prev(),b.preventDefault())}),d.fn.mousewheel&&b.mouseWheel&&1<a.group.length&&a.wrap.bind("mousewheel.fb",function(b,c){var d=b.target||null;if(0!==c&&(!d||0===d.clientHeight||d.scrollHeight===d.clientHeight&&d.scrollWidth===d.clientWidth))b.preventDefault(),a[0<c?"prev":"next"]()}))},trigger:function(b,c){var e,f=c||a[-1<d.inArray(b,["onCancel","beforeLoad","afterLoad"])?"coming":"current"];if(f){d.isFunction(f[b])&&(e=f[b].apply(f,Array.prototype.slice.call(arguments,
+1)));if(!1===e)return!1;f.helpers&&d.each(f.helpers,function(c,e){if(e&&d.isPlainObject(a.helpers[c])&&d.isFunction(a.helpers[c][b]))a.helpers[c][b](e,f)});d.event.trigger(b+".fb")}},isImage:function(a){return o(a)&&a.match(/\.(jpe?g|gif|png|bmp)((\?|#).*)?$/i)},isSWF:function(a){return o(a)&&a.match(/\.(swf)((\?|#).*)?$/i)},_start:function(b){var c={},e=a.group[b]||null,f,g,i;if(e&&(e.nodeType||e instanceof d))f=!0,d.metadata&&(c=d(e).metadata());c=d.extend(!0,{},a.opts,{index:b,element:e},d.isPlainObject(e)?
+e:c);d.each(["href","title","content","type"],function(b,g){c[g]=a.opts[g]||f&&d(e).attr(g)||c[g]||null});"number"===typeof c.margin&&(c.margin=[c.margin,c.margin,c.margin,c.margin]);c.modal&&d.extend(!0,c,{closeBtn:!1,closeClick:!1,nextClick:!1,arrows:!1,mouseWheel:!1,keys:null,helpers:{overlay:{css:{cursor:"auto"},closeClick:!1}}});a.coming=c;if(!1===a.trigger("beforeLoad"))a.coming=null;else{g=c.type;b=c.href||e;g||(f&&(g=d(e).data("fancybox-type"),g||(g=(g=e.className.match(/fancybox\.(\w+)/))?
+g[1]:null)),!g&&o(b)&&(a.isImage(b)?g="image":a.isSWF(b)?g="swf":b.match(/^#/)&&(g="inline")),g||(g=f?"inline":"html"),c.type=g);if("inline"===g||"html"===g){if(c.content||(c.content="inline"===g?d(o(b)?b.replace(/.*(?=#[^\s]+$)/,""):b):e),!c.content||!c.content.length)g=null}else b||(g=null);"ajax"===g&&o(b)&&(i=b.split(/\s+/,2),b=i.shift(),c.selector=i.shift());c.href=b;c.group=a.group;c.isDom=f;switch(g){case "image":a._loadImage();break;case "ajax":a._loadAjax();break;case "inline":case "iframe":case "swf":case "html":a._afterLoad();
+break;default:a._error("type")}}},_error:function(b){a.hideLoading();d.extend(a.coming,{type:"html",autoSize:!0,minWidth:0,minHeight:0,padding:15,hasError:b,content:a.coming.tpl.error});a._afterLoad()},_loadImage:function(){var b=a.imgPreload=new Image;b.onload=function(){this.onload=this.onerror=null;a.coming.width=this.width;a.coming.height=this.height;a._afterLoad()};b.onerror=function(){this.onload=this.onerror=null;a._error("image")};b.src=a.coming.href;(b.complete===t||!b.complete)&&a.showLoading()},
+_loadAjax:function(){a.showLoading();a.ajaxLoad=d.ajax(d.extend({},a.coming.ajax,{url:a.coming.href,error:function(b,c){a.coming&&"abort"!==c?a._error("ajax",b):a.hideLoading()},success:function(b,c){"success"===c&&(a.coming.content=b,a._afterLoad())}}))},_preloadImages:function(){var b=a.group,c=a.current,e=b.length,f,g,i,h=Math.min(c.preload,e-1);if(c.preload&&!(2>b.length))for(i=1;i<=h;i+=1)if(f=b[(c.index+i)%e],g=f.href||d(f).attr("href")||f,"image"===f.type||a.isImage(g))(new Image).src=g},_afterLoad:function(){a.hideLoading();
+!a.coming||!1===a.trigger("afterLoad",a.current)?a.coming=!1:(a.isOpened?(d(".fancybox-item, .fancybox-nav").remove(),a.wrap.stop(!0).removeClass("fancybox-opened"),a.inner.css("overflow","hidden"),a.transitions[a.current.prevMethod]()):(d(".fancybox-wrap").stop().trigger("onReset").remove(),a.trigger("afterClose")),a.unbindEvents(),a.isOpen=!1,a.current=a.coming,a.wrap=d(a.current.tpl.wrap).addClass("fancybox-"+(k?"mobile":"desktop")+" fancybox-type-"+a.current.type+" fancybox-tmp "+a.current.wrapCSS).appendTo("body"),
+a.skin=d(".fancybox-skin",a.wrap).css("padding",n(a.current.padding)),a.outer=d(".fancybox-outer",a.wrap),a.inner=d(".fancybox-inner",a.wrap),a._setContent())},_setContent:function(){var b=a.current,c=b.content,e=b.type,f=b.minWidth,g=b.minHeight,i=b.maxWidth,h=b.maxHeight;switch(e){case "inline":case "ajax":case "html":b.selector?c=d("<div>").html(c).find(b.selector):c instanceof d&&(c.parent().hasClass("fancybox-inner")&&c.parents(".fancybox-wrap").unbind("onReset"),c=c.show().detach(),d(a.wrap).bind("onReset",
+function(){c.appendTo("body").hide()}));b.autoSize&&(f=d('<div class="fancybox-wrap '+a.current.wrapCSS+' fancybox-tmp"></div>').appendTo("body").css({minWidth:n(f,"w"),minHeight:n(g,"h"),maxWidth:n(i,"w"),maxHeight:n(h,"h")}).append(c),b.width=f.width(),b.height=f.height(),f.width(a.current.width),f.height()>b.height&&(f.width(b.width+1),b.width=f.width(),b.height=f.height()),c=f.contents().detach(),f.remove());break;case "image":c=b.tpl.image.replace("{href}",b.href);b.aspectRatio=!0;break;case "swf":c=
+b.tpl.swf.replace(/\{width\}/g,b.width).replace(/\{height\}/g,b.height).replace(/\{href\}/g,b.href);break;case "iframe":c=d(b.tpl.iframe.replace("{rnd}",(new Date).getTime())).attr("scrolling",b.scrolling).attr("src",b.href),b.scrolling=k?"scroll":"auto"}if("image"===e||"swf"===e)b.autoSize=!1,b.scrolling="visible";"iframe"===e&&b.autoSize?(a.showLoading(),a._setDimension(),a.inner.css("overflow",b.scrolling),c.bind({onCancel:function(){d(this).unbind();a._afterZoomOut()},load:function(){a.hideLoading();
+try{this.contentWindow.document.location&&(a.current.height=d(this).contents().find("body").height())}catch(b){a.current.autoSize=!1}a[a.isOpen?"_afterZoomIn":"_beforeShow"]()}}).appendTo(a.inner)):(a.inner.append(c),a._beforeShow())},_beforeShow:function(){a.coming=null;a.trigger("beforeShow");a._setDimension();a.wrap.hide().removeClass("fancybox-tmp");a.bindEvents();a._preloadImages();a.transitions[a.isOpened?a.current.nextMethod:a.current.openMethod]()},_setDimension:function(){var b=a.wrap,c=
+a.inner,e=a.current,f=a.getViewport(),g=e.margin,i=2*e.padding,h=e.width,j=e.height,r=e.maxWidth+i,k=e.maxHeight+i,l=e.minWidth+i,m=e.minHeight+i,p;f.w-=g[1]+g[3];f.h-=g[0]+g[2];o(h)&&0<h.indexOf("%")&&(h=(f.w-i)*parseFloat(h)/100);o(j)&&0<j.indexOf("%")&&(j=(f.h-i)*parseFloat(j)/100);g=h/j;h+=i;j+=i;e.fitToView&&(r=Math.min(f.w,r),k=Math.min(f.h,k));if(e.aspectRatio){if(h>r&&(h=r,j=(h-i)/g+i),j>k&&(j=k,h=(j-i)*g+i),h<l&&(h=l,j=(h-i)/g+i),j<m)j=m,h=(j-i)*g+i}else h=Math.max(l,Math.min(h,r)),j=Math.max(m,
+Math.min(j,k));h=Math.round(h);j=Math.round(j);d(b.add(c)).width("auto").height("auto");c.width(h-i).height(j-i);b.width(h);p=b.height();if(h>r||p>k)for(;(h>r||p>k)&&h>l&&p>m;)j-=10,e.aspectRatio?(h=Math.round((j-i)*g+i),h<l&&(h=l,j=(h-i)/g+i)):h-=10,c.width(h-i).height(j-i),b.width(h),p=b.height();e.dim={width:n(h),height:n(p)};e.canGrow=e.autoSize&&j>m&&j<k;e.canShrink=!1;e.canExpand=!1;if(h-i<e.width||j-i<e.height)e.canExpand=!0;else if((h>f.w||p>f.h)&&h>l&&j>m)e.canShrink=!0;a.innerSpace=p-i-
+c.height()},_getPosition:function(b){var c=a.current,e=a.getViewport(),f=c.margin,d=a.wrap.width()+f[1]+f[3],i=a.wrap.height()+f[0]+f[2],h={position:"absolute",top:f[0]+e.y,left:f[3]+e.x};c.autoCenter&&c.fixed&&!b&&i<=e.h&&d<=e.w&&(h={position:"fixed",top:f[0],left:f[3]});h.top=n(Math.max(h.top,h.top+(e.h-i)*c.topRatio));h.left=n(Math.max(h.left,h.left+0.5*(e.w-d)));return h},_afterZoomIn:function(){var b=a.current,c=b?b.scrolling:"no";if(b&&(a.isOpen=a.isOpened=!0,a.wrap.addClass("fancybox-opened"),
+a.inner.css("overflow","yes"===c?"scroll":"no"===c?"hidden":c),a.trigger("afterShow"),a.update(),(b.closeClick||b.nextClick)&&a.inner.css("cursor","pointer").bind("click.fb",function(c){if(!d(c.target).is("a")&&!d(c.target).parent().is("a"))a[b.closeClick?"close":"next"]()}),b.closeBtn&&d(b.tpl.closeBtn).appendTo(a.skin).bind("click.fb",a.close),b.arrows&&1<a.group.length&&((b.loop||0<b.index)&&d(b.tpl.prev).appendTo(a.outer).bind("click.fb",a.prev),(b.loop||b.index<a.group.length-1)&&d(b.tpl.next).appendTo(a.outer).bind("click.fb",
+a.next)),a.opts.autoPlay&&!a.player.isActive))a.opts.autoPlay=!1,a.play()},_afterZoomOut:function(){var b=a.current;a.wrap.trigger("onReset").remove();d.extend(a,{group:{},opts:{},current:null,isActive:!1,isOpened:!1,isOpen:!1,wrap:null,skin:null,outer:null,inner:null});a.trigger("afterClose",b)}});a.transitions={getOrigPosition:function(){var b=a.current,c=b.element,e=b.padding,f=d(b.orig),g={},i=50,h=50;!f.length&&b.isDom&&d(c).is(":visible")&&(f=d(c).find("img:first"),f.length||(f=d(c)));f.length?
+(g=f.offset(),f.is("img")&&(i=f.outerWidth(),h=f.outerHeight())):(b=a.getViewport(),g.top=b.y+0.5*(b.h-h),g.left=b.x+0.5*(b.w-i));return g={top:n(g.top-e),left:n(g.left-e),width:n(i+2*e),height:n(h+2*e)}},step:function(b,c){var e=c.prop,d,g;if("width"===e||"height"===e)d=Math.ceil(b-2*a.current.padding),"height"===e&&(g=(b-c.start)/(c.end-c.start),c.start>c.end&&(g=1-g),d-=a.innerSpace*g),a.inner[e](d)},zoomIn:function(){var b=a.wrap,c=a.current,e=c.openEffect,f="elastic"===e,g=d.extend({},c.dim,
+a._getPosition(f)),i=d.extend({opacity:1},g);delete i.position;f?(g=this.getOrigPosition(),c.openOpacity&&(g.opacity=0),a.outer.add(a.inner).width("auto").height("auto")):"fade"===e&&(g.opacity=0);b.css(g).show().animate(i,{duration:"none"===e?0:c.openSpeed,easing:c.openEasing,step:f?this.step:null,complete:a._afterZoomIn})},zoomOut:function(){var b=a.wrap,c=a.current,d=c.openEffect,f="elastic"===d,g={opacity:0};f&&("fixed"===b.css("position")&&b.css(a._getPosition(!0)),g=this.getOrigPosition(),c.closeOpacity&&
+(g.opacity=0));b.animate(g,{duration:"none"===d?0:c.closeSpeed,easing:c.closeEasing,step:f?this.step:null,complete:a._afterZoomOut})},changeIn:function(){var b=a.wrap,c=a.current,d=c.nextEffect,f="elastic"===d,g=a._getPosition(f),i={opacity:1};g.opacity=0;f&&(g.top=n(parseInt(g.top,10)-200),i.top="+=200px");b.css(g).show().animate(i,{duration:"none"===d?0:c.nextSpeed,easing:c.nextEasing,complete:a._afterZoomIn})},changeOut:function(){var b=a.wrap,c=a.current,e=c.prevEffect,f={opacity:0};b.removeClass("fancybox-opened");
+"elastic"===e&&(f.top="+=200px");b.animate(f,{duration:"none"===e?0:c.prevSpeed,easing:c.prevEasing,complete:function(){d(this).trigger("onReset").remove()}})}};a.helpers.overlay={overlay:null,update:function(){var a,c;this.overlay.width("100%").height("100%");d.browser.msie||k?(a=Math.max(l.documentElement.scrollWidth,l.body.scrollWidth),c=Math.max(l.documentElement.offsetWidth,l.body.offsetWidth),a=a<c?m.width():a):a=q.width();this.overlay.width(a).height(q.height())},beforeShow:function(b){this.overlay||
+(b=d.extend(!0,{},a.defaults.helpers.overlay,b),this.overlay=d('<div id="fancybox-overlay"></div>').css(b.css).appendTo("body"),b.closeClick&&this.overlay.bind("click.fb",a.close),a.current.fixed&&!k?this.overlay.addClass("overlay-fixed"):(this.update(),this.onUpdate=function(){this.update()}),this.overlay.fadeTo(b.speedIn,b.opacity))},afterClose:function(a){this.overlay&&this.overlay.fadeOut(a.speedOut||0,function(){d(this).remove()});this.overlay=null}};a.helpers.title={beforeShow:function(b){var c;
+if(c=a.current.title)c=d('<div class="fancybox-title fancybox-title-'+b.type+'-wrap">'+c+"</div>").appendTo("body"),"float"===b.type&&(c.width(c.width()),c.wrapInner('<span class="child"></span>'),a.current.margin[2]+=Math.abs(parseInt(c.css("margin-bottom"),10))),c.appendTo("over"===b.type?a.inner:"outside"===b.type?a.wrap:a.skin)}};d.fn.fancybox=function(b){var c=d(this),e=this.selector||"",f,g=function(g){var h=this,j=f,k;!g.ctrlKey&&!g.altKey&&!g.shiftKey&&!g.metaKey&&!d(h).is(".fancybox-wrap")&&
+(g.preventDefault(),g=b.groupAttr||"data-fancybox-group",k=d(h).attr(g),k||(g="rel",k=h[g]),k&&""!==k&&"nofollow"!==k&&(h=e.length?d(e):c,h=h.filter("["+g+'="'+k+'"]'),j=h.index(this)),b.index=j,a.open(h,b))},b=b||{};f=b.index||0;e?q.undelegate(e,"click.fb-start").delegate(e,"click.fb-start",g):c.unbind("click.fb-start").bind("click.fb-start",g);return this};d(l).ready(function(){a.defaults.fixed=d.support.fixedPosition||!(d.browser.msie&&6>=d.browser.version)&&!k})})(window,document,jQuery);        0 x ˇˇ     20250331133932-8l ``}Ú=   https://erp.cmrit.ac.in/studentMPW/js/jquery.fancybox.pack.js      ÊD  /*! fancyBox v2.0.6 fancyapps.com | fancyapps.com/fancybox/#license */
+(function(s,l,d,t){var m=d(s),q=d(l),a=d.fancybox=function(){a.open.apply(this,arguments)},u=!1,k=l.createTouch!==t,o=function(a){return"string"===d.type(a)},n=function(b,c){c&&o(b)&&0<b.indexOf("%")&&(b=a.getViewport()[c]/100*parseInt(b,10));return Math.round(b)+"px"};d.extend(a,{version:"2.0.5",defaults:{padding:15,margin:20,width:800,height:600,minWidth:100,minHeight:100,maxWidth:9999,maxHeight:9999,autoSize:!0,autoResize:!k,autoCenter:!k,fitToView:!0,aspectRatio:!1,topRatio:0.5,fixed:!1,scrolling:"auto",
+wrapCSS:"",arrows:!0,closeBtn:!0,closeClick:!1,nextClick:!1,mouseWheel:!0,autoPlay:!1,playSpeed:3E3,preload:3,modal:!1,loop:!0,ajax:{dataType:"html",headers:{"X-fancyBox":!0}},keys:{next:[13,32,34,39,40],prev:[8,33,37,38],close:[27]},tpl:{wrap:'<div class="fancybox-wrap"><div class="fancybox-skin"><div class="fancybox-outer"><div class="fancybox-inner"></div></div></div></div>',image:'<img class="fancybox-image" src="{href}" alt="" />',iframe:'<iframe class="fancybox-iframe" name="fancybox-frame{rnd}" frameborder="0" hspace="0"'+
+(d.browser.msie?' allowtransparency="true"':"")+"></iframe>",swf:'<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="100%" height="100%"><param name="wmode" value="transparent" /><param name="allowfullscreen" value="true" /><param name="allowscriptaccess" value="always" /><param name="movie" value="{href}" /><embed src="{href}" type="application/x-shockwave-flash" allowfullscreen="true" allowscriptaccess="always" width="100%" height="100%" wmode="transparent"></embed></object>',error:'<p class="fancybox-error">The requested content cannot be loaded.<br/>Please try again later.</p>',
+closeBtn:'<div title="Close" class="fancybox-item fancybox-close"></div>',next:'<a title="Next" class="fancybox-nav fancybox-next"><span></span></a>',prev:'<a title="Previous" class="fancybox-nav fancybox-prev"><span></span></a>'},openEffect:"fade",openSpeed:300,openEasing:"swing",openOpacity:!0,openMethod:"zoomIn",closeEffect:"fade",closeSpeed:300,closeEasing:"swing",closeOpacity:!0,closeMethod:"zoomOut",nextEffect:"elastic",nextSpeed:300,nextEasing:"swing",nextMethod:"changeIn",prevEffect:"elastic",
+prevSpeed:300,prevEasing:"swing",prevMethod:"changeOut",helpers:{overlay:{speedIn:0,speedOut:300,opacity:0.8,css:{cursor:"pointer"},closeClick:!0},title:{type:"float"}}},group:{},opts:{},coming:null,current:null,isOpen:!1,isOpened:!1,player:{timer:null,isActive:!1},ajaxLoad:null,imgPreload:null,transitions:{},helpers:{},open:function(b,c){a.close(!0);b&&!d.isArray(b)&&(b=b instanceof d?d(b).get():[b]);a.isActive=!0;a.opts=d.extend(!0,{},a.defaults,c);d.isPlainObject(c)&&c.keys!==t&&(a.opts.keys=c.keys?
+d.extend({},a.defaults.keys,c.keys):!1);a.group=b;a._start(a.opts.index||0)},cancel:function(){a.coming&&!1===a.trigger("onCancel")||(a.coming=null,a.hideLoading(),a.ajaxLoad&&a.ajaxLoad.abort(),a.ajaxLoad=null,a.imgPreload&&(a.imgPreload.onload=a.imgPreload.onabort=a.imgPreload.onerror=null))},close:function(b){a.cancel();a.current&&!1!==a.trigger("beforeClose")&&(a.unbindEvents(),!a.isOpen||b&&!0===b[0]?(d(".fancybox-wrap").stop().trigger("onReset").remove(),a._afterZoomOut()):(a.isOpen=a.isOpened=
+!1,d(".fancybox-item, .fancybox-nav").remove(),a.wrap.stop(!0).removeClass("fancybox-opened"),a.inner.css("overflow","hidden"),a.transitions[a.current.closeMethod]()))},play:function(b){var c=function(){clearTimeout(a.player.timer)},e=function(){c();a.current&&a.player.isActive&&(a.player.timer=setTimeout(a.next,a.current.playSpeed))},f=function(){c();d("body").unbind(".player");a.player.isActive=!1;a.trigger("onPlayEnd")};if(a.player.isActive||b&&!1===b[0])f();else if(a.current&&(a.current.loop||
+a.current.index<a.group.length-1))a.player.isActive=!0,d("body").bind({"afterShow.player onUpdate.player":e,"onCancel.player beforeClose.player":f,"beforeLoad.player":c}),e(),a.trigger("onPlayStart")},next:function(){a.current&&a.jumpto(a.current.index+1)},prev:function(){a.current&&a.jumpto(a.current.index-1)},jumpto:function(b){a.current&&(b=parseInt(b,10),1<a.group.length&&a.current.loop&&(b>=a.group.length?b=0:0>b&&(b=a.group.length-1)),a.group[b]!==t&&(a.cancel(),a._start(b)))},reposition:function(b,
+c){var e;a.isOpen&&(e=a._getPosition(c),b&&"scroll"===b.type?(delete e.position,a.wrap.stop(!0,!0).animate(e,200)):a.wrap.css(e))},update:function(b){a.isOpen&&(u||setTimeout(function(){var c=a.current,e=!b||b&&"orientationchange"===b.type;if(u&&(u=!1,c)){if(!b||"scroll"!==b.type||e)c.autoSize&&"iframe"!==c.type&&(a.inner.height("auto"),c.height=a.inner.height()),(c.autoResize||e)&&a._setDimension(),c.canGrow&&"iframe"!==c.type&&a.inner.height("auto");(c.autoCenter||e)&&a.reposition(b);a.trigger("onUpdate")}},
+200),u=!0)},toggle:function(){a.isOpen&&(a.current.fitToView=!a.current.fitToView,a.update())},hideLoading:function(){q.unbind("keypress.fb");d("#fancybox-loading").remove()},showLoading:function(){a.hideLoading();q.bind("keypress.fb",function(b){27===b.keyCode&&(b.preventDefault(),a.cancel())});d('<div id="fancybox-loading"><div></div></div>').click(a.cancel).appendTo("body")},getViewport:function(){return{x:m.scrollLeft(),y:m.scrollTop(),w:k&&s.innerWidth?s.innerWidth:m.width(),h:k&&s.innerHeight?
+s.innerHeight:m.height()}},unbindEvents:function(){a.wrap&&a.wrap.unbind(".fb");q.unbind(".fb");m.unbind(".fb")},bindEvents:function(){var b=a.current,c=b.keys;b&&(m.bind("resize.fb orientationchange.fb"+(b.autoCenter&&!b.fixed?" scroll.fb":""),a.update),c&&q.bind("keydown.fb",function(b){var f;f=b.target||b.srcElement;if(!b.ctrlKey&&!b.altKey&&!b.shiftKey&&!b.metaKey&&(!f||!f.type&&!d(f).is("[contenteditable]")))f=b.keyCode,-1<d.inArray(f,c.close)?(a.close(),b.preventDefault()):-1<d.inArray(f,c.next)?
+(a.next(),b.preventDefault()):-1<d.inArray(f,c.prev)&&(a.prev(),b.preventDefault())}),d.fn.mousewheel&&b.mouseWheel&&1<a.group.length&&a.wrap.bind("mousewheel.fb",function(b,c){var d=b.target||null;if(0!==c&&(!d||0===d.clientHeight||d.scrollHeight===d.clientHeight&&d.scrollWidth===d.clientWidth))b.preventDefault(),a[0<c?"prev":"next"]()}))},trigger:function(b,c){var e,f=c||a[-1<d.inArray(b,["onCancel","beforeLoad","afterLoad"])?"coming":"current"];if(f){d.isFunction(f[b])&&(e=f[b].apply(f,Array.prototype.slice.call(arguments,
+1)));if(!1===e)return!1;f.helpers&&d.each(f.helpers,function(c,e){if(e&&d.isPlainObject(a.helpers[c])&&d.isFunction(a.helpers[c][b]))a.helpers[c][b](e,f)});d.event.trigger(b+".fb")}},isImage:function(a){return o(a)&&a.match(/\.(jpe?g|gif|png|bmp)((\?|#).*)?$/i)},isSWF:function(a){return o(a)&&a.match(/\.(swf)((\?|#).*)?$/i)},_start:function(b){var c={},e=a.group[b]||null,f,g,i;if(e&&(e.nodeType||e instanceof d))f=!0,d.metadata&&(c=d(e).metadata());c=d.extend(!0,{},a.opts,{index:b,element:e},d.isPlainObject(e)?
+e:c);d.each(["href","title","content","type"],function(b,g){c[g]=a.opts[g]||f&&d(e).attr(g)||c[g]||null});"number"===typeof c.margin&&(c.margin=[c.margin,c.margin,c.margin,c.margin]);c.modal&&d.extend(!0,c,{closeBtn:!1,closeClick:!1,nextClick:!1,arrows:!1,mouseWheel:!1,keys:null,helpers:{overlay:{css:{cursor:"auto"},closeClick:!1}}});a.coming=c;if(!1===a.trigger("beforeLoad"))a.coming=null;else{g=c.type;b=c.href||e;g||(f&&(g=d(e).data("fancybox-type"),g||(g=(g=e.className.match(/fancybox\.(\w+)/))?
+g[1]:null)),!g&&o(b)&&(a.isImage(b)?g="image":a.isSWF(b)?g="swf":b.match(/^#/)&&(g="inline")),g||(g=f?"inline":"html"),c.type=g);if("inline"===g||"html"===g){if(c.content||(c.content="inline"===g?d(o(b)?b.replace(/.*(?=#[^\s]+$)/,""):b):e),!c.content||!c.content.length)g=null}else b||(g=null);"ajax"===g&&o(b)&&(i=b.split(/\s+/,2),b=i.shift(),c.selector=i.shift());c.href=b;c.group=a.group;c.isDom=f;switch(g){case "image":a._loadImage();break;case "ajax":a._loadAjax();break;case "inline":case "iframe":case "swf":case "html":a._afterLoad();
+break;default:a._error("type")}}},_error:function(b){a.hideLoading();d.extend(a.coming,{type:"html",autoSize:!0,minWidth:0,minHeight:0,padding:15,hasError:b,content:a.coming.tpl.error});a._afterLoad()},_loadImage:function(){var b=a.imgPreload=new Image;b.onload=function(){this.onload=this.onerror=null;a.coming.width=this.width;a.coming.height=this.height;a._afterLoad()};b.onerror=function(){this.onload=this.onerror=null;a._error("image")};b.src=a.coming.href;(b.complete===t||!b.complete)&&a.showLoading()},
+_loadAjax:function(){a.showLoading();a.ajaxLoad=d.ajax(d.extend({},a.coming.ajax,{url:a.coming.href,error:function(b,c){a.coming&&"abort"!==c?a._error("ajax",b):a.hideLoading()},success:function(b,c){"success"===c&&(a.coming.content=b,a._afterLoad())}}))},_preloadImages:function(){var b=a.group,c=a.current,e=b.length,f,g,i,h=Math.min(c.preload,e-1);if(c.preload&&!(2>b.length))for(i=1;i<=h;i+=1)if(f=b[(c.index+i)%e],g=f.href||d(f).attr("href")||f,"image"===f.type||a.isImage(g))(new Image).src=g},_afterLoad:function(){a.hideLoading();
+!a.coming||!1===a.trigger("afterLoad",a.current)?a.coming=!1:(a.isOpened?(d(".fancybox-item, .fancybox-nav").remove(),a.wrap.stop(!0).removeClass("fancybox-opened"),a.inner.css("overflow","hidden"),a.transitions[a.current.prevMethod]()):(d(".fancybox-wrap").stop().trigger("onReset").remove(),a.trigger("afterClose")),a.unbindEvents(),a.isOpen=!1,a.current=a.coming,a.wrap=d(a.current.tpl.wrap).addClass("fancybox-"+(k?"mobile":"desktop")+" fancybox-type-"+a.current.type+" fancybox-tmp "+a.current.wrapCSS).appendTo("body"),
+a.skin=d(".fancybox-skin",a.wrap).css("padding",n(a.current.padding)),a.outer=d(".fancybox-outer",a.wrap),a.inner=d(".fancybox-inner",a.wrap),a._setContent())},_setContent:function(){var b=a.current,c=b.content,e=b.type,f=b.minWidth,g=b.minHeight,i=b.maxWidth,h=b.maxHeight;switch(e){case "inline":case "ajax":case "html":b.selector?c=d("<div>").html(c).find(b.selector):c instanceof d&&(c.parent().hasClass("fancybox-inner")&&c.parents(".fancybox-wrap").unbind("onReset"),c=c.show().detach(),d(a.wrap).bind("onReset",
+function(){c.appendTo("body").hide()}));b.autoSize&&(f=d('<div class="fancybox-wrap '+a.current.wrapCSS+' fancybox-tmp"></div>').appendTo("body").css({minWidth:n(f,"w"),minHeight:n(g,"h"),maxWidth:n(i,"w"),maxHeight:n(h,"h")}).append(c),b.width=f.width(),b.height=f.height(),f.width(a.current.width),f.height()>b.height&&(f.width(b.width+1),b.width=f.width(),b.height=f.height()),c=f.contents().detach(),f.remove());break;case "image":c=b.tpl.image.replace("{href}",b.href);b.aspectRatio=!0;break;case "swf":c=
+b.tpl.swf.replace(/\{width\}/g,b.width).replace(/\{height\}/g,b.height).replace(/\{href\}/g,b.href);break;case "iframe":c=d(b.tpl.iframe.replace("{rnd}",(new Date).getTime())).attr("scrolling",b.scrolling).attr("src",b.href),b.scrolling=k?"scroll":"auto"}if("image"===e||"swf"===e)b.autoSize=!1,b.scrolling="visible";"iframe"===e&&b.autoSize?(a.showLoading(),a._setDimension(),a.inner.css("overflow",b.scrolling),c.bind({onCancel:function(){d(this).unbind();a._afterZoomOut()},load:function(){a.hideLoading();
+try{this.contentWindow.document.location&&(a.current.height=d(this).contents().find("body").height())}catch(b){a.current.autoSize=!1}a[a.isOpen?"_afterZoomIn":"_beforeShow"]()}}).appendTo(a.inner)):(a.inner.append(c),a._beforeShow())},_beforeShow:function(){a.coming=null;a.trigger("beforeShow");a._setDimension();a.wrap.hide().removeClass("fancybox-tmp");a.bindEvents();a._preloadImages();a.transitions[a.isOpened?a.current.nextMethod:a.current.openMethod]()},_setDimension:function(){var b=a.wrap,c=
+a.inner,e=a.current,f=a.getViewport(),g=e.margin,i=2*e.padding,h=e.width,j=e.height,r=e.maxWidth+i,k=e.maxHeight+i,l=e.minWidth+i,m=e.minHeight+i,p;f.w-=g[1]+g[3];f.h-=g[0]+g[2];o(h)&&0<h.indexOf("%")&&(h=(f.w-i)*parseFloat(h)/100);o(j)&&0<j.indexOf("%")&&(j=(f.h-i)*parseFloat(j)/100);g=h/j;h+=i;j+=i;e.fitToView&&(r=Math.min(f.w,r),k=Math.min(f.h,k));if(e.aspectRatio){if(h>r&&(h=r,j=(h-i)/g+i),j>k&&(j=k,h=(j-i)*g+i),h<l&&(h=l,j=(h-i)/g+i),j<m)j=m,h=(j-i)*g+i}else h=Math.max(l,Math.min(h,r)),j=Math.max(m,
+Math.min(j,k));h=Math.round(h);j=Math.round(j);d(b.add(c)).width("auto").height("auto");c.width(h-i).height(j-i);b.width(h);p=b.height();if(h>r||p>k)for(;(h>r||p>k)&&h>l&&p>m;)j-=10,e.aspectRatio?(h=Math.round((j-i)*g+i),h<l&&(h=l,j=(h-i)/g+i)):h-=10,c.width(h-i).height(j-i),b.width(h),p=b.height();e.dim={width:n(h),height:n(p)};e.canGrow=e.autoSize&&j>m&&j<k;e.canShrink=!1;e.canExpand=!1;if(h-i<e.width||j-i<e.height)e.canExpand=!0;else if((h>f.w||p>f.h)&&h>l&&j>m)e.canShrink=!0;a.innerSpace=p-i-
+c.height()},_getPosition:function(b){var c=a.current,e=a.getViewport(),f=c.margin,d=a.wrap.width()+f[1]+f[3],i=a.wrap.height()+f[0]+f[2],h={position:"absolute",top:f[0]+e.y,left:f[3]+e.x};c.autoCenter&&c.fixed&&!b&&i<=e.h&&d<=e.w&&(h={position:"fixed",top:f[0],left:f[3]});h.top=n(Math.max(h.top,h.top+(e.h-i)*c.topRatio));h.left=n(Math.max(h.left,h.left+0.5*(e.w-d)));return h},_afterZoomIn:function(){var b=a.current,c=b?b.scrolling:"no";if(b&&(a.isOpen=a.isOpened=!0,a.wrap.addClass("fancybox-opened"),
+a.inner.css("overflow","yes"===c?"scroll":"no"===c?"hidden":c),a.trigger("afterShow"),a.update(),(b.closeClick||b.nextClick)&&a.inner.css("cursor","pointer").bind("click.fb",function(c){if(!d(c.target).is("a")&&!d(c.target).parent().is("a"))a[b.closeClick?"close":"next"]()}),b.closeBtn&&d(b.tpl.closeBtn).appendTo(a.skin).bind("click.fb",a.close),b.arrows&&1<a.group.length&&((b.loop||0<b.index)&&d(b.tpl.prev).appendTo(a.outer).bind("click.fb",a.prev),(b.loop||b.index<a.group.length-1)&&d(b.tpl.next).appendTo(a.outer).bind("click.fb",
+a.next)),a.opts.autoPlay&&!a.player.isActive))a.opts.autoPlay=!1,a.play()},_afterZoomOut:function(){var b=a.current;a.wrap.trigger("onReset").remove();d.extend(a,{group:{},opts:{},current:null,isActive:!1,isOpened:!1,isOpen:!1,wrap:null,skin:null,outer:null,inner:null});a.trigger("afterClose",b)}});a.transitions={getOrigPosition:function(){var b=a.current,c=b.element,e=b.padding,f=d(b.orig),g={},i=50,h=50;!f.length&&b.isDom&&d(c).is(":visible")&&(f=d(c).find("img:first"),f.length||(f=d(c)));f.length?
+(g=f.offset(),f.is("img")&&(i=f.outerWidth(),h=f.outerHeight())):(b=a.getViewport(),g.top=b.y+0.5*(b.h-h),g.left=b.x+0.5*(b.w-i));return g={top:n(g.top-e),left:n(g.left-e),width:n(i+2*e),height:n(h+2*e)}},step:function(b,c){var e=c.prop,d,g;if("width"===e||"height"===e)d=Math.ceil(b-2*a.current.padding),"height"===e&&(g=(b-c.start)/(c.end-c.start),c.start>c.end&&(g=1-g),d-=a.innerSpace*g),a.inner[e](d)},zoomIn:function(){var b=a.wrap,c=a.current,e=c.openEffect,f="elastic"===e,g=d.extend({},c.dim,
+a._getPosition(f)),i=d.extend({opacity:1},g);delete i.position;f?(g=this.getOrigPosition(),c.openOpacity&&(g.opacity=0),a.outer.add(a.inner).width("auto").height("auto")):"fade"===e&&(g.opacity=0);b.css(g).show().animate(i,{duration:"none"===e?0:c.openSpeed,easing:c.openEasing,step:f?this.step:null,complete:a._afterZoomIn})},zoomOut:function(){var b=a.wrap,c=a.current,d=c.openEffect,f="elastic"===d,g={opacity:0};f&&("fixed"===b.css("position")&&b.css(a._getPosition(!0)),g=this.getOrigPosition(),c.closeOpacity&&
+(g.opacity=0));b.animate(g,{duration:"none"===d?0:c.closeSpeed,easing:c.closeEasing,step:f?this.step:null,complete:a._afterZoomOut})},changeIn:function(){var b=a.wrap,c=a.current,d=c.nextEffect,f="elastic"===d,g=a._getPosition(f),i={opacity:1};g.opacity=0;f&&(g.top=n(parseInt(g.top,10)-200),i.top="+=200px");b.css(g).show().animate(i,{duration:"none"===d?0:c.nextSpeed,easing:c.nextEasing,complete:a._afterZoomIn})},changeOut:function(){var b=a.wrap,c=a.current,e=c.prevEffect,f={opacity:0};b.removeClass("fancybox-opened");
+"elastic"===e&&(f.top="+=200px");b.animate(f,{duration:"none"===e?0:c.prevSpeed,easing:c.prevEasing,complete:function(){d(this).trigger("onReset").remove()}})}};a.helpers.overlay={overlay:null,update:function(){var a,c;this.overlay.width("100%").height("100%");d.browser.msie||k?(a=Math.max(l.documentElement.scrollWidth,l.body.scrollWidth),c=Math.max(l.documentElement.offsetWidth,l.body.offsetWidth),a=a<c?m.width():a):a=q.width();this.overlay.width(a).height(q.height())},beforeShow:function(b){this.overlay||
+(b=d.extend(!0,{},a.defaults.helpers.overlay,b),this.overlay=d('<div id="fancybox-overlay"></div>').css(b.css).appendTo("body"),b.closeClick&&this.overlay.bind("click.fb",a.close),a.current.fixed&&!k?this.overlay.addClass("overlay-fixed"):(this.update(),this.onUpdate=function(){this.update()}),this.overlay.fadeTo(b.speedIn,b.opacity))},afterClose:function(a){this.overlay&&this.overlay.fadeOut(a.speedOut||0,function(){d(this).remove()});this.overlay=null}};a.helpers.title={beforeShow:function(b){var c;
+if(c=a.current.title)c=d('<div class="fancybox-title fancybox-title-'+b.type+'-wrap">'+c+"</div>").appendTo("body"),"float"===b.type&&(c.width(c.width()),c.wrapInner('<span class="child"></span>'),a.current.margin[2]+=Math.abs(parseInt(c.css("margin-bottom"),10))),c.appendTo("over"===b.type?a.inner:"outside"===b.type?a.wrap:a.skin)}};d.fn.fancybox=function(b){var c=d(this),e=this.selector||"",f,g=function(g){var h=this,j=f,k;!g.ctrlKey&&!g.altKey&&!g.shiftKey&&!g.metaKey&&!d(h).is(".fancybox-wrap")&&
+(g.preventDefault(),g=b.groupAttr||"data-fancybox-group",k=d(h).attr(g),k||(g="rel",k=h[g]),k&&""!==k&&"nofollow"!==k&&(h=e.length?d(e):c,h=h.filter("["+g+'="'+k+'"]'),j=h.index(this)),b.index=j,a.open(h,b))},b=b||{};f=b.index||0;e?q.undelegate(e,"click.fb-start").delegate(e,"click.fb-start",g):c.unbind("click.fb-start").bind("click.fb-start",g);return this};d(l).ready(function(){a.defaults.fixed=d.support.fixedPosition||!(d.browser.msie&&6>=d.browser.version)&&!k})})(window,document,jQuery);”ò¿ŸO  F        ®|ÃÖ      fancybox   óx5      open   ≠$ØÚ      createTouch    ⁄Eú¡      indexOf    «±â      getViewport    &9!Ï      round      ªl‡Ù      extend     èæ_„      version    8¥ét      2.0.5	      /·´B      padding
+    d¸9      margin     ÎƒJ˚      width      ∑…≈      height     ¥Ò;
+      minWidth   *|ã§	      minHeight      ã; x      maxWidth   Ç⁄Œá	      maxHeight      +Riˇ      autoSize   ∫ÆÄ
+      autoResize     
+U 6
+      autoCenter     YFÅ‡	      fitToView      óâv      aspectRatio    ,ŒÇX      topRatio   å≤ÜX      fixed      E >Ö	      scrolling      z¡≤S      auto   Ïg¬      wrapCSS    O¶Í÷      arrows     ﬁM[      closeBtn   ∑¸πÖ
+      closeClick     Ó˜ù	      nextClick      ‡¸4
+      mouseWheel      †Ób      autoPlay!   »¯Ê˜	      playSpeed"      Øô      preload#     ∫˚      modal$      e™»`      loop%   æd»ê      ajax&   DoÄw      dataType'   ‘„X      html(   ¨yòü      headers)    à$ø
+      X-fancyBox*     >∆ß"      prev+   0≈à√      tpl,    —Íc      wrap-   d™µÜ      <div class="fancybox-wrap"><div class="fancybox-skin"><div class="fancybox-outer"><div class="fancybox-inner"></div></div></div></div>.     µ¥â·      image/      Aúˇ»2      <img class="fancybox-image" src="{href}" alt="" />0     ·7ªµ      iframe1     òÀ?/U      <iframe class="fancybox-iframe" name="fancybox-frame{rnd}" frameborder="0" hspace="0"2      “ßf∞      browser3    5∂™‰      msie4   GØ‡       allowtransparency="true"5      ^ì(Q
+      ></iframe>6     §Æ∑S      swf7    WÃ£…∞     <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="100%" height="100%"><param name="wmode" value="transparent" /><param name="allowfullscreen" value="true" /><param name="allowscriptaccess" value="always" /><param name="movie" value="{href}" /><embed src="{href}" type="application/x-shockwave-flash" allowfullscreen="true" allowscriptaccess="always" width="100%" height="100%" wmode="transparent"></embed></object>8   ˛tuW      error9      ≥;π*a      <p class="fancybox-error">The requested content cannot be loaded.<br/>Please try again later.</p>:      9Z≠>      <div title="Close" class="fancybox-item fancybox-close"></div>;     í´D      <a title="Next" class="fancybox-nav fancybox-next"><span></span></a><   ≠Áb¯H      <a title="Previous" class="fancybox-nav fancybox-prev"><span></span></a>=   {=›¨
+      openEffect>     &oª7      fade?   =B	      openSpeed@      ﬁ¯˛%
+      openEasingA     øwå-      swingB      ’/À\      openOpacityC    oD
+      openMethodD     √êªø      zoomInE     ·\o<      closeEffectF    M‚Ÿ`
+      closeSpeedG     C*      closeEasingH    »V      closeOpacityI   l)¢ˇ      closeMethodJ    ¡W§      zoomOutK    9õwm
+      nextEffectL     æ1\•      elasticM    ‰ic¶	      nextSpeedN      ÷˜ <
+      nextEasingO     ≤÷3k      changeInP   ?‹M4
+      prevEffectQ     Ãëqﬁ	      prevSpeedR      ∏≠öó
+      prevEasingS     òçz
+      prevMethodT     ûó'	      changeOutU      6)”K      helpersV    ØLËÚ      overlayW    *êWb      speedInX    H “=      speedOutY   ﬂue…      opacityZ    >ü      css[    ˇ∆N      cursor\     ˘Èÿ9      pointer]    “E      title^      [œ      float_      ™çG‡      opts`   ˝%·0      cominga     ÜÉÎ˝      currentb    ˜_       isOpenc     p8Ä_      isOpenedd   w!·      playere     ≈“Ó      timerf      ÆA/      isActiveg   k)¥      ajaxLoadh   ˜ﬁo
+      imgPreloadi     õ[è-      transitionsj    ¢]¡Ï      isArrayk    6U›í      isPlainObjectl      ˆNˇ      _startm     ˘!p¬      triggern    \1Y˚      onCancelo   à‹Äw      hideLoadingp    áƒ{p      onloadq     gK¨ß      onabortr    ¢Î˜s      onerrors    ıBm#      beforeCloset    Kòœo      unbindEventsu   Ç˛ı◊      .fancybox-wrapv     mêÅ      stopw   …≥Ì¿      onResetx    *N∑∆      removey     ß‚-Z      _afterZoomOutz      ◊‘ΩÃ      .fancybox-item, .fancybox-nav{      ˆ+      removeClass|    õÈnú      fancybox-opened}    ˇ¶ã      inner~      Ñ€ËW      hidden     «SBö      playÄ   QÔ8u      clearTimeoutÅ   3AtŸ
+      setTimeoutÇ     òh;      bodyÉ   ı˛«Æ      unbindÑ     ¡      .playerÖ    YuçË	      onPlayEndÜ      ‡Õ      bindá   ÍòØ       afterShow.player onUpdate.playerà   7?ı"      onCancel.player beforeClose.playerâ     ›r*      beforeLoad.playerä      ∫˘e≤      onPlayStartã    ˜JÔ      jumptoå     ô¶
+      repositionç     o.B      _getPositioné   \z˚      scrollè     »Åí      positionê   ÷q1º      animateë    üˇc9      updateí     ÎÓ
+◊      orientationchangeì      “]|      _setDimensionî      S‚Ræ      canGrowï    Sì_      onUpdateñ   Ogµ      toggleó     ±.\∑      keypress.fbò    _ª%      #fancybox-loadingô      a+àN      showLoadingö    ≠5      keyCodeõ    B9∫¿      preventDefaultú     j‹‹û,      <div id="fancybox-loading"><div></div></div>ù   ü™‚X      clickû      †Á„V      appendToü   |c…r
+      scrollLeft†     ìGÎ	      scrollTop°      Uü
+      innerWidth¢     0Uó      innerHeight£    JöW      .fb§    £ü*Å
+      bindEvents•     ìZﬁR      resize.fb orientationchange.fb¶     †•–¸
+       scroll.fbß     cˆ8
+      keydown.fb®     |5Œ
+      srcElement©     
+@•&      ctrlKey™    ◊ïÊ      altKey´     ô,Åÿ      shiftKey¨   `$ü˝      metaKey≠    6ˆ8∂      [contenteditable]Æ      ∞≠ÿG      inArrayØ    €±ù
+      mousewheel∞     [Ì˝      mousewheel.fb±      À˙∏      clientHeight≤   LsAø      scrollHeight≥   ˝F)Å      scrollWidth¥    ïß˘G      clientWidthµ    ç{–
+      beforeLoad∂     π˚ı	      afterLoad∑      ãè@i
+      isFunction∏     ÿÖ Ã      sliceπ      II∑P      event∫      ‡Ô€µ      isImageª    [ãÓ!      \.(jpe?g|gif|png|bmp)((\?|#).*)?$º      xˆO      isSWFΩ      ÂË&y      \.(swf)((\?|#).*)?$æ    'JØ(      nodeTypeø   -;ﬁ÷      metadata¿   ª©`X      href¡   4W»      content¬    A¢Ωê      attr√   6ó(Å      dataƒ   G±¨S      fancybox-type≈      6CY>	      className∆      £©R¿      fancybox\.(\w+)«    ‡ñ1\      ^#»     Tünì      inline…     I°´3      .*(?=#[^\s]+$)      _Ù      \s+À    Ç=äO      shiftÃ       _l$      selectorÕ   Œ÷`      isDomŒ      QÕíd
+      _loadImageœ     §óz	      _loadAjax–      Ä¢ñ~
+      _afterLoad—     ≥f      _error“     “≤ÁÛ      hasError”   û“      Image‘      ú∑»õ      src’    Dï»á      complete÷   …©\9      success◊    ]LµG      _preloadImagesÿ     €U ≥      minŸ    K/Q
+      afterClose⁄     Bå|      addClass€   Æg¨	      fancybox-‹      
+Le      mobile›      ∂      desktopﬁ    43ƒ2       fancybox-type-ﬂ    `‚≤Z       fancybox-tmp ‡     EGÒÃ      skin·   *∂¥      .fancybox-skin‚     ‡m+û      outer„      G’µÑ      .fancybox-outer‰    Ù)¬”      .fancybox-innerÂ    B'<<      _setContentÊ    Sï      <div>Á      ˛Ë˘2      parentË     7ÑÉz      hasClassÈ    "Õã      fancybox-innerÍ     Õv=      parentsÎ    HáíK      showÏ   vﬂY…      detachÌ     üvÙ}      hideÓ   ì€      <div class="fancybox-wrap Ô     “ˇ,¶       fancybox-tmp"></div>      ‹B-      appendÒ     π—      contentsÚ   ÎÒX$      {href}Û     ö8ZN	      \{width\}Ù      »»
+      \{height\}ı     \√`      \{href\}ˆ   ﬂ:Nì      {rnd}˜      uÙ.      getTime¯    ?Iqõ      visible˘    2áU)      load˙   ÷¬ 6      contentWindow˚      ∏OÄ      document¸   0+QA      location˝   +“l£      _afterZoomIn˛   {ZA2      _beforeShowˇ    ’O.˚
+      beforeShow     Ÿ¯≤%      fancybox-tmp  Kk.      max   o∑Yﬂ      dim   ∫4l	      canShrink     aµ◊	      canExpand     Æáß
+      innerSpace    H<*ê      absolute  $√Á      top   ı]á      left	  ‚gÚü      yes
+   `@°Œ	      afterShow     ∞˘Ì=      click.fb  ∆≈æè      getOrigPosition   5ï˛      orig  SZK#      :visible  êv	∏	      img:first     e ú      img   QÒ=i
+      outerWidth    k]2      outerHeight   Æ6nn      step  “P…ù      prop  ËŒ&˙      ceil  ¿
+7      duration  ,Ω      none  fò„`      easing    º–ìB      +=200px   ª?y      100%  ï,Øp      documentElement   ≥Z÷¶      offsetWidth   SWÅ !      <div id="fancybox-overlay"></div>     õÕ3      overlay-fixed     iºxl      fadeTo     –cH:      fadeOut!   iõK*      <div class="fancybox-title fancybox-title-"    °Í	      -wrap">#   ©è^      </div>$    ;z 	      wrapInner%     Ö¡Ê/      <span class="child"></span>&   ˛ .      abs'   ’î,9      margin-bottom(     óÅ¶é      over)  ¸	“b      outside*   Ô·Ï	      groupAttr+     |\◊      data-fancybox-group,   ¨Êí‹      rel-   	π¶ä      nofollow.  >	≈      filter/    Ù<E      ="0    ı£Ø      "]1    õ¨ß
+      undelegate2    Íé@z      click.fb-start3    €dAb      delegate4  ¢Ñ
+      ready5     7÷È6      support6   ≥(§      fixedPosition7     ¯2áâ      window8    >Â/      jQuery9    X¿~Œ
+      d.fancybox=    "ovF      update/<>  å0Ã      showLoading/<?     ]ˇ+      bindEvents/<@  /¿∆	      trigger/<A     ,˙      _start/<B  (T ]      _loadImage/b.onloadC   ì∆      _loadImage/b.onerrorF  /àDm      _setContent/<I     Q…ÌÎ      _afterZoomIn/<K    O´˝      beforeShow/this.onUpdateL  …¨,U      afterClose/<M  ¥mp      d.fn.fancybox     D   ~  E   D   	       5   Ô%,â                                                                                                                                                                      	                 
+                                                                                                                                                                                                                                                                                                                                                                                                    !                 "      "           #      "           $                 %      %           &      %           '                 (                 )                *      *           +      *           ,      *           -      -                           .                 /                 0                1      2           2                 3                 4                 5                 6                 7                 8                 9      :           :                 ;                 <      =           =                 >      ?           ?                 @                A      B           B                 C      ≥Oåc                         s `l `d `t `m `q `a `u `k `o `n `                 ã                a               b  c               b  c                               b              b  c `e  f                                                                                               b              b  c  e               b `              c  e                                                               b                                                b  c `            b  f              b  c  d              b `c  e  f `                c  e               a               a              b  c `e `f `g  i               b  g               b                b                ã                 ã                                b  c               b  c                b  c  e  f  g  i  h                                b  c `e  f  g  i  h                                ã                 ã            b                                b  c  e  f  g  i  h  j  r  k  l  m  p              b  c  e  f  d  i  h                b `c               c                b                b  c  e  f  g  i  h              b  c  e  d  g                b  c  e  f  g  i  ã                 b  c  d  f  g  ã                 b  c  d  f  g  i                b  c  e  f                ã                 a  c  ã               b  ã                 ã               a  ã                 ã               b  c              b `c `e `f `g  ã               g  h  j  k  ã                   Ø¬0∞ª     Ω     ∆      «      …             Û     Ù     ı     IÙ$KEÆ˙ö+   ◊        n   Á   _  `  a  b  c  d  g  h  i  U    <   C     Ç  *  ã  å  ë  ñ  o  ô    t  §  m  ∫  º  l  —  Œ  œ  ◊  –  Â  ˛  ì  ç  ˝  y  1   ı   	  
+                                             !  "  #  $  %  C  +  =  ?  @  B  C  E  F  G  H  I  K  M  N  É  P  Q  R  S  U     
+     &  (         )          Ç  *  C      (   ,  .  0  6  8    Ç  *     
+      V  ]         W  X  Y  Z            [          0                     
+   e  f                                         á  à  â        x  y  w  h                     
+      ç      #              C  U        V     
+     Z           [     #     0        	  “  ¡                   J  8  ÷                   
+      n  ˘     
+               è          è    
+   2   Á   _  a  f  c  b  ,  ‡  ‚  }                             D  J  O  T                                      Y             ’           Y             ’           Y            ’        Y            ’        V  ë  ˇ  Ÿ                  ˇ          á&’™ç!´!D   T     Ω÷T                             m    ª   ª   ª   w ﬂ• `F"Ä ⁄	ˇˇˇÔPPÄÄÄ¸  ôáÀ¸    $       	       ⁄       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂ¡    ¡   s Œ   ﬂ¡    ¡   s Œ   ﬂ¡   m   L   Œ   ﬂŒ 	  ﬂ¡   J   ¡   Œ 
+  ﬂm   Œ   ﬂm   Œ   ﬂ¡   ·J   ‰¡   9      <	   9
+   <   <    <   X<   d<   d<   '<   '<   <   ¡ 
+  <   ¡ 
+  <   <   <   
+      ‡?<   <      <      <   <   <   <    <!   <"   <#   ∏<$   <%   <&   <'   9(   )   <*   9+   <,   <-   <.   9/   h   i     i   "i   'i   (i   <0   h   i    !i   %i   &i   <1   h   i    <2   <3   94   5   <6   7   <8   9   ¡   J:   J;   ö   ó=   <   ô   ó=      ó=   &=   &<>   ?   <@   A   <B   C   <   D   <0   E   <1   <F   G   <H   ,<I   J   <K   <L   M   <N   G   <O   ,<P   J   <Q   <R   S   <T   U   <V   ,<W   J   <X   Y   <Z   U   <[   ,<\   J   <]   ^   <_   9`   9a   <b   ,<c   
+öôôôôôÈ?<d   9e   f   <g   <h   <    <i   9j   k   <l   <m   <n   <o   9p   <q   9r   <s   <t   <u   <v   <w   9x   <y   <z   <{   <|   <}   9~   <   9Ä   <n   mÅ   <Ç   mÉ   <Ñ   mÖ   <2   mÜ   <á   mà   <0   mâ   <1   mä   <ã   må   <ç   mé   <è   mê   <ë   mí   <ì   mî   <ï   mñ   <ó   mò   <ô   mö   <õ   mú   <ù   mû   <ü   m†   <°   m¢   <£   m§   <•   m¶   <ß   m®   <©   m™   <´   m¨   <≠   mÆ   <Ø   m∞   <±   m≤   <≥   m¥   <µ   m∂   <∑   m∏   <π   w ﬂ¡   9∫   mª   <º   mΩ   <æ   mø   <M   m¿   <S   m¡   <Y   m¬   <^   L   ﬂ¡   Jn   9√   <i   mƒ   <è   m≈   <∆   m«   <»   Li   ﬂ¡   Jn   9…   m    <∆   Lm   ﬂ¡   JÀ   mÃ   L   ﬂ¡    ¡   s ·JÕ   ‰mŒ   w ﬂ•§ `ˇˇˇˇP	`ˇˇˇˇP	`ï 6``
+`*`n`	
+
+
+
+  	*ê 
+
+	
+	ê ≠ ¶ ñ 
+Ä  é
+;%æ <
+Ä ∑*Kî LQ
+
+
+
+
+
+
+
+
+*í 
+		
+ô 
+	
+
+
+
+*N
+Ä  €*Ä  ™*Ä   
+8
+8
+Ä  Ø*Ä  Ñ*
+S
+P
+Ä  Œ*
+V*Ä X*Ä  ∏
+P
+@J#
+Ä  ®*Ä î Ä  ÙJÄ  °JÄ  Ï
+Ä  ‚J
+Ä oJLJ Ä PDÄ -`
+*Ä  Œ
+Ä   *Ä H*Ä  á
+Ä ê Ä  ¢`
+Ä *Ä Sê z`ê Ä Q`ï Ä j`ˇˇˇˇP
+
+ˇˇˇ˙PhPÄÄ\   °[ı\   *                        ‹Õ   ﬂﬁÕ  ﬂ¡   J   ·J   ‰æ  æ   w ﬂ•`ë ˇˇˇıPPL   …R®¿L                               ¡   ·J   ‰º  s ¢• `ˇˇˇ˚PQÄ‹   É}EÃ‹   å                         º úi   ó   ﬂ¡    º  s úR   ó   ﬂº  ·J   ‰   s ú3   ó   ﬂ¡   ·J   ‰s  º Kd+ª    º  
+s *Ã  ó   ﬂª   ·J   ‰º  s    &¢• `î ˇˇˇ˛PPõ P
+	ˇˇˇ˜P`ˇˇˇ˙P	QÄÄ$  fj$  õ                 )       ¡   ·J   ‰w ﬂº  úq   ó   ﬂ¡   ·J   ‰º  s úS   ó   ﬂº  ¡   !ö%   ó	   ¡    º  s ·J   ‰s  ô   ó   h   º  i    ó   Ã  ó   ﬂ¡   L   ﬂ¡   ¡   ·J   ‰9   ¡   J   º s L   ﬂ¡   ·J	   ‰º s úÄ   ó   ﬂº J
+   ¡   úg   ó   ﬂ¡   J   º J
+   ö:   ó   ¡   ·J   ‰9   ¡   J   J
+   º J
+   s ô   ó"   ó"   L
+   ó#   ﬂ¡   º  L   ﬂ¡   ·J   ‰¡   J   J   ù   ó(   ﬂó(   w ﬂ• `P
+`ˇˇˇ¯Pí ñ ˇˇˇ˛P
+Pí ñ ``í 
+ˇˇˇËP	`ˇˇˇÚPñ ≠ 
+ë ˇˇˇÊPû &`
+`	† ˇˇˇ˘PP   êå,“   ‹                          ¡   J   ú!   ó   ﬂ¡   ·J   ‰   s ó   ù•   ó   ﬂ¡   L   ﬂ¡   ·J   ‰w  ﬂ¡   J   ú   ó   ﬂ¡   J   ·J   ‰w  ó   ﬂ¡   L   ﬂ¡   J   ú9   ó   ﬂ¡   J   ¡   J   ¡   J   L   L	   L
+   ó   ﬂ• `ñ ë Pî P¶ P	… SPÄÄÄ‰  Ø+tœ‰  t                 ,       ¡   ·J   ‰w  ﬂ¡   J   úS  ó   ﬂ¡   ·J   ‰   s ú2  ó   ﬂ¡   ·J   ‰w  ﬂ¡   J   ù    ó   ﬂº  ú   ó   ﬂº  Kó   öP   ó   ¡       s ·J   ‰s  ·J   ‰	   s ·J
+   ‰w  ﬂ¡   ·J   ‰w  ôú   ó   ¡   ¡   L   L   ﬂ¡       s ·J
+   ‰w  ﬂ¡   J   ·J   ‰s ·J   ‰   w ﬂ¡   J   ·J   ‰      w ﬂ¡   J   ·¡   J   J   K‰w  ó,   ﬂ• `P	`ñ ë PP• ï [
+PP
+P	P*óP
+#P	í P	Põ Pú $P	PÄÄú  2‡”ú  >                #       m   Œ   ﬂm   Õ   ﬂm   Õ  ﬂ¡  J   J   ù    ó   ﬂº  ú   ó   ﬂº  Kó	   ö   ó
+   æ   w  ﬂô“   ó   ¡  J   úF   ó   ﬂ¡  J   J   ù,   ó   ﬂ¡  J   J   ¡  J	   J
+   'ó   ös   ó   ¡  J   L   ﬂ¡      s ·J   ‰9   æ   <   æ  <   ¡   <   w ﬂæ    w  ﬂ¡  ·J   ‰   w ﬂó#   • 
+`+`
+h`
+[`© ï `ì `Ø ∞ `ë [
+	%	'
+ˇˇˇÆPjUë P	PÄL   Ñ;L                             ª    ¡  J   J   w ﬂ• `ˇˇˇˇPPÄÄÄ®   ˘˙v®   q                          ¡    w  ﬂ¡  J   úV   ó   ﬂ¡  J   J   ú<   ó   ﬂ¡  J   ª    ¡  J   ¡  J   J   s L   ó   ﬂ• `
+`ø 9
+ˇˇˇÓP'PÄÄå   Aÿ~õå   O                          ¡    w  ﬂ¡      s ·J   ‰   w ﬂ¡  J   L   ﬂ¡  ·J   ‰   w ﬂ• `
+`P	P`ë `ë PPÄÄp   uÌÅÒp   <                          ¡   J   ú+   ó   ﬂ¡   ·J   ‰¡   J   J   &w ó   ﬂ• `° ë ˇˇˇ˘P	PÄÄÄp   s¿HÄp   <                          ¡   J   ú+   ó   ﬂ¡   ·J   ‰¡   J   J   'w ó   ﬂ• `° ë ˇˇˇ˘P	PÄÄÄL  2®±VL  ˙                         ¡   J   úÈ   ó   ﬂª    º  
+s Ã  ﬂ¡   J   J   út   ó   ﬂ¡   J   J   úZ   ó   ﬂº  ¡   J   J    ö   ó   Ã  ô.   ó   º  ú   ó   ﬂ¡   J   J   'Ã  ó   ﬂ¡   J   º  K¡   ú-   ó   ﬂ¡   ·J   ‰w  ﬂ¡   ·J   ‰º  w ó   ﬂ• `ï ˇˇˇ˜P∏ $© © ë P		ˇˇˇ˘P	PÄ  ≈{Öï  ±                        ¡   J   ú†   ó   ﬂ¡   ·J   ‰º s Õ   ﬂº  ú   ó   ﬂ   º  J   ó   ö@   ó   æ   P   ﬂ¡   J   ·J   ‰s ·J   ‰æ   » w ô"   ó   ¡   J   ·J	   ‰æ   w ó   ﬂ• 
+`ï ˇˇˇÛPì ò 
+ì P
+ˇˇˇ¯Pû ˇˇˇ¸P	PÄÄå   ˇkéqå   R   	                     Ω  Œ   ﬂ¡  J   ú8   ó   ﬂ¡	  ù   ó   ﬂª    m   » w ó   ﬂŒ	  ó   ﬂ•	`ï ñ C Ä  •P)PÄÄÄÄ  ΩåH·Ä  
+                .        ¡  J   Õ   ﬂ¡   ù+   ó   ﬂ¡   ú   ó   ﬂ   ¡   J   ó   Õ  ﬂ¡	  ú   ó   ﬂŒ	  ﬂæ   ó   öö  ó   ¡   ù*   ó
+   ﬂ   ¡   J   ù   ó   ﬂæ  ó   öˇ   ó   æ   J   ú\   ó   ﬂ   æ   J   úB   ó   ﬂ¡  J   ·J   ‰	   w ﬂæ   ¡  J   ·J   ‰s  L   ó   ﬂæ   J
+   ù   ó   ﬂæ  ó   ú   ó   ﬂ¡  ·J   ‰w  ó   ﬂæ   J   ú>   ó!   ﬂ   æ   J   ú$   ó$   ﬂ¡  J   ·J   ‰	   w ó'   ﬂó'   æ   J   ù   ó)   ﬂæ  ó)   ú   ó*   ﬂ¡  ·J   ‰¡   w ó,   ﬂ¡  ·J   ‰   w ﬂó.   • 	``¶ ï 
+`ê ì `ñ © 
+`ô ï 	ñ Pï P¥ P	ô ´ P`¥ ˇˇˇıP	`ë P	PÄÄÄÄ   Ë?ã”Ä   K                  	        ¡   J   ú:   ó   ﬂ¡   J   ¡   J   J   L   ﬂ¡   ·J   ‰w  ó	   ﬂ• `ï 
+ñ P		PÄÄÄd   º´d   /                          ¡   ·J   ‰   w ﬂ¡       s ·J   ‰w  ﬂ• `ë P`P
+PPÄ§   -"œ§   ]                          ¡   ·J   ‰w  ﬂ¡   ·J   ‰   m   w ﬂ¡       s ·J   ‰¡   J   s ·J   ‰	   w ﬂ• `P`ë ˇˇˇÌPQ`P
+7
+ˇˇˇ˙PPPp   7¡
+Vp   :                         º  J   ú(   ó   ﬂº  ·J   ‰w  ﬂ¡   ·J   ‰w  ó   ﬂ• `î 
+PP		PÄÄ  ›Mq  €                          9   ¡   ·J   ‰s  <   ¡   ·J   ‰s  <   ¡ 
+  ú   ó   ﬂ¡   J   ó	   ö   ó
+   ¡   J   ô   ó   ¡   ·J   ‰s  ó   <   ¡ 
+  ú   ó   ﬂ¡   J	   ó   ö   ó   ¡   J	   ô   ó   ¡   ·J
+   ‰s  ó   <   ¢• `PP… !P© †P	QÄÄÄò   Øﬂò   _                  	        ¡   J   ú$   ó   ﬂ¡   J   ·J   ‰   w ó   ﬂ¡   ·J   ‰   w ﬂ¡   ·J   ‰   w ﬂ• `´ P	`ë P`ë PPå  S<’†å  1                        ¡  J   Õ   ﬂæ   J   Œ   ﬂæ   ú  ó   ﬂ¡  ·J   ‰   æ   J   ú   ó   ﬂæ   J   ó   ö   ó	      ô   ó	      ó	   &¡  J	   w ﬂ¡   ú$   ó   ﬂ¡  ·J   ‰
+   m   w ó   ﬂ¡  J   J   úY   ó   ﬂæ   J   úE   ó   ﬂ¡  J   J   ú)   ó   ﬂ¡  J   ·J   ‰   m   w ó   ﬂ• 	```"î ≥ 
+ˇˇˇ±PY° ˇˇˇÓP)WØ !± ,ˇˇˇÎP	Ä  «P\  !”P\  …                5       º  J   ù   ó   ﬂº  J   ó   Õ   ﬂº  J   úâ   ó   ﬂº  J   úu   ó	   ﬂº  J   úa   ó   ﬂº  J   úM   ó   ﬂæ   ù=   ó   ﬂæ   J   ú(   ó   ﬂ¡   æ   s ·J   ‰	   s ó   ö  ó   º  J
+   Õ   ﬂˇ¡  ·J   ‰æ   ¡   J   s ö,   ó   ¡  ·J   ‰w  ﬂº  ·J   ‰w  ô£   ó#   ˇ¡  ·J   ‰æ   ¡   J   s ö,   ó(   ¡  ·J   ‰w  ﬂº  ·J   ‰w  ôR   ó,   ˇ¡  ·J   ‰æ   ¡   J   s ú(   ó1   ﬂ¡  ·J   ‰w  ﬂº  ·J   ‰w  ó5   ﬂó5   • 
+`• `î î î î ê ï 	ˇˇˇ˛PPì `
+
+ˇˇˇˆPP
+P
+
+ˇˇˇˆP.P
+P
+
+ˇˇˇˆPP
+PPÄÄÄ$  ˘ûL•$  ‹                        º  J   ù   ó   ﬂó   Õ   ﬂº úb   ó   ﬂæ   ùR   ó   ﬂæ   J   ù<   ó	   ﬂæ   J   æ   J   ú   ó   ﬂæ   J   æ   J   ó   öL   ó   º  ·J   ‰w  ﬂ¡  ·º ö   ó      ô   ó      ó   K‰w  ﬂó   • `û `ë û !û  ô `
+P© P	PÄ¸  ˜Uˆ¸  w        	               Ω  Œ   ﬂ‹Õ  ﬂº ùn   ó   ﬂ¡  ˇ¡  ·J   ‰¡   h      i       i      i   s ö   ó      ô   ó      ó   Kó   Œ   ﬂ¡   ö·   ó   ¡  ·J   ‰¡   ¡   Ks úG   ó   ﬂ¡   ¡   K·J   ‰¡   ª	   J
+   J   ·J   ‰æ  s s Õ   ó   ﬂæ   ö   ó   ¢ó   ¡   J   ú)   ó   ﬂ¡  ·J   ‰¡   J   m   w ó   ﬂ¡  J   ·J   ‰¡      &w ﬂó    •`ï 
+£ ˇˇˇˆP≥ H``ˇˇˇıP†  ñ A Ä Pˇˇˇ‚P-	``Ä  ¶ˇˇˇc`° 
+
+ˇˇˇÒP	w`ë ˇˇˇ¯P	PÄ‹   «ﬁ‹   ê                         º úV   ó   ﬂ¡  ·J   ‰¡  J   º  Ks ú.   ó   ﬂ¡  ·J   ‰¡  J   º  K¡   Ks ó   ö,   ó   ¡  J   º  K·¡   K‰º ¡   w ﬂó   • 	`ö ˇˇˇÚPö *î ˇˇˇıPí `ñ ˇˇˇ˝P	PÄÄÄh   kZ˜˙h   0                         ¡    º  s ú   ó   ﬂº  ·J   ‰l   s ó   ¢• `	ˇˇˇ˛Pò ˇˇˇ˙P+Qh   kZ˝ßh   0                         ¡    º  s ú   ó   ﬂº  ·J   ‰l   s ó   ¢• `	ˇˇˇ˛Pò ˇˇˇ˙PQº  Qt÷°º  !                ê       9   Œ   ﬂ¡  J   º  Kù   ó   ﬂó   Œ   ﬂ¡   ú+   ó   ﬂ¡   J   ù   ó   ﬂ¡   ¡  !ó   öI   ó	   Œ   ﬂ¡  J   ú(   ó   ﬂ¡   ¡   s ·J   ‰s  Œ   ó   ﬂó   ¡  ·J   ‰9   ¡  J   9   º  <	   ¡   <
+   ¡  ·J   ‰¡   s ö   ó   ¡   ô   ó   ¡   ó   s Œ   ﬂ¡  ·J   ‰h      i       i      i      i   m   w ﬂ   ¡   J   úV   ó    ﬂ¡   h   ¡   J   i    ¡   J   i   ¡   J   i   ¡   J   i   L   ó&   ﬂ¡   J   úw   ó(   ﬂ¡  ·J   ‰¡   9   <   <   <   <   <   <   9   9   9      <    <!   <   <"   <#   w ó9   ﬂ¡  ¡   L$   ﬂ¡  ·J%   ‰&   s ö   ó>   ¡  L$   ﬂôÉ  ó?   ¡   J   Õ   ﬂ¡   J   ù   óB   ﬂ¡   óB   Ã  ﬂæ   ùì  óC   ﬂ¡   ú}   óD   ﬂ¡   ¡   s ·J'   ‰(   s Õ   ﬂæ   ùL   óH   ﬂ¡   J)   ·J*   ‰l+   s Õ   ö   óL   æ   Kô   óM   óM   Õ   óM   ﬂæ   ú¶   óO   ﬂ¡   º  s úè   óQ   ﬂ¡  ·J,   ‰º  s ö   óT   -   Õ   ô_   óT   ¡  ·J.   ‰º  s ö   óW   /   Õ   ô0   óW   º  ·J*   ‰l0   s ú   óZ   ﬂ1   Õ   óZ   ﬂæ   ù7   ó[   ﬂ¡   ö   ó\   1   ô   ó\   2   ó\   Õ   ó\   ﬂ¡   æ   L   ó]   ﬂ1   æ   ù   ó_   ﬂ2   æ   ó`   ö‰   óa   ¡   J   ùÖ   óc   ﬂ¡   1   æ   öW   óe   ¡   ¡   º  s ö&   óg   º  ·J3   ‰l4   5   s ô   ói   º  ói   s ô   ój   ¡   ój   L   ók   ﬂ¡   J   ù   ón   ﬂ¡   J   J6   óq   ö   ór   Õ   ﬂór   ô#   ór   º  ù   ós   ﬂÕ   ós   ﬂós   7   æ   úe   óu   ﬂ¡   º  s úN   ów   ﬂº  ·J8   ‰l9   s Õ  ﬂæ  ·J:   ‰s  Ã  ﬂ¡   æ  ·J:   ‰s  L;   ó~   ﬂ¡   º  L   ﬂ¡   ¡  J   L   ﬂ¡   ¡   L<   ﬂæ   ·-   üd   óÉ   ·7   üm   óÑ   ·1   üv   óÖ   ·=   üe   óÜ   ·/   üT   óá   ·2   üC   óà   †S   óà   ¡  ·J>   ‰w  ﬂôS   óä   ¡  ·J?   ‰w  ﬂô9   óå   ¡  ·J@   ‰w  ﬂô   óé   ¡  ·JA   ‰   w ﬂóê   • 
+``• `™ ï `õ ˇˇˇ˛P
+Pì `
+
+ˇˇˇÚPô@ Ä …P)`≠ "ˇˇˇŸPc`° 			ö `¢ 
+
+		ê ˇˇˇÑP	Ä  é`ê `ë P`ñ `	`£ `ê ˇˇˇ˛PP† ˇˇˇ˙Pë ∂ ˇˇˇ˛Pö ˇˇˇ¯P¨ ˇˇˇ˙P™ ˇˇˇ˙Pù ¡ î `ï î `ü !ï ˇˇˇ˛Pó 
+ˇˇˇ¯Pï ˇˇˇ˜P¢ ,ñ ü `ï `û `	ñ ˇˇˇ˛P
+
+ˇˇˇ˙PPê P	`	`ï `ê `Ù `P`
+`P`
+9`P`
+`ë P	PÄÄ¥   ˚îb¥   y                         ¡   º ¡  J   º Kù[   ó   ﬂ¡   ú&   ó   ﬂ¡   ¡   s ·J   ‰º s ó   ù    ó   ﬂ¡   º Kù   ó
+   ﬂó
+   Nﬂ• `∑ ˇˇˇ˛P
+
+ˇˇˇ˚PØ PÄÄ–   n∆.–   Ñ                         ¡   ·J   ‰w  ﬂ¡   ·J   ‰¡   J   9      <   <   <   <	   <
+   º  <   ¡   J   J   J   <   w ﬂ¡   ·J   ‰w  ﬂ• `P`	
+	
+ô ˇˇˇ™Ps`PP‡   ¡J#»‡   ù                         ¡   ª   Ä„  Å  L   Õ   ﬂæ   m   L   ﬂæ   m   L   ﬂæ   ¡   J   J   L	   ﬂæ   J
+   ¡   ù   ó   ﬂæ   J
+   ó   ú   ó   ﬂ¡   ·J   ‰w  ó   ﬂ• 	`P
+`x`F`ô `	ë ¶ P	PÄÄÄî   òñî   ]                
+       ﬁÕ   ﬂæ   æ   L   L   ﬂ¡   J   æ   J   L   ﬂ¡   J   æ   J   L   ﬂ¡   ·J   ‰w  ﬂ•`î `ô `ô `PPÄ`   ¢R6ô`   0                       ﬁÕ   ﬂæ   æ   L   L   ﬂ¡   ·J   ‰   w ﬂ•`î `ë PPÄ»   {°8»   {           	               ¡   ·J   ‰w  ﬂ¡   ¡   ·J   ‰¡   ·J   ‰9   ¡   J   J   9   ¡   J   J   <   m	   <
+   m   <   s s L   ﬂ• `P`ë 	î 
+N
+ˇˇˇáPˇˇˇ˘P	Ä  ÃPÄú   ‘ÏÚXú   d                         ¡   J   ú   ó   ﬂ   º ó   ö&   ó   ¡   ·J   ‰   º  w ô   ó   ¡   ·J   ‰w  ó   ﬂ• `ö § ˇˇˇÚPô P	PÄp   vK¥'p   =                            º ú-   ó   ﬂ¡   J   º  L   ﬂ¡   ·J   ‰w  ó   ﬂ• `ì P	PÄÄ  O† Ù  s                $       ¡   J   Õ   ﬂ¡   J   Õ  ﬂæ   J   Õ  ﬂª   ·J   ‰æ  J   æ  's Õ  ﬂæ  J   ú   ó
+   ﬂæ   J   ó   ö¯   ó   Õ  ﬂò   æ  æ  öŸ   ó   æ   æ  J   æ  &æ  ,KÕ  ﬂæ  J   ù6   ó   ﬂ¡    æ  s ·J	   ‰   s ù   ó   ﬂæ  ó   Õ  ﬂ
+   æ  J   ù   ó   ﬂ¡   ·J   ‰æ  s ó   ö!   ó    ª   Ä„  Å  æ  L   ﬂó#   æ  &.Õ  ﬂôˇˇˇó$   • 	`
+```		
+ˇˇˇÚP`î ö `f
+`ö ˇˇˇ˛PPú 
+° ˇˇˇ¯Pí `ú ˇˇˇ¶`ñ jPÄÄÄ         Ö   Ë   à  ãà  ¬                 N        ¡   ·J   ‰w  ﬂ¡   J   ù+   ó   ﬂ¡   ·J   ‰   ¡   J   s ó	   ö   ó
+   ¡   L   ô[  ó   ¡   J   öã   ó   ¡       s ·J   ‰w  ﬂ¡   J	   ·J
+   ‰s ·J   ‰   w ﬂ¡   J   ·J   ‰      w ﬂ¡   J   ·¡   J   J   K‰w  ôP   ó   ¡       s ·J
+   ‰s  ·J   ‰   s ·J   ‰w  ﬂ¡   ·J   ‰   w ó&   ﬂ¡   ·J   ‰w  ﬂ¡   L   ﬂ¡   ¡   J   L   ﬂ¡   ¡    ¡   J   J   J	   s ·J   ‰   ¡ 
+  ö   ó1      ô   ó1      ó1   &   &¡   J   J   &   &¡   J   J    &s ·J!   ‰"   s L	   ﬂ¡   ¡    #   ¡   J	   s ·J   ‰$   ¡    ¡   J   J$   s s L%   ﬂ¡   ¡    &   ¡   J	   s L'   ﬂ¡   ¡    (   ¡   J	   s L   ﬂ¡   ·J)   ‰w  óN   ﬂ• `P`ó ë 
+ˇˇˇÏP® ,î [
+#P	í P	Põ Pú #P[
+PP
+P	ë P	Pï 	î ˇˇˇ˛P
+Ø (ñ  ê ˇˇˇ¢PqP)ö ˇˇˇÌP)ˇˇˇ˛PˇˇˇÚP	$ê 
+ˇˇˇÏP	ê 
+ˇˇˇÏP	P	PË  k6Î?Ë  $                °        ¡  J   Õ   ﬂæ   J   Œ   ﬂæ   J   Õ  ﬂæ   J   Õ  ﬂæ   J   Õ  ﬂæ   J   Õ  ﬂæ   J   Õ  ﬂæ  ·   üd   ó   ·	   üS   ó	   ·
+   üB   ó
+   ·   ü˘  ó   ·   ü)  ó   ·   ü~  ó   †  ó   æ   J   öD   ó   ¡      s ·J
+   ‰¡   s ·J   ‰æ   J   s Œ   ô∏   ó   ¡   ¡  !ú£   ó   ﬂ¡   ·J   ‰s  ·J   ‰   s ú.   ó   ﬂ¡   ·J   ‰   s ·J   ‰   w ó    ﬂ¡   ·J   ‰s  ·J   ‰s  Œ   ﬂ¡   ¡  J   s ·J   ‰   m   w ó)   ﬂæ   J   ú©  ó+   ﬂ¡      ¡  J   J   &    &s ·J!   ‰"   s ·J#   ‰9$   ¡   æ  %   s <   ¡   æ  &   s <   ¡   æ  %   s <   ¡   æ  &   s <   s ·J'   ‰¡   s Õ  ﬂæ   æ  ·J(   ‰s  L(   ﬂæ   æ  ·J)   ‰s  L)   ﬂæ  ·J(   ‰¡  J   J(   w ﬂæ  ·J)   ‰s  æ   J)   úT   óN   ﬂæ  ·J(   ‰æ   J(   &w ﬂæ   æ  ·J(   ‰s  L(   ﬂæ   æ  ·J)   ‰s  L)   óX   ﬂæ  ·J*   ‰s  ·J   ‰s  Œ   ﬂæ  ·J+   ‰w  ó^   ﬂôV  ó^   æ   J,   J   ·J-   ‰.   æ   J/   s Œ   ﬂæ   L0   ﬂô  ód   æ   J,   J   ·J-   ‰l1   æ   J(   s ·J-   ‰l2   æ   J)   s ·J-   ‰l3   æ   J/   s Œ   ﬂôØ   óo   ¡   æ   J,   J   ·J-   ‰4   ª5   Ä„  Å  ·J6   ‰s  s s ·J7   ‰8   æ   J8   s ·J7   ‰9   æ   J/   s Œ   ﬂæ   ¡
+  ö   ó   :   ô   ó   ;   ó   L8   ﬂóÄ      æ  ù   óÇ   ﬂ   æ  óÉ   ö$   óÑ   æ   L   ﬂæ   <   L8   ﬂóÜ      æ  ú   óà   ﬂæ   J   óâ   öé   óä   ¡  ·J=   ‰w  ﬂ¡  ·J>   ‰w  ﬂ¡  J?   ·J#   ‰@   æ   J8   w ﬂ¡   ·J   ‰9A   mB   <C   mD   <E   s ·J!   ‰¡  J?   w ô3   óú   ¡  J?   ·J'   ‰¡   w ﬂ¡  ·JF   ‰w  ó°   ﬂ• 	```	`````Ù )`û P
+ˇˇˇ˚P
+	ˇˇˇ˚Pó ë P	Pü PP	P
+P		
+ˇˇˇ˛PE Ä ¯P))`î ñ ˇˇˇ·PJP
+	ˇˇˇ˛P		ˇˇˇ˛P		ˇˇˇ˛P		ˇˇˇ˛Pˇˇˇ∫P
+Xˇˇˇ˘P
+
+P	P		ˇˇˇ˙PP	ï ˇˇˇ˙P
+P	P
+P
+P		P	
+`
+`ö 	ˇˇˇÔP	``
+` ö 	ˇˇˇÎP
+&	ˇˇˇÍP
+(	ˇˇˇÏP	`
+`ö Z
+
+PˇˇˇÂPˇˇˇÒPG	ˇˇˇÔP)	ˇˇˇıP	∑ !`
+ï î `î `® PPñ 	ˇˇˇÒP
+8
+ˇˇˇ¬P*Ä  Ω
+ˇˇˇ˜Pë ˇˇˇ˘P
+P	PÄÄP   ê9NÙP                              ¡   ·J   ‰   s ·J   ‰w  ﬂ• `ë P
+PPÄÄh   c2ºh   /                        ﬁÕ   ﬂ¡   æ   s ·J   ‰w  ﬂ¡  ·J   ‰w  ﬂ•`ˇˇˇˇP
+P	`PPÄX  ˛MÙ8  „                       $ﬁÕ   ﬂ¡  ·J   ‰w  ﬂ´æ   J   J   J   úJ   ó   ﬂ¡  J   ¡   æ   s ·J   ‰s  ·J   ‰   s ·J	   ‰s  L	   ó   ﬂô*   ó    §≠∞±  ﬂ±  ﬂ¡  J   L   ﬂ“ó   ¡  ·¡  J   ö   ó      ô   ó      ó   K‰w  ﬂ•`P$aÆ :ˇˇˇ˛P
+PP
+Põ `ó `µ (PPX  H  
+   á      ˇˇˇˇ           h     ÁÃcÀ  »                          ¡   L   ﬂ¡   ·J   ‰   w ﬂ¡   ·J   ‰w  ﬂ¡   J   ·J   ‰s  ·J   ‰   w ﬂ¡   ·J	   ‰w  ﬂ¡   ·J
+   ‰w  ﬂ¡   J   ·¡   J   ö   ó   ¡   J   J   ô   ó   ¡   J   J   ó   K‰w  ﬂ• ``ë P`P`ë PP`P`P`Œ CPPÄÄÄƒ	  U´z„¥	  j                »       ¡   J   Õ   ﬂ¡   J   Õ  ﬂ¡   J   Õ  ﬂ¡   ·J   ‰s  Õ  ﬂæ  J   Õ  ﬂæ  J   *Õ  ﬂæ  J   Õ  ﬂæ  J   Õ  ﬂæ  J	   æ  &Õ  ﬂæ  J
+   æ  &Õ	  ﬂæ  J   æ  &Õ
+  ﬂæ  J   æ  &Õ  ﬂæ  ·J   æ  Kæ  K&'.L   ﬂæ  ·J   æ  Kæ  K&'.L   ﬂ¡    æ  s úN   ó    ﬂæ  ·J   ‰   s ú.   ó$   ﬂæ  J   æ  'ª    æ  s *d+Õ  ó*   ﬂ¡    æ  s úN   ó,   ﬂæ  ·J   ‰   s ú.   ó0   ﬂæ  J   æ  'ª    æ  s *d+Õ  ó6   ﬂæ  æ  +Õ  ﬂæ  æ  &.Õ  ﬂæ  æ  &.Õ  ﬂæ  J   úL   ó;   ﬂª   ·J   ‰æ  J   æ  s Õ  ﬂª   ·J   ‰æ  J   æ	  s Õ	  óC   ﬂæ  J   öˆ   óE   æ  æ  ú+   óG   ﬂæ  Õ  ﬂæ  æ  'æ  +æ  &Õ  óJ   ﬂæ  æ	  ú+   óL   ﬂæ	  Õ  ﬂæ  æ  'æ  *æ  &Õ  óO   ﬂæ  æ
+  ú+   óQ   ﬂæ
+  Õ  ﬂæ  æ  'æ  +æ  &Õ  óT   ﬂæ  æ  ö+   óV   æ  Õ  ﬂæ  æ  'æ  *æ  &Õ  ﬂóY   ôh   óY   ª   ·J   ‰æ
+  ª   ·J   ‰æ  æ  s s Õ  ﬂª   ·J   ‰æ  ª   ·J   ‰æ  æ	  s s Õ  ﬂóe   ª   ·J   ‰æ  s Õ  ﬂª   ·J   ‰æ  s Õ  ﬂ¡    æ   ·J   ‰æ  s s ·J   ‰   s ·J   ‰   w ﬂæ  ·J   ‰æ  æ  's ·J   ‰æ  æ  'w ﬂæ   ·J   ‰æ  w ﬂæ   ·J   ‰s  Õ  ﬂæ  æ  ù   ó~   ﬂæ  æ	  ó   ö[  óÄ   òÄ   æ  æ  ù   óÇ   ﬂæ  æ	  óÉ   ú(   óÑ   ﬂæ  æ
+  ú   óÜ   ﬂæ  æ  óá   ö¸   óà   æ  
+'.Õ  ﬂæ  J   öo   óã   ª   ·J   ‰æ  æ  'æ  *æ  &s Õ  ﬂæ  æ
+  ú+   óì   ﬂæ
+  Õ  ﬂæ  æ  'æ  +æ  &Õ  óñ   ô   óñ   æ  
+'.Õ  óó   ﬂæ  ·J   ‰æ  æ  's ·J   ‰æ  æ  'w ﬂæ   ·J   ‰æ  w ﬂæ   ·J   ‰s  Õ  ﬂô¥˛ˇˇó°   æ  9   ¡    æ  s <   ¡    æ  s <   L   ﬂæ  æ  J   ú(   ó©   ﬂæ  æ  ú   ó´   ﬂæ  æ	  ó¨   L   ﬂæ  L   ﬂæ  L   ﬂæ  æ  'æ  J   ù   ó≥   ﬂæ  æ  'æ  J   ó∂   ö   ó∑   æ  L   ﬂôx   ó∏   æ  æ  J   ù   óª   ﬂæ  æ  J   óΩ   ú(   óæ   ﬂæ  æ
+  ú   ó¿   ﬂæ  æ  ó¡   ö   ó¬   æ  L   ﬂó√   ¡   æ  æ  'æ  ·J   ‰s  'L    ﬂ• 	``
+``P```
+``	
+`	
+`	
+`	
+`ê 
+ê `ê 
+ê `ˇˇˇˇPê Pò ˇˇˇıPë `ˇˇˇˇPê Pò ˇˇˇıPë `
+```î 	ˇˇˇ¯P	ˇˇˇ¯P`ì `ê 	ê 	ê 	`	ô `	ˇˇˇ˙PˇˇˇıP$
+ê ˇˇˇ˙PCÄ ¯P-`ˇˇˇ˙P	`ˇˇˇ˙P	`ˇˇˇ¸Pˇˇˇ˝PPP`ˇˇˇ¯P
+ˇˇˇ˜P`ˇˇˇ˙P	`P`î î fî ô î î `ì ˇˇˇÚPê 	™ 
+ˇˇˇ¯P
+ˇˇˇ˜Pˇˇˇ˙P	Pí 	`	ˇˇˇ˛P	ˇˇˇ˛P`ú î ê ```ô ô 	`ï `ô û î î `ê `	%[
+PÄÄƒ	         ü  Q  ú  ‚ ¡xú  ˘                E       ¡   J   Õ   ﬂ¡   ·J   ‰s  Õ  ﬂæ   J   Õ  ﬂ¡   J   ·J   ‰s  æ  K&æ  K&Õ  ﬂ¡   J   ·J   ‰s  æ  K&æ  K&Õ  ﬂ9      <	   æ  Kæ  J
+   &<   æ  Kæ  J   &<   Õ  ﬂæ   J   úä   ó   ﬂæ   J   úv   ó    ﬂº  úg   ó"   ﬂæ  æ  J   úN   ó%   ﬂæ  æ  J   ú5   ó(   ﬂ9      <	   æ  K<   æ  K<   Õ  ó.   ﬂæ  ¡    ª   ·J   ‰æ  J   æ  J   æ  J   æ  'æ   J   *&s s L   ﬂæ  ¡    ª   ·J   ‰æ  J   æ  J   
+      ‡?æ  J   æ  '*&s s L   ﬂæ  ¢• 
+``P``ë P`ë P	`
+	
+î `® ì ô ö 	
+	ñ `
+				ˇˇˇËPˇˇˇ˘P	,`
+						ˇˇˇÂPˇˇˇ˘P	'`QÄÄ@  FAx@  p                Y        ¡  J   Œ   ﬂ¡   ö   ó   ¡   J   ô   ó      ó   Õ   ﬂ¡   úÛ  ó   ﬂ¡  ¡  L   L   ﬂ¡  J   ·J   ‰   w ﬂ¡  J	   ·J
+   ‰      æ   ö   ó      ô1   ó      æ   ö   ó      ô   ó   æ   ó   w ﬂ¡  ·J   ‰   w ﬂ¡  ·J   ‰w  ﬂ¡   J   ù   ó   ﬂ¡   J   ó   ú=   ó   ﬂ¡  J	   ·J
+   ‰      s ·J   ‰   m   w ó   ﬂ¡   J   úP   ó    ﬂ¡   ¡   J   J   s ·J   ‰¡  J   s ·J   ‰   ¡  J   w ó)   ﬂ¡   J   ú)  ó+   ﬂ¡  J   J    ú  ó/   ﬂ¡   J!   ù   ó1   ﬂ¡   J"   ó3   úP   ó4   ﬂ¡   ¡   J   J#   s ·J   ‰¡  J$   s ·J   ‰   ¡  J#   w ó=   ﬂ¡   J!   ù'   ó?   ﬂ¡   J"   ¡  J   J    'óD   úP   óE   ﬂ¡   ¡   J   J%   s ·J   ‰¡  J$   s ·J   ‰   ¡  J%   w óN   ﬂ¡  J&   J'   ú   óQ   ﬂ¡  J(   J)   óT   ö+   óU   ¡  J&   L'   ﬂ¡  ·J*   ‰w  ﬂóY   • 	`ê `≤ `ê ñ ñ P$õ £ ß ˇˇˇ◊P7ë PP
+  $P(ˇˇˇP	võ ˇˇˇ˛P
+
+ˇˇˇ˜P!
+ˇˇˇP	ñ õ ñ 
+° ˇˇˇ˛P
+
+ˇˇˇ˜P"
+ˇˇˇP	ü ® ˇˇˇ˛P
+
+ˇˇˇ˜PJÄ P)
+ö ü `ë P	PÄÄÄ   T∑öt   •                         ¡   º  J   s ·J   ‰   s ú6   ó   ﬂ¡   º  J   s ·J   ‰s  ·J   ‰   s ó   öC   ó   ¡  ·¡   J   ö   ó      ô   ó      ó   K‰w  ﬂó   • `ˇˇˇ˛PP	ˇˇˇ˛P
+P	Pì `µ P	PÄ  ˙ht  ´                         ¡   J   Õ   ﬂ¡   J   ·J   ‰   s ·J   ‰w  ﬂ¡   ·J   ‰¡   9   9   <	   9
+   <   <   <   <   <   <   <   <   <   w ﬂ¡   ·J   ‰   æ   w ﬂ• 	`
+`ñ P
+P	`	
+	
+
+
+
+ˇˇˇóPv`ë ˇˇˇÎPPÄÄÄ(  !¿»b(  V                ?        ¡   J   Õ   ﬂæ   J   Õ  ﬂæ   J   Õ  ﬂ¡    æ   J   s Õ  ﬂ9   Õ  ﬂ2Õ  ﬂ2Õ  ﬂæ  J   úå   ó	   ﬂæ   J   úx   ó   ﬂ¡    æ  s ·J   ‰	   s úQ   ó   ﬂ¡    æ  s ·J
+   ‰   s Õ  ﬂæ  J   ù   ó   ﬂ¡    æ  s Õ  ó   ﬂæ  J   öj   ó   æ  ·J   ‰s  Õ  ﬂæ  ·J   ‰   s ú0   ó   ﬂæ  ·J   ‰s  Õ  ﬂæ  ·J   ‰s  Õ  ó    ôu   ó    ¡   ·J   ‰s  Õ   ﬂæ  æ   J   
+      ‡?æ   J   æ  '*&L   ﬂæ  æ   J   
+      ‡?æ   J   æ  '*&L   ó.   ﬂ9   ¡    æ  J   æ  's <   ¡    æ  J   æ  's <   ¡    æ  æ  *&s <   ¡    æ  æ  *&s <   Õ  ¢• 	````	ˇˇˇˇP`
+```Ø ˇˇˇ˛PPˇˇˇ˛PPö ˇˇˇ˛P`ì P	ê PPPñ P
+				í `
+	ˇˇˇ¯P	ˇˇˇ˜Pˇˇˇ˙P		ˇˇˇ˙P	QÄÄÄl  ÏpDNl                         º J   Õ   ﬂ   æ   ù   ó   ﬂ   æ   ó   ö–   ó   ª   ·J   ‰º  ¡   J   J   *'s Õ  ﬂ   æ   ús   ó   ﬂº  º J   'º J	   º J   '+Õ  ﬂº J   º J	   ú   ó   ﬂæ  'Õ  ó   ﬂæ  ¡   J
+   æ  *'.Õ  ó   ﬂ¡   J   ·æ   K‰æ  w ﬂó   • ``
+ï î `ë ˇˇˇ˜Pê 	
+	ï ë ë ˇˇˇˇP	PÄ†  Ÿ	¯i†  ˇ               1        ﬁÕ  ﬂ¡   J   Õ   ﬂ¡   J   Õ  ﬂæ  J   Õ  ﬂ   æ  Õ  ﬂ¡   ·J   ‰9   æ  J   ¡   ·J   ‰æ  s s Õ  ﬂ¡   ·J   ‰9	   <
+   æ  s Õ  ﬂæ  P   ﬂæ  öÇ   ó   æ  ·J   ‰s  Õ  ﬂæ  J   ú   ó   ﬂæ  L
+   ó   ﬂ¡   J   ·J   ‰¡   J   s ·J   ‰   s ·J   ‰   w ô)   ó      æ  ú   ó   ﬂæ  L
+   ó   ﬂæ   ·J   ‰æ  s ·J   ‰s  ·J   ‰æ  9      æ  ö   ó'   ô   ó'   æ  J   ó(   <   æ  J   <   æ  ö   ó,   æ  J   ô   ó-   ó-   <   ¡   J   <    w ﬂ•	`	```
+`	)ê ˇˇˇÛPC Ä ÊP(`	ˇˇˇÌP`
+`P§ ë 
+ˇˇˇ¸PPPí † `ˇˇˇ¸P
+P
+≠ ¨ ˇˇˇ©PpPÄÄ‰   9D‚‰  s               "        ﬁÕ  ﬂ¡   J   Õ   ﬂ¡   J   Õ  ﬂæ  J   Õ  ﬂ   æ  Õ  ﬂ9   <   Õ  ﬂæ  úÑ   ó   ﬂ   æ   ·J   ‰	   s ú)   ó   ﬂæ   ·J   ‰¡   ·J
+   ‰s w ó   ﬂæ  ·J   ‰s  Õ  ﬂæ  J   ú   ó   ﬂæ  L   ó   ﬂæ   ·J   ‰æ  9      æ  ö   ó   ô   ó   æ  J   ó   <   æ  J   <   æ  ö   ó   æ  J   ô   ó   ó   <   ¡   J   <   w ﬂ•	`	```
+``
+ê Pö Pˇˇˇ˙P	Pî ê`
+≠ ¨ ˇˇˇßPsPÄº  Îb™´º  <                         ¡   J   Õ   ﬂ¡   J   Õ  ﬂæ  J   Õ  ﬂ   æ  Õ  ﬂ¡   ·J   ‰æ  s Õ  ﬂ9   <   Õ  ﬂæ  L   ﬂæ  úD   ó
+   ﬂæ  ¡    ª    æ  J	   
+s » 's L	   ﬂæ  
+   L	   ó   ﬂæ   ·J   ‰æ  s ·J   ‰s  ·J   ‰æ  9      æ  ö   ó   ô   ó   æ  J   ó   <   æ  J   <   ¡   J   <   w ﬂ• 	`	```
+`ˇˇˇÛP```
+	ˇˇˇ˜Pˇˇˇ˛P	î `ˇˇˇ¸P
+P
+≠ ˇˇˇøPZPÄÄ0  ÿ*0  ‹          
+               ¡   J   Õ   ﬂ¡   J   Õ  ﬂæ  J   Õ  ﬂ9   <   Õ  ﬂæ   ·J   ‰   w ﬂ   æ  ú   ó	   ﬂæ  	   L
+   ó
+   ﬂæ   ·J   ‰æ  9      æ  ö   ó   ô   ó   æ  J   ó   <   æ  J   <   m   <   w ﬂ• 	`	````ê P`§ `
+≠ 
+ˇˇˇøP{Pd   ñ¥Lád   .                        ﬁÕ   ﬂ¡    æ   s ·J   ‰   s ·J   ‰w  ﬂ•`ˇˇˇˇPP
+PPÄº  8jöEº  N               $        ﬁÕ  ﬂæ  J   ·J   ‰   s ·J   ‰   w ﬂ¡   J   J   ù   ó   ﬂ¡ 
+  ó   ö¨   ó	   ª   ·J   ‰¡   J	   J
+   ¡   J   J
+   s Õ   ﬂª   ·J   ‰¡   J	   J   ¡   J   J   s Õ  ﬂæ   æ  ö   ó   ¡   ·J   ‰s  ô   ó   æ   ó   Õ   ô   ó   ¡   ·J   ‰s  Õ   ó   ﬂæ  J   ·J   ‰æ   s ·J   ‰¡   ·J   ‰s  w ﬂ•`ï PP`Æ ˇˇˇﬁP6ˇˇˇﬁP6õ P∞ P`ê ˇˇˇ˙P
+Pˇˇˇ˜PPÄÃ  ø©:ÂÃ  \               &      ﬁÕ   ﬂæ   J   ùF  ó   ﬂ¡   ·J   ‰9   ¡   J   J   J   º  s Ã  ﬂæ   ¡       s ·J   ‰º  J   s ·J   ‰	   s L   ﬂº  J
+   ú-   ó   ﬂæ   J   ·J   ‰   ¡   J   w ó   ﬂ¡   J   J   ú   ó   ﬂ¡ 
+  ó   ö'   ó   æ   J   ·J   ‰   w ô'   ó   æ   ·J   ‰w  ﬂæ   m   L   ó!   ﬂæ   J   ·J   ‰º  J   º  J   w ó&   ﬂ•`î î ˇˇˇÿP+P
++ˇˇˇ¸PP	® +
+ˇˇˇP	ö ™ PP	î )ê 
+ˇˇˇÔP	P@   Î&O≠@                           ﬁÕ   ﬂæ   ·J   ‰w  ﬂ•`PPî   5ˆäΩî   ]                	      ﬁÕ   ﬂæ   J   ú<   ó   ﬂæ   J   ·J   ‰º  J   ù   ó   ﬂó   m   w ó   ﬂæ   L   ﬂ•`§ #ô ˇˇˇÍP	4`PÄT   ç7$¡T                           ﬁÕ   ﬂ¡    æ   s ·J   ‰w  ﬂ•`ˇˇˇˇP
+PPÄÄÄ‰  è”_„‰  i                ,       ¡   J   J   Õ   öP  ó   ¡       º  J   &   &æ   &   &s ·J   ‰   s Õ   ﬂ	   º  J   úÄ   ó   ﬂæ   ·J
+   ‰æ   ·J
+   ‰s  w ﬂæ   ·J   ‰   w ﬂ¡   J   J   /‚Kª   ·J   ‰ª    æ   ·J   ‰   s 
+s s &.Nó!   ﬂæ   ·J   ‰   º  J   ö   ó%   ¡   J   ô@   ó&      º  J   ö   ó)   ¡   J   ô   ó*   ¡   J   ó+   w ﬂó,   • `ù `-ˇˇˇ¿PLP
+î 	Pˇˇˇ¯Pê P)† 	ê PˇˇˇıPˇˇˇ¸P*	¨ ∂ ˇˇˇ”P	BPÄÄt  ¬Yxt                        Ω  Œ   ﬂﬁÕ  ﬂ¡   æ  s Œ   ﬂæ  J   ù   ó   ﬂ   ó   Œ   ﬂm   Õ   ﬂ¡   ù   ó   ﬂ9   ó   Œ   ﬂ¡   J   ù   ó   ﬂó   Œ   ﬂ¡   ö@   ó	   ¡  ·J   ‰¡      s ·J   ‰¡      æ   w ô1   ó   ¡   ·J	   ‰   s ·J
+   ‰   æ   w ó   ﬂæ  ¢•
+`ˇˇˇˇP		`§ `*Ä  ‘`† `° `õ 
+ˇˇˇıP
+(
+ˇˇˇ‰Pû !P/ˇˇˇÍP	`Qò  oÿ¬>ò  ˆ               -       ﬁÕ  ﬂæ  Õ   ﬂ¡   Õ  ﬂº  J   úÕ  ó   ﬂº  J   úπ  ó   ﬂº  J   ú•  ó	   ﬂº  J   úë  ó   ﬂ¡   æ   s ·J   ‰   s úi  ó   ﬂº  ·J   ‰w  ﬂ¡   J   ù   ó   ﬂ	   ó   Ã  ﬂ¡   æ   s ·J
+   ‰º  s Õ  ﬂæ  ù    ó   ﬂ   Ã  ﬂæ   º  KÕ  ó   ﬂæ  ú≥   ó   ﬂ   æ  úû   ó   ﬂ   æ  úâ   ó   ﬂ¡   J   ö   ó!   ¡   ¡   s ô   ó"   ¡   ó"   Õ   ﬂæ   ·J   ‰   º  &   &æ  &   &s Õ   ﬂæ   ·J   ‰æ  s Õ  ó*   ﬂ¡   æ  L   ﬂ¡  ·J   ‰æ   ¡   w ó-   ﬂ•
+`	`
+`î î î î ˇˇˇ˛PP/
+P£ %ˇˇˇ˛P
+
+ˇˇˇ˚P	í î ï ê ö ˇˇˇ˛Pú 
+ˇˇˇÓP
+ˇˇˇ˙P
+ˇˇˇ˘P	
+PÄÄ§   Ñ∑ﬂU§   s                          ¡   J   ¡   J   J   ùN   ó   ﬂ¡   J   J   ú   ó   ﬂ¡   J   J    ó
+   ú   ó   ﬂ¡ 
+  ó   L   ﬂ• `§ *ú ° ë P3ıÿ  `       `w  0    `  %    ±  Ñ    a   `C   j  Œ   f      @n   _  k  C    @Á   l      ``  m  n  o  g      h  r  q  p    `<   a  m  s  t  b  u  v  w  x  y  c  z  ,  {  |  }  Z  ¨  ~  i  I  	  `Ä  d  e  
+  `a  d  f  Å  Ç  !  e    `Ç  É  Ñ  d  f  m  Ö    `	  p
+  p  pd  f  a  $    Á   I  Ç  Ü    @á  à  â  m  ä    `a  ã      `a  ã      `a  ±  Á   I  $  <   l    `b  ç  é  0  è  ,  v  ê  Z    `a  í  0  é    0  }        ì  î    å  m  ï    `b  Å    p  `b  a    ë    `É  ó  ò  x    `ö  õ  <     `o  Ü  ó    pú  ù  <   û  Ç    `  @ü  x  †  y  °    w  ¢    h    `,  É  £    `  ®  ©  ™  ´  ¨  0  ú ≠  ö  Æ  C   õ  Ç  *    `  ±  ≤  ≥  ¥  õ  *  Ç    `a  C  Ü  •      ¶  ê   ë  ß    p◊ Ø    Á   I  ,  ∞    p  `k  U  ∑    `Æ  n  µ  ∂  `  a  ∑     Ä  √  ∏  6   U  å     pπ  m  £    `Ÿ     P  `Ÿ    P   `_  ¬    `  @Á   æ  ø      @_    @  ç   k  å   ¿  ]  ¡  0     px  
+  #    @          C    @  @  @  [  Z  V  U  `  m  µ  √  ƒ  ≈  Ÿ    P∫  .  º  6    P»  '  ⁄    Pê   I  %  ﬁ    PÀ  Ã  Õ  0  Œ  œ  –  —  !  `o    `    @'  0        	  “  +  8  ¡  –  #  `r  p  `      –  $  `r  p  —  .  "  `”  h  #  pp  $  pr  `  ¿  ‘  ’  ô  &  ``      —  %  o  '  `÷  `  ¡  –  %  `ô  %      @`    @¿  J  &  p8  '  p÷  g  (  `Á   a  I  Ñ  ÿ  "    ¿  ¬  .  0  ∫  ”  ‘  )  `o  `  m  ∂  a  c  z  x  ,  v  {  |  }  Z  ¨  ~  i  S  u  w  Ÿ  t  b  +  ⁄  €  ‹  ›  ﬁ  0  ﬂ    û  Ç  ·  	  ‡  „  ‚  ‰  Â  +  `û  Ç  Ì  ,  `É  y  -  `o  ˙  ˚  ¸  a  Ò  ∞   Ç    .  `  b  ˝  ˛  *  `a  ¡  0          »  %  '  .  6  0  Ã  Ê  ∞   Á  Ë  È  Í  u  É  w  Î  Ï  ,  Ü  +  p  Ó    Ô  û  Ç  Z    @w  h        Ò  x  +  ⁄  Ú  ¿      P  P  Pˆ  É  ˜  ¬    ‘  é    ¯  ô  ì  }  ¨    @,  pn  -  p˘  ˛  /  ``  m  ˇ  ì  ,  Ì  {    §  ◊  i  c  a  É  C  0  `,  }  a    
+  	              w  h    %  ∞    Ñ  ÿ              @   î     1  `a    
+  ,         @ è  y   x       h  w  !  @Ñ     3  `  ú a  Á    C   Ç  2  `a    ÿ c  b  ,  ⁄  |  }  Z  ¨  	 é  ~  m  
+ ë      [  \  Ü   2  p  +  û  ‡  C     Á   I  $    *  ‚  Ç  _     d  f    4  `a  ,  m  w  x    "  @#  @Á   $  @_  f  c  b  ‡  ‚  }  Ÿ  5  `a  ç   	   &  @I  Õ  ú  ∞    •       y  h   x  w   '  @    6  `     Ñ   a  	  ˇ  î    }  7  `,  a  =  L    (  @ ç  )  @Y  è   B  ‚     }        >  Z  Î  ê  *  @ ?   @    ˝  ’  8  `,  a  =  L  +  @Y    Z  è  ç   H  ê  ,  @ F   G    y  ’  9  `,  a  K  L  ç  -  @Y  ±    Z  Î  ê  .  @ M   N   ˝  ’  ;  `m  w  x  :  `,  a  P  /  @Y  {  |  L    ê  0  @ Q   R   :  p’  <  `V       2  3  Ñ    ≥  Ç   >  `ë  =  `V    2  @n   U   Z  û  Ç    Ü   C   a    ⁄   ë  =  pï   W  Y  @  `x  ?  `V    X  ?  pA  `a  ]  ! 0  " # û  Ç  ^    $ % 
+  Ñ  & ±  Z  ' ( }  ) ,  ‡  C  `©  ™  ´  ¨  ú u  õ  * + ¬  , ê   - I  . [  / 0     B  `Ã  ê   B  p4  @  1 2 3 É  Ü  D  `n   5 6 2  3        `  p       p  p     @      @	  
+                                ê                  !  "  #  $    @'  &    @)  (  %    @Ç  *  C   C    @-  ,  /  .  1  2  3  4  5  0  7  6  9  8  :  ;  <  +  >  =  ?  A  @  B  D  C  E  F  G  H  J  I  L  K  M  N  O  É  P  Q  R  T  S    @  @W  X  Y    @\  [  Z  V  	  @^  0  ]  U  n   
+  @Á     @_  `  a  b  c    @e  f  d  g  h    @i    @  p    p<     p  p    p  p  pã    på    pë    pñ    po    pô    p    pt    p§    pm    p∫    pº    pl  !  p—  "  pŒ  %  pœ  (  p◊  )  p–  *  pÂ  .  p˛  /  pì  0  pç  1  p˝  3  py  %  @4  p 5  p 6  p7  p8  p9  p1  @;  p<  pˇ  >  pŸ  3  @@  p◊ A  p4 C  p   `  p7 ˚  8 ˇXÑy                ™  œ                    9             o              n                            <         (      C         S              ?  1ŒÒ    c        C      e        K      f        f      Ç        j      *        n      ã        v   
+   å        ë      ë        Ä      =       ï      ñ        ö      o        £   
+   ô        ü      >       ≠              π      t        ÷      §        Ω      ?       Õ   	   ?       Ó      m        Í      @            ∫             º        
+  B   l             A       L     —        h     Œ        \     B       c     C            œ        t     8        z     ÷        ç     ◊        ú  *   –        ‹  G   Â        ∆     F             n        Õ     ˘        #     ˛        3  !   ì        T     ç        r  +   ˝        j     I       ù     y        ∞                         ÷  !   D        ˜     J             O        (     T        $     ’        <     ë        K     ˇ        I     K       e     Ÿ        c     L       j     ˇ        ó     M       Ç     g        ¢               ùH©¿      ÊD      ÊD                ÄP   ÃD  H   ÃD     
+           Å   °   y   °      ;             ≈   ‰   Ω   ‰                  Ô   T  Á   T     ©            
+
+    
+       P             ﬁ    ﬁ     ]             Ì  Y  Â  Y     7         Äg  p  _  p     ∑            y  ô  q  ô     …             §    ú       Ù               [    [     \            ~  ®  v  ®  	   ◊             ∂  ‡  Æ  ‡  	                 è  Ë  è  	   I           £  )  õ  )  	   ¸         Ä9  ∂  1  ∂  
+   ì            ^  ©  V  ©  
+   ∏             ∆  	  æ  	                    Y    Y     t            n  '  f  '     ƒ             û  “  ñ  “     Ù            <  æ  4  æ     í            ‘    Ã       1           Ä(  ˆ     ˆ     Ö             ¬  Ù  ∫  Ù                K  Û  C  Û     ¨          Ä  j  ˇ  j     h             N  Ë  N     =            {  ∫  s  ∫     »            …  ˙  ¡  ˙              Ä
+  Ò    Ò     W           Ó     Ê        7              ô  ˘  ô     2           ≠  Œ   •  Œ      ﬁ            ﬁ  D   ÷  D                 W   ä   O   ä      à           ‚   œ!  ⁄   œ!                  B!  Å!  :!  Å!     s            í!  À!  ä!  À!     √            Á!  √"  ﬂ!  √"                 ◊"  ò%  œ"  ò%               Ä≠%  Á+  •%  Á+     µ             '  %'   '  %'     	            µ*  €*  ≠*  €*     ∑           È*  ≠+  ·*  ≠+     Î            ¸+  …,  Ù+  …,                  ‡,  Ú0  ÿ,  Ú0     ‰            1  a2   1  a2     "          Äw2  F5  o2  F5     ë            ó3  Û3  è3  Û3     ∑            ]5  %6  U5  %6     b             O6  ¬7  G6  ¬7     T            –7  å8  »7  å8     €           ú8  2:  î8  2:     ß           C:  v;  ;:  v;     X            à;  ë<  Ä;  ë<     ò            §<  û=  ú<  û=     ¥           t=  õ=  l=  õ=      v            œ=  Ÿ>  «=  Ÿ>      —           Ì>  Q@  Â>  Q@      Ô          @  %@  @  %@  !             e@   @  ]@   @  !   f          ¢@  ∂@  ö@  ∂@  !   £            @  IB  Ë@  IB  !   Ò         ÇaB  ]D  YB  ]D  "   g          ìB  ≈C  ãB  ≈C  "   ô           qD   D  iD   D  #   }          5°›Í—&@∑úÒ„      g¯ﬁ˚g¯ﬁ˚H≈tg¯Âp   g    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/studentMPW/js/jquery.fancybox.pack.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|2ed8f56b-3540-a5a2-001f-25c4e728b93a|
+Accept-Ranges: bytes
+ETag: W/"17638-1744298494000"
+Last-Modified: Thu, 10 Apr 2025 15:21:34 GMT
+Content-Type: application/javascript
+Content-Length: 17638
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:07:54 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|2ed8f56b-3540-a5a2-001f-25c4e728b93a|
+Accept-Ranges: bytes
+ETag: W/"17638-1744298494000"
+Last-Modified: Thu, 10 Apr 2025 15:21:34 GMT
+Content-Type: application/javascript
+Content-Length: 17638
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=100
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 129 net-response-time-onstop 158 alt-data 1;17638,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  S2

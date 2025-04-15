@@ -1,0 +1,3275 @@
+/**
+ *@since 14 may 2012
+ *
+ *
+ */
+var gRoasterIdArray = new Array();
+var gDepartmentName = new Array();
+var gBatchSemester  = new Array();
+var gDepartmentId = new Array();
+function replaceAll(txt, replace, with_this){
+	return txt.replace(new RegExp(replace, 'g'),with_this);
+}
+/**
+ * @author jignesh vaghela
+ *	@name showStudentShare()
+ *	@since 30th Apr 2012
+ */
+
+var unshareStudentImage=new Array();
+var unshareStudentShareDt=new Array();
+var unshareStudentName=new Array();
+
+var newshareStudentImage=new Array();
+var newshareStudentShareDt=new Array();
+var newshareStudentName=new Array();
+var newshareStudentTypeId=new Array();
+
+
+
+
+function showStudentShare(id,inputid,batchIndexId,documentid,documenttype,semesterName,src,srcid)
+{
+	$('#trshowComment'+inputid).hide();
+	$('#trshowEmployeeShare'+inputid).hide();
+	$('#trshowPrivateComment'+inputid).hide();
+	
+	var share='<div class="shadow"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" onclick="javascript:$(\'#trshowStudentShare'+inputid+'\').fadeOut(1000);" style="color:red;">x</button><h5>Student Sharing with '+semesterName+'</h5></div>'+
+	'<table  class="table"><tr><td colspan="2"><table class="table"><tr><th colspan="5">By Batch</th></tr>'+
+	'<tr><td> <input type="text" id="student-batch-input-'+id+inputid+'" /></td><td><input type="checkbox" id="checkAllBatch'+id+inputid+'" /><label>My Batches</label></td>'+
+	'<td colspan="3" align="center"><input type="button" id="btnStudBatch'+id+inputid+'" value="Submit" class="btn btn-inverse btn-mini  " /></td></tr></table></td></tr>'+
+	'<tr><td colspan="2"><table class="table"><tr><th colspan="5">By Student Name</th></tr>'+
+	'<tr><td> <input type="text" id="student-name-input-'+id+inputid+'" /></td><td><input type="checkbox" id="checkAllStudent'+id+inputid+'" /><label>All Students</label></td>'+
+	'<td colspan="2" align="center"><input type="button" id="btnStud'+id+inputid+'" value="Submit" class="btn btn-inverse btn-mini  " /></td></tr></table></td></tr>'+		
+	'</table></div>';
+	$('#showStudentShare'+inputid).html(share);
+	var semcapid=gBatchSemCapId[batchIndexId];
+	var semId=gSemesterId[batchIndexId];
+	
+	var subId = $('#cmdloadsubject').val();
+	if(subId==undefined)
+		subId=0;
+	$.ajax({
+		url:'GetBatchStudentMappingAjax.json?semcapid='+semcapid+'&semesterName='+semesterName+'&semId='+semId+
+		'&subId='+subId,
+		dataType:'json',
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		async:false,
+		success:function(jArray){
+			$(document).ready(function() {
+
+				$("#student-batch-input-"+id+inputid).tokenInput(jArray, {
+					theme: "facebook",
+					preventDuplicates: true
+				});   
+
+				$("#checkAllBatch"+id+inputid).click(function() {
+					if($(this).attr('checked'))
+					{
+						for(var i=0; i<jArray.length; i++)
+						{
+							$("#student-batch-input-"+id+inputid).tokenInput("add", {id: jArray[i]["id"], name: jArray[i]["name"]});
+						}
+					}
+					else
+					{
+						$("#student-batch-input-"+id+inputid).tokenInput("clear");
+					}
+				});
+			});
+		},
+		error:function(){
+
+		}
+	});
+
+	$.ajax({
+		url:'getStudentMappingAllStudentofSemAjax.json?semcapid='+semcapid+'&semesterName='+semesterName+'&semId='+semId,
+		dataType:'json',
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		async:false,
+		success:function(jArray){
+			$(document).ready(function() {
+
+				$("#student-name-input-"+id+inputid).tokenInput(jArray, {
+					theme: "facebook",
+					preventDuplicates: true
+				}); 
+
+				$("#checkAllStudent"+id+inputid).click(function() {
+					if($(this).attr('checked'))
+					{
+						for(var i=0; i<jArray.length; i++)
+						{
+							$("#student-name-input-"+id+inputid).tokenInput("add", {id: jArray[i]["id"], name: jArray[i]["name"]});
+						}
+					}
+					else
+					{
+						$("#student-name-input-"+id+inputid).tokenInput("clear");
+					}
+				});
+			});
+		},
+		error:function(){
+
+		}
+	});
+	$('#trshowStudentShare'+inputid).show();
+
+	$("#btnStudBatch"+id+inputid).click(function() {
+
+		var sharedToStudent=$("#student-batch-input-"+id+inputid).val();
+		var studBatchArray = new Array();
+
+		studBatchArray=sharedToStudent.split(",");
+		$.ajax({
+			url:'saveStudentBatchDocumentSharingAjax.json?d__documentId='+documentid+'&documentType='+documenttype+'&sharedToStudent='+studBatchArray,
+			dataType:'json',
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray){
+				
+				
+				if(src=='dms')
+				{
+					$('#'+srcid).html('');
+					var uploadDocument =new	UploadDocument();
+					uploadDocument.getDocument(gNodeId, function(jArray){
+						uploadDocument.showDocument({
+							elementId:srcid,
+							documentList:jArray,
+						});
+					});
+				}	
+				else
+				{
+					
+					$('.tblFileIconList').html('');
+					getTextFiles(gNodeId);
+					getUploadedFiles(gNodeId);
+				}
+			},
+			error:function(){
+
+			}
+		});
+
+	});
+
+
+	$("#btnStud"+id+inputid).click(function() {
+
+		var sharedToStudent=$("#student-name-input-"+id+inputid).val();
+		var studPersonalArray = new Array();
+
+		studPersonalArray=sharedToStudent.split(",");
+		$.ajax({
+			url:'saveStudentPersonalDocumentSharingAjax.json',
+			dataType:'json',
+			type:'POST',
+			data:{d__documentId:documentid,documentType:documenttype,sharedToStudent:studPersonalArray.toString()},
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray){
+
+				if(src=='dms')
+				{
+					$('#'+srcid).html('');
+					var uploadDocument =new	UploadDocument();
+					uploadDocument.getDocument(gNodeId, function(jArray){
+						uploadDocument.showDocument({
+							elementId:srcid,
+							documentList:jArray,
+						});
+					});
+					
+					
+					
+				}	
+				else
+				{
+					$('.tblFileIconList').html('');
+					getTextFiles(gNodeId);
+					getUploadedFiles(gNodeId);
+					shareCourseFileDocument();
+					
+				}
+			},
+			error:function(){
+
+			}
+		});
+
+	});
+
+}
+/**
+ * @author jignesh vaghela
+ *	@name showEmployeeShare()
+ *	@since 30th Apr 2012
+ */
+var unshareEmployeeImage=new Array();
+var unshareEmployeeShareDt=new Array();
+var unshareEmployeeName=new Array();
+
+var newshareEmployeeImage=new Array();
+var newshareEmployeeShareDt=new Array();
+var newshareEmployeeName=new Array();
+var newshareEmployeeTypeId=new Array();
+function showEmployeeShare(id,inputid,roasterIndexId,documentid,documenttype,departmentName,src,srcid)
+{
+	$('#trshowComment'+inputid).hide();
+	$('#trshowStudentShare'+inputid).hide();
+	$('#trshowPrivateComment'+inputid).hide();
+	var share='<table class="gridtable">'+
+	'<tr><th colspan="3">Employee Sharing with '+departmentName+' Staff</th><th align="right"><a href="#" onclick="javascript:$(\'#trshowEmployeeShare'+inputid+'\').hide();"><img src="img/remove.png" /></a></th></tr>'+
+	'<tr><td><label>With Employee Name :</label></td><td> <input type="text" id="employee-name-input-'+id+inputid+'" /></td>'+
+	'<td colspan="2"><input type="checkbox" id="chkAll'+id+inputid+'" /><label>select All</label></td></tr>'+	
+	'<tr><td colspan="3"><table class="smalltable"><tr><td><label>Can View :</label><input type="checkbox" value="view" id="view'+inputid+'" /></td>'+
+	'<td><label>Can Edit :</label><input type="checkbox" value="edit" id="edit'+inputid+'" /></td>'+
+	'</tr></table></td><td align="center"><div class="login"><input type="button" value="Submit" id="btnSubmit'+id+inputid+'" /></div></td>'+
+	'</table>';
+	$('#showEmployeeShare'+inputid).html(share);
+
+	var roasterId=gRoasterIdArray[roasterIndexId];
+	$.ajax({
+		url:'loadEmployeeListofSharing.json?roasterId='+roasterId,
+		dataType:'json',
+		async:false,
+		beforeSend:function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			$(document).ready(function() {
+				$("#employee-name-input-"+id+inputid).tokenInput(jArray, {
+					theme: "facebook",
+					preventDuplicates: true
+				});
+				$("#btnSubmit"+id+inputid).click(function() {		        	
+					var sharedToEmployee=$("#employee-name-input-"+id+inputid).val();
+					var empIdArray = new Array();
+					empIdArray=sharedToEmployee.split(",");
+					
+					var view=$('#view'+inputid).attr('checked');
+					var edit=$('#edit'+inputid).attr('checked');
+					
+					$.ajax({
+						url:'saveDocumentSharingAjax.json?d__documentId='+documentid+'&documentType='+documenttype+'&sharedToEmployee='+empIdArray+'&view='+view+'&edit='+edit,
+						dataType:'json',
+						async:false,
+						beforeSend:function() {
+							startCommonAjaxSpinner();
+						},
+						complete: function() {
+							stopCommonAjaxSpinner();
+						},
+						success:function(jArray){
+					
+							if(src=='dms')
+							{
+								$('#'+srcid).html('');
+								var uploadDocument =new	UploadDocument();
+								uploadDocument.getDocument(gNodeId, function(jArray){
+									uploadDocument.showDocument({
+										elementId:srcid,
+										documentList:jArray,
+									});
+								});
+								
+								
+							}	
+							else
+							{
+								$('.tblFileIconList').html('');
+								getTextFiles(gNodeId);
+								getUploadedFiles(gNodeId);
+							}
+						},
+						error:function(){
+
+						}
+					});
+
+				});
+				$("#chkAll"+id+inputid).click(function() {
+					if($(this).attr('checked'))
+					{
+						for(var i=0; i<jArray.length; i++)
+						{
+							$("#employee-name-input-"+id+inputid).tokenInput("add", {id: jArray[i]["id"], name: jArray[i]["name"]});
+						}
+					}
+					else
+					{
+						$("#employee-name-input-"+id+inputid).tokenInput("clear");
+					}
+				});
+			});
+
+		},
+		error:function(){
+
+		}
+	});
+
+
+	$('#trshowEmployeeShare'+inputid).show();
+
+}
+/**
+ * @author jignesh vaghela
+ *	@name loadEmployeeRoasterMappingAjax()
+ *	@since 1st May 2012
+ */
+
+function loadEmployeeRoasterMappingAjax()
+{
+	if(gCategoryType=='courseFile')
+	{
+		var instCourseId=$('#cmbloadCourse').val();
+	
+		$.ajax({
+			url:'loadEmployeeRoasterMappingMin.json?type=required&instCourseId='+instCourseId,
+			dataType:'json',
+			async:false,
+			success:function(jArray){
+				var j=jArray.length;
+				var roasterId = 0;
+				var trustName = 1;
+				var campusName = 2;
+				var instituteName = 3;
+				var courseName = 4;
+				for(var i=0; i<j; i++)
+				{
+					gRoasterIdArray[i]=jArray[i][roasterId];
+					
+					if(jArray[i][trustName]!=undefined && jArray[i][trustName].toString()!='null')
+						gDepartmentName[i]=jArray[i][trustName];
+					else if(jArray[i][campusName]!=undefined && jArray[i][campusName].toString()!='null')
+						gDepartmentName[i]=jArray[i][campusName];
+					else if(jArray[i][instituteName]!=undefined && jArray[i][instituteName].toString()!='null')
+						gDepartmentName[i]=jArray[i][instituteName];
+					else if(jArray[i][courseName]!=undefined && jArray[i][courseName].toString()!='null')
+						gDepartmentName[i]=jArray[i][courseName];
+				}
+			},
+			error:function(){
+	
+			}
+		});
+	}
+	else
+	{
+		
+		$.ajax({
+			url:'loadEmployeeRoasterMappingMin.json?type=notrequired&instCourseId=0',
+			dataType:'json',
+			async:false,
+			success:function(jArray){
+				var j=jArray.length;
+				var roasterId = 0;
+				var trustName = 1;
+				var campusName = 2;
+				var instituteName = 3;
+				var courseName = 4;
+				for(var i=0; i<j; i++)
+				{
+					gRoasterIdArray[i]=jArray[i][roasterId];
+					
+					if(jArray[i][trustName]!=undefined && jArray[i][trustName].toString()!='null')
+						gDepartmentName[i]=jArray[i][trustName];
+					else if(jArray[i][campusName]!=undefined && jArray[i][campusName].toString()!='null')
+						gDepartmentName[i]=jArray[i][campusName];
+					else if(jArray[i][instituteName]!=undefined && jArray[i][instituteName].toString()!='null')
+						gDepartmentName[i]=jArray[i][instituteName];
+					else if(jArray[i][courseName]!=undefined && jArray[i][courseName].toString()!='null')
+						gDepartmentName[i]=jArray[i][courseName];
+				}
+			},
+			error:function(){
+	
+			}
+		});
+	}
+	loadStudentBatchAjax();
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name loadEmployeeRoasterMappingAjax()
+ *	@since 23rd june 2012
+ */
+var gBatchSemCapId = new Array();
+var gSemesterId = new Array();
+function loadStudentBatchAjax()
+{
+	if(gCategoryType=='mentoring')
+	{
+		loadStudentMentoring();
+	}	
+	else if(gCategoryType=='courseFile')
+	{
+		var instCourseId=$('#cmbloadCourse').val();
+		$.ajax({
+			url:'loadStudentBatch.json?type=required&instCourseId='+instCourseId,
+			dataType:'json',
+			async:false,
+			success:function(jArray){
+				var j=jArray.length;
+				for(var i=0; i<j; i++)
+				{
+					gBatchSemCapId[i]=jArray[i]["semesterBatchId"];
+					gBatchSemester[i]=jArray[i]["semesterName"];
+					gSemesterId[i]=jArray[i]["semesterId"];
+				}
+			},
+			error:function(){
+
+			}
+		});
+	}	
+	else
+	{
+		$.ajax({
+			url:'loadStudentBatch.json?type=notrequired&instCourseId=0',
+			dataType:'json',
+			async:false,
+			success:function(jArray){
+				var j=jArray.length;
+				for(var i=0; i<j; i++)
+				{
+					gBatchSemCapId[i]=jArray[i]["semesterBatchId"];
+					gBatchSemester[i]=jArray[i]["semesterName"];
+					gSemesterId[i]=jArray[i]["semesterId"];
+				}
+			},
+			error:function(){
+
+			}
+		});
+	}
+	
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name showComment()
+ *	@since 5th May 2012
+ */
+function showComment(inputid,documentTypeId,documentType,gcnt)
+{
+	var link='';
+	$('#trshowStudentShare'+inputid).hide();
+	$('#trshowEmployeeShare'+inputid).hide();
+	$('#trshowPrivateComment'+inputid).hide();
+	$.ajax({
+		url:'loadEmployeeDocumentComment.json?documentTypeId='+documentTypeId+'&documentType='+documentType,
+		dataType:'json',
+		async:false,
+		success:function(jArray){
+			var size =jArray[0].length;
+			var temp=new Array();
+			
+			if(documentType=='textfile')
+				temp=gjArrTextDocument;
+			else
+				temp=gjArrUploadedDocument;
+			
+			link='<div id="commentaccord">'+
+				'<h3><a href="#">Public Comment</a></h3>';
+			
+			link+='<div id="commonChat">'+
+			'<div style="width:100%;"><a href="javascript:void(0)" style="float:right;" onclick="javascript:$(\'#trshowComment'+inputid+'\').hide();"><img src="img/remove.png" /></a></div>'+
+			'<div id="showComment'+inputid+'">'+
+			'<div class="commentPanel" id="commentPanel-first-'+inputid+'" align="left">'+
+			'<div class="commentBox" align="right" id="commentBox-'+inputid+'">';
+
+			if(temp[gcnt]["hasProfileImage"]== 'no')
+			{
+				link+='<img src="'+jArray[gcnt]["profileImage"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+				gProfileImgPath=jArray[gcnt]["profileImage"];
+			}
+			else if(temp[gcnt]["hasProfileImage"]=='yes')
+			{
+				link+='<img src="getEmployeeProfileImage.json?id='+temp[gcnt]["employeeId"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+				gProfileImgPath= 'getEmployeeProfileImage.json?id='+temp[gcnt]["employeeId"];
+			}
+
+			link+='<input type="hidden" id="owner" value="" />'+
+			'<label id="record-">';
+			
+			if(documentType=='textfile')
+				link+='<textarea class="commentMark" id="commentMark-first-'+inputid+'" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitComment(this,event,\''+documentType+'\','+temp[gcnt]["documentId"]+','+inputid+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>';
+			else
+				link+='<textarea class="commentMark" id="commentMark-first-'+inputid+'" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitComment(this,event,\''+documentType+'\','+temp[gcnt]["documentPathId"]+','+inputid+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>';
+			link+='</label>'+
+			'<br clear="all" />'+
+			'</div>'+
+			'</div>'+
+			'</div>';
+			if(size>0)
+			{
+				for(var i=0; i<size; i++)
+				{
+					$('#'+documentType+'-'+documentTypeId+'-'+i).remove();
+				}
+				for(var i=1;i<=gCommentCnt; i++)
+				{
+					$('#'+documentType+'-'+documentTypeId+'-'+i).remove();
+				}
+				
+					for(var i=0; i<size; i++)
+					{
+						if(jArray[0][i]["person"]=='employee')
+						{
+							link+='<div class="commentPanel" id="'+documentType+'-'+documentTypeId+'-'+i+'" align="left">';
+	
+							if(jArray[0][i]["profileImageStatus"]=='notdefined') 
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="cmtimg_'+i+'" src="'+jArray[0][i]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+							else
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="cmtimg_'+i+'" src="getEmployeeProfileImageById.json?id='+jArray[0][i]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+	
+							link+='<label class="name"><b>'+jArray[0][i]["employeeName"]+'<a href="#"></a></b>'+
+							'<div class="name" style="text-align:justify;float:left;">'+
+							'<em>'+jArray[0][i]["comment"]+'</em>'+
+	
+							'</div>'+
+							'<br clear="all" />'+
+							'<br clear="all" />'+
+							'<div  class="name" align="center" style="width:350px;float:right; ">'+
+							'<div class="name" style="float:left;">';
+	
+							
+							link+='<span style="margin-bottom:10px;float:right;">'+jArray[0][i]["date"]+' at '+jArray[0][i]["time"];
+	
+							link+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deleteComment('+jArray[0][i]["documentBucketThreadId"]+',\''+documentType+'\','+i+','+documentTypeId+')" class="c_delete">Delete</a>'+
+							'<span id="clike-panel-">'+
+							'<a href="javascript: void(0)"  onclick="javascript: replyToComment(\''+documentType+'\','+documentTypeId+','+i+');">reply</a>'+
+							'</span>'+
+							'</span>'+
+							'</div>'+
+							'</div>'+
+							'</div>';
+						}
+						else
+						{
+							link+='<div class="commentPanel" id="'+documentType+'-'+documentTypeId+'-'+i+'" align="left">';
+							
+							if(jArray[0][i]["profileImageStatus"]=='notdefined') 
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="cmtimg_'+i+'" src="'+jArray[0][i]["studentId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+							else
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="cmtimg_'+i+'" src="getStudentProfileImageById.json?id='+jArray[0][i]["studentId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+	
+							link+='<label class="name"><b>'+jArray[0][i]["studentName"]+'<a href="#"></a></b>'+
+							'<div class="name" style="text-align:justify;float:left;">'+
+							'<em>'+jArray[0][i]["comment"]+'</em>'+
+	
+							'</div>'+
+							'<br clear="all" />'+
+							'<br clear="all" />'+
+							'<div  class="name" align="center" style="width:350px;float:right; ">'+
+							'<div class="name" style="float:left;">';
+	
+							
+							link+='<span style="margin-bottom:10px;float:right;">'+jArray[0][i]["date"]+' at '+jArray[0][i]["time"];
+	
+							link+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deleteComment('+jArray[0][i]["documentBucketThreadId"]+',\''+documentType+'\','+i+','+documentTypeId+')" class="c_delete">Delete</a>'+
+							'<span id="clike-panel-">'+
+							'<a href="javascript: void(0)"  onclick="javascript: replyToComment(\''+documentType+'\','+documentTypeId+','+i+');">reply</a>'+
+							'</span>'+
+							'</span>'+
+							'</div>'+
+							'</div>'+
+							'</div>';
+						}
+						gCommentCnt++;
+					}
+			}
+			link+='</div>';
+			
+			for(var i=1; i<jArray.length; i++)
+			{
+				if(jArray[i][0]!=undefined)
+				{
+					link+='<h3><a href="#">'+jArray[i][0]["threadName"]+' Comment</a></h3>';
+					link+='<div id="'+jArray[i][0]["threadName"]+'-'+jArray[i][0]["documentPrivateThreadId"]+'">';
+					link+='<div style="width:100%;"><a href="javascript:void(0)" style="float:right;" onclick="javascript:$(\'#trshowComment'+inputid+'\').hide();"><img src="img/remove.png" /></a></div>'+
+					'<div id="showComment-private'+inputid+'">'+
+					'<div class="commentPanel" id="commentPanel-first-private-'+inputid+'" align="left">'+
+					'<div class="commentBox" align="right" id="commentBox-private'+inputid+'">';
+	
+					if(temp[gcnt]["hasProfileImage"]== 'no')
+					{
+						link+='<img src="'+jArray[gcnt]["profileImage"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+						gProfileImgPath=jArray[gcnt]["profileImage"];
+					}
+					else if(temp[gcnt]["hasProfileImage"]=='yes')
+					{
+						link+='<img src="getEmployeeProfileImage.json?id='+temp[gcnt]["employeeId"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+						gProfileImgPath= 'getEmployeeProfileImage.json?id='+temp[gcnt]["employeeId"];
+					}
+	
+					link+='<input type="hidden" id="owner" value="" />'+
+					'<label id="record-">'+
+					'<textarea class="commentMark" id="commentMark-first-private-'+inputid+'" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitPrivateComment(this,event,\'textfile\','+documentTypeId+','+inputid+','+jArray[i][0]["documentPrivateThreadId"]+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>'+
+					'</label>'+
+					'<br clear="all" />'+
+					'</div>'+
+					'</div>'+
+					'</div>';
+					for(var j=1; j<jArray[i].length; j++)
+					{
+						if(jArray[0][i]["person"]=='employee')
+						{
+							link+='<div class="commentPanel" id="private-'+documentType+'-'+documentTypeId+'-'+i+'" align="left">';
+		
+							if(jArray[0][i]["profileImageStatus"]=='notdefined') 
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'privatecmtempimg_'+i+'\',\''+jArray[i][j]["employeeId"]+'\',\'employee\')" id="privatecmtimg_'+i+'" src="'+jArray[i][j]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+							else
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'privatecmtempimg_'+i+'\',\''+jArray[i][j]["employeeId"]+'\',\'employee\')" id="privatecmtimg_'+i+'" src="getEmployeeProfileImageById.json?id='+jArray[i][j]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+		
+							link+='<label class="name"><b>'+jArray[i][j]["employeeName"]+'<a href="#"></a></b>'+
+							'<div class="name" style="text-align:justify;float:left;">'+
+							'<em>'+jArray[i][j]["comment"]+'</em>'+
+		
+							'</div>'+
+							'<br clear="all" />'+
+							'<br clear="all" />'+
+							'<div  class="name" align="center" style="width:350px;float:right; ">'+
+							'<div class="name" style="float:left;">';
+		
+		
+							link+='<span style="margin-bottom:10px;float:right;">'+jArray[i][j]["date"]+' at '+jArray[i][j]["time"];
+		
+							link+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deletePrivateComment('+jArray[i][j]["documentPrivateBucketThreadId"]+',\''+documentType+'\','+i+','+documentTypeId+')" class="c_delete">Delete</a>'+
+							'<span id="clike-panel-">'+
+							'<a href="javascript: void(0)"  onclick="javascript: replyToPrivateComment(\''+documentType+'\','+documentTypeId+','+i+','+jArray[i][j]["documentPrivateBucketThreadId"]+');">reply</a>'+
+							'</span>'+
+							'</span>'+
+							'</div>'+
+							'</div>'+
+							'</div>';
+						}
+						else
+						{
+							link+='<div class="commentPanel" id="private-'+documentType+'-'+documentTypeId+'-'+i+'" align="left">';
+							
+							if(jArray[0][i]["profileImageStatus"]=='notdefined') 
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'privatecmtempimg_'+i+'\',\''+jArray[i][j]["studentId"]+'\',\'employee\')" id="privatecmtimg_'+i+'" src="'+jArray[i][j]["studentId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+							else
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'privatecmtempimg_'+i+'\',\''+jArray[i][j]["studentId"]+'\',\'employee\')" id="privatecmtimg_'+i+'" src="getStudnentProfileImageById.htm?id='+jArray[i][j]["studentId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+		
+							link+='<label class="name"><b>'+jArray[i][j]["studentName"]+'<a href="#"></a></b>'+
+							'<div class="name" style="text-align:justify;float:left;">'+
+							'<em>'+jArray[i][j]["comment"]+'</em>'+
+		
+							'</div>'+
+							'<br clear="all" />'+
+							'<br clear="all" />'+
+							'<div  class="name" align="center" style="width:350px;float:right; ">'+
+							'<div class="name" style="float:left;">';
+		
+		
+							link+='<span style="margin-bottom:10px;float:right;">'+jArray[i][j]["date"]+' at '+jArray[i][j]["time"];
+		
+							link+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deletePrivateComment('+jArray[i][j]["documentPrivateBucketThreadId"]+',\''+documentType+'\','+i+','+documentTypeId+')" class="c_delete">Delete</a>'+
+							'<span id="clike-panel-">'+
+							'<a href="javascript: void(0)"  onclick="javascript: replyToPrivateComment(\''+documentType+'\','+documentTypeId+','+i+','+jArray[i][j]["documentPrivateBucketThreadId"]+');">reply</a>'+
+							'</span>'+
+							'</span>'+
+							'</div>'+
+							'</div>'+
+							'</div>';
+						}
+					}
+					
+				}
+			}
+			link+='</div>';
+
+		},
+		error:function(){
+
+		}
+	});
+	$('#commentConfig'+inputid).html(link);
+	
+	$("#commentaccord").accordion('destroy');
+	   
+	$('#commentaccord').accordion({ header: "h3",
+   	 autoHeight: false, collapsible: true, active:false
+	});
+	$(document).ready(function(){$('.commentMark').elastic(); });
+	$('#trshowComment'+inputid).show();
+}
+/**
+ * @author jignesh vaghela
+ *	@name replyToComment()
+ *	@since 5th May 2012
+ */
+function replyToComment(documentType,documentTypeId,counter)
+{
+	$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove();
+
+	var comment='<div class="commentPanel" id="temp-'+documentType+'-'+documentTypeId+'-'+counter+'" align="left">'+
+	'<div class="commentBox" align="right" id="commentBox-">'+
+	'<img src="'+gProfileImgPath+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />'+
+	'<input type="hidden" id="owner" value="" />'+
+	'<label id="record-">'+
+	'<textarea class="commentMark" id="commentMark-" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitComment(this,event,\''+documentType+'\','+documentTypeId+','+counter+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>'+
+	'</label><a href="javascript:void(0)" onclick="removeCurrentComment(\'temp-'+documentType+'-'+documentTypeId+'-'+counter+'\')"><img src="img/cloaseshare.jpg" /></a>'+
+	'<br clear="all" />'+
+	'</div>'+
+	'</div>'+
+	'</div>';
+
+	$('#'+documentType+'-'+documentTypeId+'-'+counter).after($(comment).fadeIn('slow'));
+	
+}
+
+function replyToPrivateComment(documentType,documentTypeId,counter,documentPrivateBucketThreadId)
+{
+	$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove();
+
+	var comment='<div class="commentPanel" id="temp-'+documentType+'-'+documentTypeId+'-'+counter+'" align="left">'+
+	'<div class="commentBox" align="right" id="commentBox-">'+
+	'<img src="'+gProfileImgPath+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />'+
+	'<input type="hidden" id="owner" value="" />'+
+	'<label id="record-">'+
+	'<textarea class="commentMark" id="commentMark-" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitPrivateComment(this,event,\''+documentType+'\','+documentTypeId+','+counter+','+documentPrivateBucketThreadId+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>'+
+	'</label><a href="javascript:void(0)" onclick="removeCurrentComment(\'temp-'+documentType+'-'+documentTypeId+'-'+counter+'\')"><img src="img/cloaseshare.jpg" /></a>'+
+	'<br clear="all" />'+
+	'</div>'+
+	'</div>'+
+	'</div>';
+
+	$('#private-'+documentType+'-'+documentTypeId+'-'+counter).after($(comment).fadeIn('slow'));
+
+}
+
+function removeCurrentComment(id)
+{
+	$('#'+id).remove();
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name SubmitComment()
+ *	@since 5th May 2012
+ */
+function SubmitComment(id,event,documentType,documentTypeId,counter)
+{
+	var key = event.keyCode;
+	// If the user has pressed enter
+	if (key == 13) {
+
+		var sourceid=id.id;
+		var commentdisp=$('#'+id.id).val();
+
+		$.ajax({
+			url:'SubmitCommentAjax.json?documentType='+documentType+'&documentTypeId='+documentTypeId+'&comment='+commentdisp,
+			dataType:'json',
+			success:function(jArray){
+
+				gCommentCnt++;
+				var comment='';
+					
+					comment='<div class="commentPanel" id="'+documentType+'-'+documentTypeId+'-'+gCommentCnt+'" align="left">';
+
+
+					if(jArray[0]["profileImageStatus"]=='notdefined') 
+						comment+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+counter+'\',\''+jArray[0]["employeeId"]+'\',\'employee\')" id="cmtimg_'+counter+'" src="'+jArray[0]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+					else
+						comment+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+counter+'\',\''+jArray[0]["employeeId"]+'\',\'employee\')" id="cmtimg_'+counter+'" src="getEmployeeProfileImageById.json?id='+jArray[0]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+
+					comment+='<label class="name"><b>'+jArray[0]["employeeName"]+'<a href="#"></a></b>'+
+					'<div class="name" style="text-align:justify;float:left;">'+
+					'<em>'+jArray[0]["comment"]+'</em>'+
+
+					'</div>'+
+					'<br clear="all" />'+
+					'<br clear="all" />'+
+					'<div  class="name" align="center" style="width:350px;float:right; ">'+
+					'<div class="name" style="float:left;">';
+
+					alert(jArray[0]["documentBucketThreadId"]);
+					comment+='<span style="margin-bottom:10px;float:right;">'+jArray[0]["date"]+' at '+jArray[0]["time"];
+
+					comment+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deleteComment('+jArray[0]["documentBucketThreadId"]+',\''+documentType+'\','+gCommentCnt+','+documentTypeId+')" class="c_delete">Delete</a>'+
+					'<span id="clike-panel-">'+
+					'<a href="javascript: void(0)"  onclick="javascript: replyToComment(\''+documentType+'\','+documentTypeId+','+gCommentCnt+');">reply</a>'+
+					'</span>'+
+					'</span>'+
+					'</div>'+
+					'</div>'+
+					'</div>';
+					
+
+				if(sourceid.indexOf("commentMark-first") != -1)
+				{
+					$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeOut('slow');
+					$('#commentPanel-first-'+counter).after($(comment).fadeIn('slow'));
+				}
+				else
+				{
+					$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeOut('slow');
+					$('#'+documentType+'-'+documentTypeId+'-'+counter).after($(comment).fadeIn('slow'));
+				}
+			},
+			error:function(){
+
+			}
+		});
+		return false;
+	}
+	else {
+		return true;
+	}
+
+}
+
+function SubmitPrivateComment(id,event,documentType,documentTypeId,counter,documentPrivateBucketThreadId)
+{
+	var key = event.keyCode;
+	if (key == 13) {
+
+		var sourceid=id.id;
+		var commentdisp=$('#'+id.id).val();
+
+		$.ajax({
+			url:'SubmitPrivateCommentAjax.json?documentPrivateBucketThreadId='+documentPrivateBucketThreadId+'&comment='+commentdisp,
+			dataType:'json',
+			success:function(jArray){
+
+				gCommentCnt++;
+				var comment='';
+					
+					comment='<div class="commentPanel" id="private-'+documentType+'-'+documentTypeId+'-'+gCommentCnt+'" align="left">';
+
+
+					if(jArray[0]["profileImageStatus"]=='notdefined') 
+						comment+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+counter+'\',\''+jArray[0]["employeeId"]+'\',\'employee\')" id="cmtimg_'+counter+'" src="'+jArray[0]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+					else
+						comment+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+counter+'\',\''+jArray[0]["employeeId"]+'\',\'employee\')" id="cmtimg_'+counter+'" src="getEmployeeProfileImageById.json?id='+jArray[0]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+
+					comment+='<label class="name"><b>'+jArray[0]["employeeName"]+'<a href="#"></a></b>'+
+					'<div class="name" style="text-align:justify;float:left;">'+
+					'<em>'+jArray[0]["comment"]+'</em>'+
+
+					'</div>'+
+					'<br clear="all" />'+
+					'<br clear="all" />'+
+					'<div  class="name" align="center" style="width:350px;float:right; ">'+
+					'<div class="name" style="float:left;">';
+
+					
+					comment+='<span style="margin-bottom:10px;float:right;">'+jArray[0]["date"]+' at '+jArray[0]["time"];
+
+					comment+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deletePrivateComment('+jArray[0]["documentPrivateBucketThreadId"]+',\''+documentType+'\','+counter+','+documentTypeId+')" class="c_delete">Delete</a>'+
+					'<span id="clike-panel-">'+
+					'<a href="javascript: void(0)"  onclick="javascript: replyToPrivateComment(\''+documentType+'\','+documentTypeId+','+counter+','+jArray[0]["documentPrivateBucketThreadId"]+');">reply</a>'+
+					'</span>'+
+					'</span>'+
+					'</div>'+
+					'</div>'+
+					'</div>';
+
+				if(sourceid.indexOf("commentMark-first-private") != -1)
+				{
+					$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeOut('slow');
+					$('#commentPanel-first-private-'+counter).after($(comment).fadeIn('slow'));
+				}
+				else
+				{
+					$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeOut('slow');
+					$('#private-'+documentType+'-'+documentTypeId+'-'+counter).after($(comment).fadeIn('slow'));
+				}
+
+				counter++;
+
+			},
+			error:function(){
+
+			}
+		});
+		return false;
+	}
+	else {
+		return true;
+	}
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name for comment purpose 
+ *	@since 7th May 2012
+ */
+function deleteComment(documentThreadId,documentType,counter,documentTypeId)
+{
+	$.ajax({
+		url:'deleteCommentAjax.json?documentThreadId='+documentThreadId+'&documentType='+documentType+'&counter='+counter,
+		dataType:'json',
+		success:function(jArray){
+
+			$('#'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeIn('slow');
+
+		},
+		error:function(){
+
+		}
+	});
+}
+
+function deletePrivateComment(documentPrivateBucketThreadId,documentType,counter,documentTypeId)
+{
+	$.ajax({
+		url:'deletePrivateCommentAjax.json?documentPrivateBucketThreadId='+documentPrivateBucketThreadId,
+		dataType:'json',
+		success:function(jArray){
+
+			$('#private-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeIn('slow');
+
+		},
+		error:function(){
+
+		}
+	});
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name getSharedFiles()
+ *	@since 3rd May 2012
+ */
+function getSharedFiles()
+{
+	$.ajax({
+		url:'getSharedTextFilesAjax.json',
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			if(jArray.length > 0)
+			{
+				gjArrTextDocument = jArray;
+				showTextDocumentIcons();
+			}
+
+		},
+		error:function(){
+
+		}
+	});
+
+	$.ajax({
+		url:'getSharedUploadedFilesAjax.json',
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		async:false,
+		success:function(jArray){
+			if(jArray.length > 0)
+			{
+				gjArrUploadedDocument = jArray;
+				showUploadedDocumentIcon();
+			}
+		},
+		error:function(){
+
+		}
+	});
+}
+
+function showSharedEmployeeList(documentId,documentType,inputid)
+{
+	$('#trshowComment'+inputid).hide();
+	$('#trshowStudentShare'+inputid).hide();
+	$('#trshowPrivateComment'+inputid).hide();
+
+	var employeeShare='';
+	var doctypeId='';
+	var studsize='';
+	var empsize='';
+	employeeShare='<div id="viewSharedEmployeesAndStudents'+inputid+'"">'+
+	
+	'<h3><a href="#viewStudentSharedList'+inputid+'">View Shared Students</a></h3>';
+
+
+	employeeShare+='<div id="viewStudentSharedList'+inputid+'">';
+
+	$.ajax({
+		url:'showSharedStudentListAjax.json?d__documentId='+documentId+'&documentType='+documentType,
+		dataType:'json',
+		async:false,
+		success:function(jArray){
+
+			var size=jArray[0].length;
+			var alumcnt=0;
+			if(jArray[0].length>0)
+			{
+					employeeShare+='<div class="navbar navbar-static"><div class="navbar-inner">'+
+		            '<div class="container" style="width: auto;">'+
+		            	'<a class="brand" href="#">Shared Students</a><ul class="nav">'+
+		            '<li class="dropdown">'+
+		              '<a href="#" class="dropdown-toggle" data-toggle="dropdown">Add Private Comment <b class="caret"></b></a>'+
+		              '<ul class="dropdown-menu">';	
+					for(var i=0; i<jArray[1].length; i++)
+						employeeShare+='<li><a href="javascript:void(0)" onclick="addPrivateChat('+jArray[1][i]["documentPrivateBucketId"]+','+documentId+',\''+documentType+'\',\'student\')">'+jArray[1][i]["threadName"]+'</a></li>';
+					
+						employeeShare+='<li id="createNewThread" class="divider"></li>';
+						if(jArray[0][0]["owner"]=='yes')
+							employeeShare+='<li><a href="javascript:void(0)" onclick="newThread('+documentId+',\''+documentType+'\',\'student\')">Create New Thread</a></li>';
+					
+					employeeShare+= '  </ul>'+
+		            ' </li>'+
+		           '</ul></div></div><table style="width:100%; margin-left:0%; margin-right:0%;">'+
+					'<tr><th colspan="5">Shared Students<a href="javascript:void(0);" style="float:right;" onclick="javascript:$(\'#trshowEmployeeShare'+inputid+'\').hide();"><img src="img/remove.png" /></a></th></tr><tr>';
+					
+						for(var i=0; i<size; i++)
+						{
+							if((size-1)==i)
+							{
+								if(documentType=='textfile')
+									doctypeId=jArray[0][i]["documentBucketId"];
+								else
+									doctypeId=jArray[0][i]["documentPathBucketId"];
+								
+								if(jArray[0][i]["profileImageStatus"]=='notdefined')
+									employeeShare+='<td colspan="'+(5-alumcnt)+'" style="width:150px;"><div class="members shadow" id="sharedStud'+i+'"><img onmouseover="showPhotoDialog(\'studimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="studimg_'+i+'" src="'+jArray[0][i]["profileImage"]+'"  width="50px" height="50px" />';
+								else
+									employeeShare+='<td colspan="'+(5-alumcnt)+'" style="width:150px;"><div class="members shadow" id="sharedStud'+i+'"><img onmouseover="showPhotoDialog(\'studimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="studimg_'+i+'" src="getStudentProfileImageById.json?id='+jArray[0][i]["studentId"]+'"  width="50px" height="50px" />';
+								
+								employeeShare+='<label class="labelCircle">'+jArray[0][i]["studentName"]+'</label><input type="checkbox" class="sharedEmp" value="sharedEmp'+i+'" name="'+jArray[0][i]["employeeId"]+'" /></div></td>';
+							}
+							else
+							{
+								if(alumcnt=4)
+								{
+									alumcnt=0;
+									employeeShare+='</tr><tr>';
+								}
+									if(documentType=='textfile')
+										doctypeId=jArray[0][i]["documentBucketId"];
+									else
+										doctypeId=jArray[0][i]["documentPathBucketId"];
+			
+									if(jArray[0][i]["profileImageStatus"]=='notdefined')
+										employeeShare+='<td style="width:150px;"><div class="members shadow" id="sharedStud'+i+'"><img onmouseover="showPhotoDialog(\'studimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="studimg_'+i+'" src="'+jArray[0][i]["profileImage"]+'"  width="50px" height="50px" />';
+									else
+										employeeShare+='<td style="width:150px;"><div class="members shadow" id="sharedStud'+i+'"><img onmouseover="showPhotoDialog(\'studimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="studimg_'+i+'" src="getStudentProfileImageById.json?id='+jArray[0][i]["studentId"]+'"  width="50px" height="50px" />';
+									
+									employeeShare+='<label class="labelCircle">'+jArray[0][i]["studentName"]+'</label><input type="checkbox" class="sharedEmp" value="sharedEmp'+i+'" name="'+jArray[0][i]["employeeId"]+'" /></div></td>';
+									
+									alumcnt++;
+							}
+						}
+					employeeShare+='</tr></table></div>';
+			}
+		},
+		error:function(){
+
+		}
+	});
+
+
+	//employeeShare+='</div><h3><a href="#viewEmployeeSharedList'+inputid+'">View Shared Employees</a></h3><div id="viewEmployeeSharedList'+inputid+'">';
+
+	$.ajax({
+		url:'showSharedEmployeeListAjax.json?d__documentId='+documentId+'&documentType='+documentType,
+		dataType:'json',
+		async:false,
+		success:function(jArray){
+
+			var size=jArray[0].length;
+			empsize=jArray.length;
+			
+			var alumcnt=0;
+			if(jArray[0].length>0)
+			{
+				employeeShare+='<div class="navbar navbar-static"><div class="navbar-inner">'+
+	                '<div class="container" style="width: auto;">'+
+	            '<a class="brand" href="#">Shared Employees</a><ul class="nav">'+
+	                '<li class="dropdown">'+
+	                  '<a href="#" class="dropdown-toggle" data-toggle="dropdown">Add Private Comment <b class="caret"></b></a>'+
+	                  '<ul class="dropdown-menu">';
+				for(var i=0; i<jArray[1].length; i++)
+					employeeShare+='<li><a href="javascript:void(0)" onclick="addPrivateChat('+jArray[1][i]["documentPrivateBucketId"]+','+documentId+',\''+documentType+'\',\'employee\')">'+jArray[1][i]["threadName"]+'</a></li>';
+				
+					employeeShare+='<li id="createNewThread" class="divider"></li>';
+					if(jArray[0][0]["owner"]=='yes')
+						employeeShare+='<li><a href="javascript:void(0)" onclick="newThread('+documentId+',\''+documentType+'\',\'employee\')">Create New Thread</a></li>';
+				
+					employeeShare+= '  </ul>'+
+	               ' </li>'+
+	              '</ul></div></div><table style="width:100%; margin-left:0%; margin-right:0%;">'+
+				'<tr><th colspan="5">Shared Employees<a href="javascript:void(0);" style="float:right;" onclick="javascript:$(\'#trshowEmployeeShare'+inputid+'\').hide();"><img src="img/remove.png" /></a></th></tr><tr>';
+				
+					for(var i=0; i<size; i++)
+					{
+						if((size-1)==i)
+						{
+							if(documentType=='textfile')
+								doctypeId=jArray[0][i]["documentBucketId"];
+							else
+								doctypeId=jArray[0][i]["documentPathBucketId"];
+							
+							if(jArray[0][i]["profileImageStatus"]=='notdefined')
+								employeeShare+='<td colspan="'+(5-alumcnt)+'" style="width:150px;"><div class="members shadow" id="sharedEmp'+i+'"><img onmouseover="showPhotoDialog(\'empimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="empimg_'+i+'" src="'+jArray[0][i]["profileImage"]+'"  />';
+							else
+								employeeShare+='<td colspan="'+(5-alumcnt)+'" style="width:150px;"><div class="members shadow" id="sharedEmp'+i+'"><img onmouseover="showPhotoDialog(\'empimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="empimg_'+i+'" src="getEmployeeProfileImageById.json?id='+jArray[0][i]["employeeId"]+'" />';
+							
+							employeeShare+='<label class="labelCircle">'+jArray[0][i]["employeeName"]+'</label><input type="checkbox" class="sharedEmp" value="sharedEmp'+i+'" name="'+jArray[0][i]["employeeId"]+'" /></div></td>';
+						}
+						else
+						{
+							if(alumcnt==4)
+							{
+								alumcnt=0;
+								employeeShare+='</tr><tr>';
+							}
+								if(documentType=='textfile')
+									doctypeId=jArray[0][i]["documentBucketId"];
+								else
+									doctypeId=jArray[0][i]["documentPathBucketId"];
+		
+								if(jArray[0][i]["profileImageStatus"]=='notdefined')
+									employeeShare+='<td style="width:150px;"><div class="members shadow" id="sharedEmp'+i+'"><img onmouseover="showPhotoDialog(\'empimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="empimg_'+i+'" src="'+jArray[0][i]["profileImage"]+'"  />';
+								else
+									employeeShare+='<td style="width:150px;"><div class="members shadow" id="sharedEmp'+i+'"><img onmouseover="showPhotoDialog(\'empimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="empimg_'+i+'" src="getEmployeeProfileImageById.json?id='+jArray[0][i]["employeeId"]+'" />';
+								
+								employeeShare+='<label class="labelCircle">'+jArray[0][i]["employeeName"]+'</label><input type="checkbox" class="sharedEmp" name="'+jArray[0][i]["employeeId"]+'" value="sharedEmp'+i+'" /></div></td>';
+								
+								alumcnt++;
+						}
+					}
+			
+				employeeShare+='</tr></table></div>';
+			}
+		},
+		error:function(){
+
+		}
+	});
+	employeeShare+='</div></div>';
+
+	$('#trshowEmployeeShare'+inputid).show();
+	$('#showEmployeeShare'+inputid).html(employeeShare);
+	
+	 $("#viewSharedEmployeesAndStudents"+inputid).accordion('destroy');
+	   
+		$('#viewSharedEmployeesAndStudents'+inputid).accordion({ header: "h3",
+	   	 autoHeight: false, collapsible: true, active:false
+		});
+}
+
+
+function newThread(documentId,documentType,src)
+{
+	var thread='<div id="threadModal"  class="modal hide">'+
+	'<div class="modal-header">'+
+	'<button type="button" class="close" data-dismiss="modal">√ó</button>'+
+	'<h3>Thread Name</h3></div>'+
+	'<div class="modal-body" align="center">'+	
+	'		<table class="smalltable">	'+
+	'			<tr><th colspan="2"></th></tr>'+
+	'			<tr><td><label>Thread Name</label></td><td><input type="text" id="sharethradename" /></td></tr>'+
+	'		</table>'+
+	'</div>'+
+	'<div class="modal-footer"><input type="button" value="Save" class="btn btn-inverse btn-mini  " onclick="saveThreadName('+documentId+',\''+documentType+'\',\''+src+'\')" /> <a href="#" class="btn btn-inverse btn-mini  " data-dismiss="modal" style="margin-left:15px;">Close</a></div>'+
+	'</div>';
+	
+	$('#showPrivateCommentDiv').html(thread);
+	
+	$('#threadModal').modal('show');
+	
+}
+
+function addPrivateChat(documentPrivateBucketId,documentId,documentType,src)
+{
+	
+		var employee = new Array();
+		
+		$('.sharedEmp').each(function(){
+			if($(this).attr('checked'))
+			{
+				employee.push($(this).attr('name'));
+			}
+		});
+		var flag=0;
+		if(employee.length>0)
+			flag=1;
+		
+		if(flag==1)
+		{
+			$.ajax({
+				url:'addPrivateChat.json?documentPrivateBucketId='+documentPrivateBucketId+'&documentType='+documentType+'&employee='+employee+'&source='+src,
+				dataType:'json',
+				async:false,
+				beforeSend: function() {
+					startCommonAjaxSpinner();
+				},
+				complete: function() {
+					stopCommonAjaxSpinner();
+				},
+				success:function(jArray){
+					
+					jAlert("Successfully Added");
+
+				},
+				error:function(){
+
+				}
+			});
+		}
+		else
+		{
+			jAlert("Please select at least one Person.");
+		}
+	
+}
+
+function saveThreadName(documentId,documentType,src)
+{
+	var sharethradename=$('#sharethradename').val();
+	
+	$.ajax({
+		url:'addNewThreadToSharing.json?d__documentId='+documentId+'&documentType='+documentType+'&sharethradename='+sharethradename,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			
+			var thread='<li><a href="javascript:void(0)" onclick="addPrivateChat('+jArray[0]["documentPrivateBucketId"]+','+documentId+',\''+documentType+'\',\''+src+'\')">'+jArray[0]["threadName"]+'</a></li>';
+			
+			$('#createNewThread').before(thread);
+
+		},
+		error:function(){
+
+		}
+	});
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name unshareEmployee()
+ *	@since 15th May 2012
+ */
+
+
+
+function unshareEmployee(documentId,inputid,docuTypeBucketId,documentType)
+{
+	$.ajax({
+		url:'unshareEmployeeAjax.json?docuTypeBucketId='+docuTypeBucketId+'&documentType='+documentType,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			showSharedEmployeeList(documentId,documentType,inputid);
+
+		},
+		error:function(){
+
+		}
+	});
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name unshareEmployee()
+ *	@since 15th May 2012
+ */
+
+
+function showExistsshareEmployeeList(documentId,inputid,documentType)
+{
+
+	var size = newshareEmployeeName.length;
+	var count=parseInt(size)/9;
+	var colspanNo=parseInt(size)%9;
+	var  employeeShare='<table class="smalltable">'+
+	'<tr><th colspan="8">Shared Employees</th><th align="right"><a href="javascript:void(0);" onclick="javascript:$(\'#trshowEmployeeShare'+inputid+'\').hide();"><img src="img/remove.png" /></a></th></tr><tr>';
+	if(count==0 && colspanNo>0)
+	{
+		for(var i=0; i<colspanNo; i++)
+		{
+			if(colspanNo==(i-1))
+			{
+				employeeShare+='<td colspan="'+colspanNo+'" style="width:120px;"><table width="100px;"><tr><td width="40px" height="50px"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /></td></tr>'+
+				'<tr><td style="width:120px"><label>'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+			}
+			else
+			{
+				employeeShare+='<td width="100px"><table class="smalltable"><tr><td style="width=100px;" height="100px"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /></td></tr>'+
+				'<tr><td style="width:120px;"><label>'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+			}
+		}
+	}
+	else
+	{
+		var k=0;
+		for(var i=0; i<size; i++)
+		{
+			if(count==0)
+			{
+				var tempSize=parseInt(9)-parseInt(colspanNo);
+				for(var j=i; j<colspanNo; j++)
+				{
+
+					employeeShare+='<td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee('+documentId+','+inputid+','+newshareEmployeeTypeId[i]+',\''+documentType+'\')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>';
+					employeeShare+='<tr><td><label style="width:50px;font-size:10px;">'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+					i++;
+				}
+
+				employeeShare+='<td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee('+documentId+','+inputid+','+newshareEmployeeTypeId[i]+',\''+documentType+'\')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>';
+				employeeShare+='<tr><td colspan="'+tempSize+'"><label style="width:50px; font-size:10px;">'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+				i++;
+			}
+			else
+			{
+				if(k==9)
+				{
+					employeeShare+='</tr><tr>';
+
+					employeeShare+='<td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee('+documentId+','+inputid+','+newshareEmployeeTypeId[i]+',\''+documentType+'\')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>';
+					employeeShare+='<tr><td style="width:120px"><label style="width:50px; font-size:10px;">'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+					k=0;
+					count--;
+				}
+				else
+				{
+					employeeShare+='<td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee('+documentId+','+inputid+','+newshareEmployeeTypeId[i]+',\''+documentType+'\')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>';
+					employeeShare+='<tr><td style="width:120px"><label style="width:50px; font-size:10px;">'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+				}
+			}
+			k++;
+
+		}
+	}
+
+
+	var sizeShare = unshareEmployeeImage.length;
+	if(sizeShare > 0)
+	{
+		employeeShare+='<table class="gridtable">';
+		employeeShare+='<tr><th colspan="4">Already exist of shared employee List</th></tr>'+
+		'<tr><th><label>Employee Image</label></th><th><label>Employee Name</label></th><th><label>Shared Date</label></th></tr>';
+		for(var i=0; i<sizeShare; i++)
+		{
+
+			employeeShare+='<tr><td><img src="'+unshareEmployeeImage[i]+'" width="50px" height="50px" /></td>'+
+			'<td><label>'+unshareEmployeeName[i]+'</label></td>'+
+			'<td><label>'+unshareEmployeeShareDt[i]+'</label></td></tr>';
+		}
+		employeeShare+='</table>';
+	}
+
+	$('#trshowEmployeeShare'+inputid).show();
+	$('#showEmployeeShare'+inputid).html(employeeShare);
+
+
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name for comment purpose 
+ *	@since 5th May 2012
+ */
+
+(function($){$.fn.extend({elastic:function(){var mimics=['paddingTop','paddingRight','paddingBottom','paddingLeft','fontSize','lineHeight','fontFamily','width','fontWeight'];return this.each(function(){if(this.type!='textarea'){return false;}
+var $textarea=$(this),$twin=$('<div />').css({'position':'absolute','display':'none'}),lineHeight=parseInt($textarea.css('lineHeight'),4)||parseInt($textarea.css('fontSize'),'10'),minheight=parseInt($textarea.css('height'),4)||lineHeight*3,maxheight=parseInt($textarea.css('max-height'),10)||Number.MAX_VALUE,goalheight=0,i=0;$twin.appendTo($textarea.parent());var i=mimics.length;while(i--){$twin.css(mimics[i].toString(),$textarea.css(mimics[i].toString()));}
+function setHeightAndOverflow(height,overflow){curratedHeight=Math.floor(parseInt(height,10));if($textarea.height()!=curratedHeight){$textarea.css({'height':curratedHeight+'px','overflow':overflow});}}
+function update(){var textareaContent=$textarea.val().replace(/<|>/g,' ').replace(/\n/g,'<br />').replace(/&/g,"&amp;");var twinContent=$twin.html();if(textareaContent+'&nbsp;'!=twinContent){$twin.html(textareaContent+'&nbsp;');if(Math.abs($twin.height()+lineHeight-$textarea.height())>3){var goalheight=$twin.height()+lineHeight;if(goalheight>=maxheight){setHeightAndOverflow(maxheight,'auto');}else if(goalheight<=minheight){setHeightAndOverflow(minheight,'hidden');}else{setHeightAndOverflow(goalheight,'hidden');}}}}
+$textarea.css({'overflow':'hidden'}).bind('focus',function(){self.periodicalUpdater=window.setInterval(function(){update();},50);}).bind('blur',function(){clearInterval(self.periodicalUpdater);});update();});}});})(jQuery);
+        –Ô x ˇˇ     20250331133932-8l≥Ô £¨bÏ:   https://erp.cmrit.ac.in/scripts/dms/manageShareDocument.js      ÷  /**
+ *@since 14 may 2012
+ *
+ *
+ */
+var gRoasterIdArray = new Array();
+var gDepartmentName = new Array();
+var gBatchSemester  = new Array();
+var gDepartmentId = new Array();
+function replaceAll(txt, replace, with_this){
+	return txt.replace(new RegExp(replace, 'g'),with_this);
+}
+/**
+ * @author jignesh vaghela
+ *	@name showStudentShare()
+ *	@since 30th Apr 2012
+ */
+
+var unshareStudentImage=new Array();
+var unshareStudentShareDt=new Array();
+var unshareStudentName=new Array();
+
+var newshareStudentImage=new Array();
+var newshareStudentShareDt=new Array();
+var newshareStudentName=new Array();
+var newshareStudentTypeId=new Array();
+
+
+
+
+function showStudentShare(id,inputid,batchIndexId,documentid,documenttype,semesterName,src,srcid)
+{
+	$('#trshowComment'+inputid).hide();
+	$('#trshowEmployeeShare'+inputid).hide();
+	$('#trshowPrivateComment'+inputid).hide();
+	
+	var share='<div class="shadow"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" onclick="javascript:$(\'#trshowStudentShare'+inputid+'\').fadeOut(1000);" style="color:red;">x</button><h5>Student Sharing with '+semesterName+'</h5></div>'+
+	'<table  class="table"><tr><td colspan="2"><table class="table"><tr><th colspan="5">By Batch</th></tr>'+
+	'<tr><td> <input type="text" id="student-batch-input-'+id+inputid+'" /></td><td><input type="checkbox" id="checkAllBatch'+id+inputid+'" /><label>My Batches</label></td>'+
+	'<td colspan="3" align="center"><input type="button" id="btnStudBatch'+id+inputid+'" value="Submit" class="btn btn-inverse btn-mini  " /></td></tr></table></td></tr>'+
+	'<tr><td colspan="2"><table class="table"><tr><th colspan="5">By Student Name</th></tr>'+
+	'<tr><td> <input type="text" id="student-name-input-'+id+inputid+'" /></td><td><input type="checkbox" id="checkAllStudent'+id+inputid+'" /><label>All Students</label></td>'+
+	'<td colspan="2" align="center"><input type="button" id="btnStud'+id+inputid+'" value="Submit" class="btn btn-inverse btn-mini  " /></td></tr></table></td></tr>'+		
+	'</table></div>';
+	$('#showStudentShare'+inputid).html(share);
+	var semcapid=gBatchSemCapId[batchIndexId];
+	var semId=gSemesterId[batchIndexId];
+	
+	var subId = $('#cmdloadsubject').val();
+	if(subId==undefined)
+		subId=0;
+	$.ajax({
+		url:'GetBatchStudentMappingAjax.json?semcapid='+semcapid+'&semesterName='+semesterName+'&semId='+semId+
+		'&subId='+subId,
+		dataType:'json',
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		async:false,
+		success:function(jArray){
+			$(document).ready(function() {
+
+				$("#student-batch-input-"+id+inputid).tokenInput(jArray, {
+					theme: "facebook",
+					preventDuplicates: true
+				});   
+
+				$("#checkAllBatch"+id+inputid).click(function() {
+					if($(this).attr('checked'))
+					{
+						for(var i=0; i<jArray.length; i++)
+						{
+							$("#student-batch-input-"+id+inputid).tokenInput("add", {id: jArray[i]["id"], name: jArray[i]["name"]});
+						}
+					}
+					else
+					{
+						$("#student-batch-input-"+id+inputid).tokenInput("clear");
+					}
+				});
+			});
+		},
+		error:function(){
+
+		}
+	});
+
+	$.ajax({
+		url:'getStudentMappingAllStudentofSemAjax.json?semcapid='+semcapid+'&semesterName='+semesterName+'&semId='+semId,
+		dataType:'json',
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		async:false,
+		success:function(jArray){
+			$(document).ready(function() {
+
+				$("#student-name-input-"+id+inputid).tokenInput(jArray, {
+					theme: "facebook",
+					preventDuplicates: true
+				}); 
+
+				$("#checkAllStudent"+id+inputid).click(function() {
+					if($(this).attr('checked'))
+					{
+						for(var i=0; i<jArray.length; i++)
+						{
+							$("#student-name-input-"+id+inputid).tokenInput("add", {id: jArray[i]["id"], name: jArray[i]["name"]});
+						}
+					}
+					else
+					{
+						$("#student-name-input-"+id+inputid).tokenInput("clear");
+					}
+				});
+			});
+		},
+		error:function(){
+
+		}
+	});
+	$('#trshowStudentShare'+inputid).show();
+
+	$("#btnStudBatch"+id+inputid).click(function() {
+
+		var sharedToStudent=$("#student-batch-input-"+id+inputid).val();
+		var studBatchArray = new Array();
+
+		studBatchArray=sharedToStudent.split(",");
+		$.ajax({
+			url:'saveStudentBatchDocumentSharingAjax.json?d__documentId='+documentid+'&documentType='+documenttype+'&sharedToStudent='+studBatchArray,
+			dataType:'json',
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray){
+				
+				
+				if(src=='dms')
+				{
+					$('#'+srcid).html('');
+					var uploadDocument =new	UploadDocument();
+					uploadDocument.getDocument(gNodeId, function(jArray){
+						uploadDocument.showDocument({
+							elementId:srcid,
+							documentList:jArray,
+						});
+					});
+				}	
+				else
+				{
+					
+					$('.tblFileIconList').html('');
+					getTextFiles(gNodeId);
+					getUploadedFiles(gNodeId);
+				}
+			},
+			error:function(){
+
+			}
+		});
+
+	});
+
+
+	$("#btnStud"+id+inputid).click(function() {
+
+		var sharedToStudent=$("#student-name-input-"+id+inputid).val();
+		var studPersonalArray = new Array();
+
+		studPersonalArray=sharedToStudent.split(",");
+		$.ajax({
+			url:'saveStudentPersonalDocumentSharingAjax.json',
+			dataType:'json',
+			type:'POST',
+			data:{d__documentId:documentid,documentType:documenttype,sharedToStudent:studPersonalArray.toString()},
+			async:false,
+			beforeSend:function() {
+				startCommonAjaxSpinner();
+			},
+			complete: function() {
+				stopCommonAjaxSpinner();
+			},
+			success:function(jArray){
+
+				if(src=='dms')
+				{
+					$('#'+srcid).html('');
+					var uploadDocument =new	UploadDocument();
+					uploadDocument.getDocument(gNodeId, function(jArray){
+						uploadDocument.showDocument({
+							elementId:srcid,
+							documentList:jArray,
+						});
+					});
+					
+					
+					
+				}	
+				else
+				{
+					$('.tblFileIconList').html('');
+					getTextFiles(gNodeId);
+					getUploadedFiles(gNodeId);
+					shareCourseFileDocument();
+					
+				}
+			},
+			error:function(){
+
+			}
+		});
+
+	});
+
+}
+/**
+ * @author jignesh vaghela
+ *	@name showEmployeeShare()
+ *	@since 30th Apr 2012
+ */
+var unshareEmployeeImage=new Array();
+var unshareEmployeeShareDt=new Array();
+var unshareEmployeeName=new Array();
+
+var newshareEmployeeImage=new Array();
+var newshareEmployeeShareDt=new Array();
+var newshareEmployeeName=new Array();
+var newshareEmployeeTypeId=new Array();
+function showEmployeeShare(id,inputid,roasterIndexId,documentid,documenttype,departmentName,src,srcid)
+{
+	$('#trshowComment'+inputid).hide();
+	$('#trshowStudentShare'+inputid).hide();
+	$('#trshowPrivateComment'+inputid).hide();
+	var share='<table class="gridtable">'+
+	'<tr><th colspan="3">Employee Sharing with '+departmentName+' Staff</th><th align="right"><a href="#" onclick="javascript:$(\'#trshowEmployeeShare'+inputid+'\').hide();"><img src="img/remove.png" /></a></th></tr>'+
+	'<tr><td><label>With Employee Name :</label></td><td> <input type="text" id="employee-name-input-'+id+inputid+'" /></td>'+
+	'<td colspan="2"><input type="checkbox" id="chkAll'+id+inputid+'" /><label>select All</label></td></tr>'+	
+	'<tr><td colspan="3"><table class="smalltable"><tr><td><label>Can View :</label><input type="checkbox" value="view" id="view'+inputid+'" /></td>'+
+	'<td><label>Can Edit :</label><input type="checkbox" value="edit" id="edit'+inputid+'" /></td>'+
+	'</tr></table></td><td align="center"><div class="login"><input type="button" value="Submit" id="btnSubmit'+id+inputid+'" /></div></td>'+
+	'</table>';
+	$('#showEmployeeShare'+inputid).html(share);
+
+	var roasterId=gRoasterIdArray[roasterIndexId];
+	$.ajax({
+		url:'loadEmployeeListofSharing.json?roasterId='+roasterId,
+		dataType:'json',
+		async:false,
+		beforeSend:function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			$(document).ready(function() {
+				$("#employee-name-input-"+id+inputid).tokenInput(jArray, {
+					theme: "facebook",
+					preventDuplicates: true
+				});
+				$("#btnSubmit"+id+inputid).click(function() {		        	
+					var sharedToEmployee=$("#employee-name-input-"+id+inputid).val();
+					var empIdArray = new Array();
+					empIdArray=sharedToEmployee.split(",");
+					
+					var view=$('#view'+inputid).attr('checked');
+					var edit=$('#edit'+inputid).attr('checked');
+					
+					$.ajax({
+						url:'saveDocumentSharingAjax.json?d__documentId='+documentid+'&documentType='+documenttype+'&sharedToEmployee='+empIdArray+'&view='+view+'&edit='+edit,
+						dataType:'json',
+						async:false,
+						beforeSend:function() {
+							startCommonAjaxSpinner();
+						},
+						complete: function() {
+							stopCommonAjaxSpinner();
+						},
+						success:function(jArray){
+					
+							if(src=='dms')
+							{
+								$('#'+srcid).html('');
+								var uploadDocument =new	UploadDocument();
+								uploadDocument.getDocument(gNodeId, function(jArray){
+									uploadDocument.showDocument({
+										elementId:srcid,
+										documentList:jArray,
+									});
+								});
+								
+								
+							}	
+							else
+							{
+								$('.tblFileIconList').html('');
+								getTextFiles(gNodeId);
+								getUploadedFiles(gNodeId);
+							}
+						},
+						error:function(){
+
+						}
+					});
+
+				});
+				$("#chkAll"+id+inputid).click(function() {
+					if($(this).attr('checked'))
+					{
+						for(var i=0; i<jArray.length; i++)
+						{
+							$("#employee-name-input-"+id+inputid).tokenInput("add", {id: jArray[i]["id"], name: jArray[i]["name"]});
+						}
+					}
+					else
+					{
+						$("#employee-name-input-"+id+inputid).tokenInput("clear");
+					}
+				});
+			});
+
+		},
+		error:function(){
+
+		}
+	});
+
+
+	$('#trshowEmployeeShare'+inputid).show();
+
+}
+/**
+ * @author jignesh vaghela
+ *	@name loadEmployeeRoasterMappingAjax()
+ *	@since 1st May 2012
+ */
+
+function loadEmployeeRoasterMappingAjax()
+{
+	if(gCategoryType=='courseFile')
+	{
+		var instCourseId=$('#cmbloadCourse').val();
+	
+		$.ajax({
+			url:'loadEmployeeRoasterMappingMin.json?type=required&instCourseId='+instCourseId,
+			dataType:'json',
+			async:false,
+			success:function(jArray){
+				var j=jArray.length;
+				var roasterId = 0;
+				var trustName = 1;
+				var campusName = 2;
+				var instituteName = 3;
+				var courseName = 4;
+				for(var i=0; i<j; i++)
+				{
+					gRoasterIdArray[i]=jArray[i][roasterId];
+					
+					if(jArray[i][trustName]!=undefined && jArray[i][trustName].toString()!='null')
+						gDepartmentName[i]=jArray[i][trustName];
+					else if(jArray[i][campusName]!=undefined && jArray[i][campusName].toString()!='null')
+						gDepartmentName[i]=jArray[i][campusName];
+					else if(jArray[i][instituteName]!=undefined && jArray[i][instituteName].toString()!='null')
+						gDepartmentName[i]=jArray[i][instituteName];
+					else if(jArray[i][courseName]!=undefined && jArray[i][courseName].toString()!='null')
+						gDepartmentName[i]=jArray[i][courseName];
+				}
+			},
+			error:function(){
+	
+			}
+		});
+	}
+	else
+	{
+		
+		$.ajax({
+			url:'loadEmployeeRoasterMappingMin.json?type=notrequired&instCourseId=0',
+			dataType:'json',
+			async:false,
+			success:function(jArray){
+				var j=jArray.length;
+				var roasterId = 0;
+				var trustName = 1;
+				var campusName = 2;
+				var instituteName = 3;
+				var courseName = 4;
+				for(var i=0; i<j; i++)
+				{
+					gRoasterIdArray[i]=jArray[i][roasterId];
+					
+					if(jArray[i][trustName]!=undefined && jArray[i][trustName].toString()!='null')
+						gDepartmentName[i]=jArray[i][trustName];
+					else if(jArray[i][campusName]!=undefined && jArray[i][campusName].toString()!='null')
+						gDepartmentName[i]=jArray[i][campusName];
+					else if(jArray[i][instituteName]!=undefined && jArray[i][instituteName].toString()!='null')
+						gDepartmentName[i]=jArray[i][instituteName];
+					else if(jArray[i][courseName]!=undefined && jArray[i][courseName].toString()!='null')
+						gDepartmentName[i]=jArray[i][courseName];
+				}
+			},
+			error:function(){
+	
+			}
+		});
+	}
+	loadStudentBatchAjax();
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name loadEmployeeRoasterMappingAjax()
+ *	@since 23rd june 2012
+ */
+var gBatchSemCapId = new Array();
+var gSemesterId = new Array();
+function loadStudentBatchAjax()
+{
+	if(gCategoryType=='mentoring')
+	{
+		loadStudentMentoring();
+	}	
+	else if(gCategoryType=='courseFile')
+	{
+		var instCourseId=$('#cmbloadCourse').val();
+		$.ajax({
+			url:'loadStudentBatch.json?type=required&instCourseId='+instCourseId,
+			dataType:'json',
+			async:false,
+			success:function(jArray){
+				var j=jArray.length;
+				for(var i=0; i<j; i++)
+				{
+					gBatchSemCapId[i]=jArray[i]["semesterBatchId"];
+					gBatchSemester[i]=jArray[i]["semesterName"];
+					gSemesterId[i]=jArray[i]["semesterId"];
+				}
+			},
+			error:function(){
+
+			}
+		});
+	}	
+	else
+	{
+		$.ajax({
+			url:'loadStudentBatch.json?type=notrequired&instCourseId=0',
+			dataType:'json',
+			async:false,
+			success:function(jArray){
+				var j=jArray.length;
+				for(var i=0; i<j; i++)
+				{
+					gBatchSemCapId[i]=jArray[i]["semesterBatchId"];
+					gBatchSemester[i]=jArray[i]["semesterName"];
+					gSemesterId[i]=jArray[i]["semesterId"];
+				}
+			},
+			error:function(){
+
+			}
+		});
+	}
+	
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name showComment()
+ *	@since 5th May 2012
+ */
+function showComment(inputid,documentTypeId,documentType,gcnt)
+{
+	var link='';
+	$('#trshowStudentShare'+inputid).hide();
+	$('#trshowEmployeeShare'+inputid).hide();
+	$('#trshowPrivateComment'+inputid).hide();
+	$.ajax({
+		url:'loadEmployeeDocumentComment.json?documentTypeId='+documentTypeId+'&documentType='+documentType,
+		dataType:'json',
+		async:false,
+		success:function(jArray){
+			var size =jArray[0].length;
+			var temp=new Array();
+			
+			if(documentType=='textfile')
+				temp=gjArrTextDocument;
+			else
+				temp=gjArrUploadedDocument;
+			
+			link='<div id="commentaccord">'+
+				'<h3><a href="#">Public Comment</a></h3>';
+			
+			link+='<div id="commonChat">'+
+			'<div style="width:100%;"><a href="javascript:void(0)" style="float:right;" onclick="javascript:$(\'#trshowComment'+inputid+'\').hide();"><img src="img/remove.png" /></a></div>'+
+			'<div id="showComment'+inputid+'">'+
+			'<div class="commentPanel" id="commentPanel-first-'+inputid+'" align="left">'+
+			'<div class="commentBox" align="right" id="commentBox-'+inputid+'">';
+
+			if(temp[gcnt]["hasProfileImage"]== 'no')
+			{
+				link+='<img src="'+jArray[gcnt]["profileImage"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+				gProfileImgPath=jArray[gcnt]["profileImage"];
+			}
+			else if(temp[gcnt]["hasProfileImage"]=='yes')
+			{
+				link+='<img src="getEmployeeProfileImage.json?id='+temp[gcnt]["employeeId"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+				gProfileImgPath= 'getEmployeeProfileImage.json?id='+temp[gcnt]["employeeId"];
+			}
+
+			link+='<input type="hidden" id="owner" value="" />'+
+			'<label id="record-">';
+			
+			if(documentType=='textfile')
+				link+='<textarea class="commentMark" id="commentMark-first-'+inputid+'" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitComment(this,event,\''+documentType+'\','+temp[gcnt]["documentId"]+','+inputid+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>';
+			else
+				link+='<textarea class="commentMark" id="commentMark-first-'+inputid+'" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitComment(this,event,\''+documentType+'\','+temp[gcnt]["documentPathId"]+','+inputid+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>';
+			link+='</label>'+
+			'<br clear="all" />'+
+			'</div>'+
+			'</div>'+
+			'</div>';
+			if(size>0)
+			{
+				for(var i=0; i<size; i++)
+				{
+					$('#'+documentType+'-'+documentTypeId+'-'+i).remove();
+				}
+				for(var i=1;i<=gCommentCnt; i++)
+				{
+					$('#'+documentType+'-'+documentTypeId+'-'+i).remove();
+				}
+				
+					for(var i=0; i<size; i++)
+					{
+						if(jArray[0][i]["person"]=='employee')
+						{
+							link+='<div class="commentPanel" id="'+documentType+'-'+documentTypeId+'-'+i+'" align="left">';
+	
+							if(jArray[0][i]["profileImageStatus"]=='notdefined') 
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="cmtimg_'+i+'" src="'+jArray[0][i]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+							else
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="cmtimg_'+i+'" src="getEmployeeProfileImageById.json?id='+jArray[0][i]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+	
+							link+='<label class="name"><b>'+jArray[0][i]["employeeName"]+'<a href="#"></a></b>'+
+							'<div class="name" style="text-align:justify;float:left;">'+
+							'<em>'+jArray[0][i]["comment"]+'</em>'+
+	
+							'</div>'+
+							'<br clear="all" />'+
+							'<br clear="all" />'+
+							'<div  class="name" align="center" style="width:350px;float:right; ">'+
+							'<div class="name" style="float:left;">';
+	
+							
+							link+='<span style="margin-bottom:10px;float:right;">'+jArray[0][i]["date"]+' at '+jArray[0][i]["time"];
+	
+							link+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deleteComment('+jArray[0][i]["documentBucketThreadId"]+',\''+documentType+'\','+i+','+documentTypeId+')" class="c_delete">Delete</a>'+
+							'<span id="clike-panel-">'+
+							'<a href="javascript: void(0)"  onclick="javascript: replyToComment(\''+documentType+'\','+documentTypeId+','+i+');">reply</a>'+
+							'</span>'+
+							'</span>'+
+							'</div>'+
+							'</div>'+
+							'</div>';
+						}
+						else
+						{
+							link+='<div class="commentPanel" id="'+documentType+'-'+documentTypeId+'-'+i+'" align="left">';
+							
+							if(jArray[0][i]["profileImageStatus"]=='notdefined') 
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="cmtimg_'+i+'" src="'+jArray[0][i]["studentId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+							else
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="cmtimg_'+i+'" src="getStudentProfileImageById.json?id='+jArray[0][i]["studentId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+	
+							link+='<label class="name"><b>'+jArray[0][i]["studentName"]+'<a href="#"></a></b>'+
+							'<div class="name" style="text-align:justify;float:left;">'+
+							'<em>'+jArray[0][i]["comment"]+'</em>'+
+	
+							'</div>'+
+							'<br clear="all" />'+
+							'<br clear="all" />'+
+							'<div  class="name" align="center" style="width:350px;float:right; ">'+
+							'<div class="name" style="float:left;">';
+	
+							
+							link+='<span style="margin-bottom:10px;float:right;">'+jArray[0][i]["date"]+' at '+jArray[0][i]["time"];
+	
+							link+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deleteComment('+jArray[0][i]["documentBucketThreadId"]+',\''+documentType+'\','+i+','+documentTypeId+')" class="c_delete">Delete</a>'+
+							'<span id="clike-panel-">'+
+							'<a href="javascript: void(0)"  onclick="javascript: replyToComment(\''+documentType+'\','+documentTypeId+','+i+');">reply</a>'+
+							'</span>'+
+							'</span>'+
+							'</div>'+
+							'</div>'+
+							'</div>';
+						}
+						gCommentCnt++;
+					}
+			}
+			link+='</div>';
+			
+			for(var i=1; i<jArray.length; i++)
+			{
+				if(jArray[i][0]!=undefined)
+				{
+					link+='<h3><a href="#">'+jArray[i][0]["threadName"]+' Comment</a></h3>';
+					link+='<div id="'+jArray[i][0]["threadName"]+'-'+jArray[i][0]["documentPrivateThreadId"]+'">';
+					link+='<div style="width:100%;"><a href="javascript:void(0)" style="float:right;" onclick="javascript:$(\'#trshowComment'+inputid+'\').hide();"><img src="img/remove.png" /></a></div>'+
+					'<div id="showComment-private'+inputid+'">'+
+					'<div class="commentPanel" id="commentPanel-first-private-'+inputid+'" align="left">'+
+					'<div class="commentBox" align="right" id="commentBox-private'+inputid+'">';
+	
+					if(temp[gcnt]["hasProfileImage"]== 'no')
+					{
+						link+='<img src="'+jArray[gcnt]["profileImage"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+						gProfileImgPath=jArray[gcnt]["profileImage"];
+					}
+					else if(temp[gcnt]["hasProfileImage"]=='yes')
+					{
+						link+='<img src="getEmployeeProfileImage.json?id='+temp[gcnt]["employeeId"]+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />';
+						gProfileImgPath= 'getEmployeeProfileImage.json?id='+temp[gcnt]["employeeId"];
+					}
+	
+					link+='<input type="hidden" id="owner" value="" />'+
+					'<label id="record-">'+
+					'<textarea class="commentMark" id="commentMark-first-private-'+inputid+'" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitPrivateComment(this,event,\'textfile\','+documentTypeId+','+inputid+','+jArray[i][0]["documentPrivateThreadId"]+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>'+
+					'</label>'+
+					'<br clear="all" />'+
+					'</div>'+
+					'</div>'+
+					'</div>';
+					for(var j=1; j<jArray[i].length; j++)
+					{
+						if(jArray[0][i]["person"]=='employee')
+						{
+							link+='<div class="commentPanel" id="private-'+documentType+'-'+documentTypeId+'-'+i+'" align="left">';
+		
+							if(jArray[0][i]["profileImageStatus"]=='notdefined') 
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'privatecmtempimg_'+i+'\',\''+jArray[i][j]["employeeId"]+'\',\'employee\')" id="privatecmtimg_'+i+'" src="'+jArray[i][j]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+							else
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'privatecmtempimg_'+i+'\',\''+jArray[i][j]["employeeId"]+'\',\'employee\')" id="privatecmtimg_'+i+'" src="getEmployeeProfileImageById.json?id='+jArray[i][j]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+		
+							link+='<label class="name"><b>'+jArray[i][j]["employeeName"]+'<a href="#"></a></b>'+
+							'<div class="name" style="text-align:justify;float:left;">'+
+							'<em>'+jArray[i][j]["comment"]+'</em>'+
+		
+							'</div>'+
+							'<br clear="all" />'+
+							'<br clear="all" />'+
+							'<div  class="name" align="center" style="width:350px;float:right; ">'+
+							'<div class="name" style="float:left;">';
+		
+		
+							link+='<span style="margin-bottom:10px;float:right;">'+jArray[i][j]["date"]+' at '+jArray[i][j]["time"];
+		
+							link+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deletePrivateComment('+jArray[i][j]["documentPrivateBucketThreadId"]+',\''+documentType+'\','+i+','+documentTypeId+')" class="c_delete">Delete</a>'+
+							'<span id="clike-panel-">'+
+							'<a href="javascript: void(0)"  onclick="javascript: replyToPrivateComment(\''+documentType+'\','+documentTypeId+','+i+','+jArray[i][j]["documentPrivateBucketThreadId"]+');">reply</a>'+
+							'</span>'+
+							'</span>'+
+							'</div>'+
+							'</div>'+
+							'</div>';
+						}
+						else
+						{
+							link+='<div class="commentPanel" id="private-'+documentType+'-'+documentTypeId+'-'+i+'" align="left">';
+							
+							if(jArray[0][i]["profileImageStatus"]=='notdefined') 
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'privatecmtempimg_'+i+'\',\''+jArray[i][j]["studentId"]+'\',\'employee\')" id="privatecmtimg_'+i+'" src="'+jArray[i][j]["studentId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+							else
+								link+='<a href="#"><img onmouseover="showPhotoDialog(\'privatecmtempimg_'+i+'\',\''+jArray[i][j]["studentId"]+'\',\'employee\')" id="privatecmtimg_'+i+'" src="getStudnentProfileImageById.htm?id='+jArray[i][j]["studentId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+		
+							link+='<label class="name"><b>'+jArray[i][j]["studentName"]+'<a href="#"></a></b>'+
+							'<div class="name" style="text-align:justify;float:left;">'+
+							'<em>'+jArray[i][j]["comment"]+'</em>'+
+		
+							'</div>'+
+							'<br clear="all" />'+
+							'<br clear="all" />'+
+							'<div  class="name" align="center" style="width:350px;float:right; ">'+
+							'<div class="name" style="float:left;">';
+		
+		
+							link+='<span style="margin-bottom:10px;float:right;">'+jArray[i][j]["date"]+' at '+jArray[i][j]["time"];
+		
+							link+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deletePrivateComment('+jArray[i][j]["documentPrivateBucketThreadId"]+',\''+documentType+'\','+i+','+documentTypeId+')" class="c_delete">Delete</a>'+
+							'<span id="clike-panel-">'+
+							'<a href="javascript: void(0)"  onclick="javascript: replyToPrivateComment(\''+documentType+'\','+documentTypeId+','+i+','+jArray[i][j]["documentPrivateBucketThreadId"]+');">reply</a>'+
+							'</span>'+
+							'</span>'+
+							'</div>'+
+							'</div>'+
+							'</div>';
+						}
+					}
+					
+				}
+			}
+			link+='</div>';
+
+		},
+		error:function(){
+
+		}
+	});
+	$('#commentConfig'+inputid).html(link);
+	
+	$("#commentaccord").accordion('destroy');
+	   
+	$('#commentaccord').accordion({ header: "h3",
+   	 autoHeight: false, collapsible: true, active:false
+	});
+	$(document).ready(function(){$('.commentMark').elastic(); });
+	$('#trshowComment'+inputid).show();
+}
+/**
+ * @author jignesh vaghela
+ *	@name replyToComment()
+ *	@since 5th May 2012
+ */
+function replyToComment(documentType,documentTypeId,counter)
+{
+	$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove();
+
+	var comment='<div class="commentPanel" id="temp-'+documentType+'-'+documentTypeId+'-'+counter+'" align="left">'+
+	'<div class="commentBox" align="right" id="commentBox-">'+
+	'<img src="'+gProfileImgPath+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />'+
+	'<input type="hidden" id="owner" value="" />'+
+	'<label id="record-">'+
+	'<textarea class="commentMark" id="commentMark-" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitComment(this,event,\''+documentType+'\','+documentTypeId+','+counter+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>'+
+	'</label><a href="javascript:void(0)" onclick="removeCurrentComment(\'temp-'+documentType+'-'+documentTypeId+'-'+counter+'\')"><img src="img/cloaseshare.jpg" /></a>'+
+	'<br clear="all" />'+
+	'</div>'+
+	'</div>'+
+	'</div>';
+
+	$('#'+documentType+'-'+documentTypeId+'-'+counter).after($(comment).fadeIn('slow'));
+	
+}
+
+function replyToPrivateComment(documentType,documentTypeId,counter,documentPrivateBucketThreadId)
+{
+	$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove();
+
+	var comment='<div class="commentPanel" id="temp-'+documentType+'-'+documentTypeId+'-'+counter+'" align="left">'+
+	'<div class="commentBox" align="right" id="commentBox-">'+
+	'<img src="'+gProfileImgPath+'" style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />'+
+	'<input type="hidden" id="owner" value="" />'+
+	'<label id="record-">'+
+	'<textarea class="commentMark" id="commentMark-" onblur="if (this.value==\'\') this.value = \'Write a comment\'" onfocus="if (this.value==\'Write a comment\') this.value = \'\'" onKeyPress="return SubmitPrivateComment(this,event,\''+documentType+'\','+documentTypeId+','+counter+','+documentPrivateBucketThreadId+');" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>'+
+	'</label><a href="javascript:void(0)" onclick="removeCurrentComment(\'temp-'+documentType+'-'+documentTypeId+'-'+counter+'\')"><img src="img/cloaseshare.jpg" /></a>'+
+	'<br clear="all" />'+
+	'</div>'+
+	'</div>'+
+	'</div>';
+
+	$('#private-'+documentType+'-'+documentTypeId+'-'+counter).after($(comment).fadeIn('slow'));
+
+}
+
+function removeCurrentComment(id)
+{
+	$('#'+id).remove();
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name SubmitComment()
+ *	@since 5th May 2012
+ */
+function SubmitComment(id,event,documentType,documentTypeId,counter)
+{
+	var key = event.keyCode;
+	// If the user has pressed enter
+	if (key == 13) {
+
+		var sourceid=id.id;
+		var commentdisp=$('#'+id.id).val();
+
+		$.ajax({
+			url:'SubmitCommentAjax.json?documentType='+documentType+'&documentTypeId='+documentTypeId+'&comment='+commentdisp,
+			dataType:'json',
+			success:function(jArray){
+
+				gCommentCnt++;
+				var comment='';
+					
+					comment='<div class="commentPanel" id="'+documentType+'-'+documentTypeId+'-'+gCommentCnt+'" align="left">';
+
+
+					if(jArray[0]["profileImageStatus"]=='notdefined') 
+						comment+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+counter+'\',\''+jArray[0]["employeeId"]+'\',\'employee\')" id="cmtimg_'+counter+'" src="'+jArray[0]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+					else
+						comment+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+counter+'\',\''+jArray[0]["employeeId"]+'\',\'employee\')" id="cmtimg_'+counter+'" src="getEmployeeProfileImageById.json?id='+jArray[0]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+
+					comment+='<label class="name"><b>'+jArray[0]["employeeName"]+'<a href="#"></a></b>'+
+					'<div class="name" style="text-align:justify;float:left;">'+
+					'<em>'+jArray[0]["comment"]+'</em>'+
+
+					'</div>'+
+					'<br clear="all" />'+
+					'<br clear="all" />'+
+					'<div  class="name" align="center" style="width:350px;float:right; ">'+
+					'<div class="name" style="float:left;">';
+
+					alert(jArray[0]["documentBucketThreadId"]);
+					comment+='<span style="margin-bottom:10px;float:right;">'+jArray[0]["date"]+' at '+jArray[0]["time"];
+
+					comment+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deleteComment('+jArray[0]["documentBucketThreadId"]+',\''+documentType+'\','+gCommentCnt+','+documentTypeId+')" class="c_delete">Delete</a>'+
+					'<span id="clike-panel-">'+
+					'<a href="javascript: void(0)"  onclick="javascript: replyToComment(\''+documentType+'\','+documentTypeId+','+gCommentCnt+');">reply</a>'+
+					'</span>'+
+					'</span>'+
+					'</div>'+
+					'</div>'+
+					'</div>';
+					
+
+				if(sourceid.indexOf("commentMark-first") != -1)
+				{
+					$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeOut('slow');
+					$('#commentPanel-first-'+counter).after($(comment).fadeIn('slow'));
+				}
+				else
+				{
+					$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeOut('slow');
+					$('#'+documentType+'-'+documentTypeId+'-'+counter).after($(comment).fadeIn('slow'));
+				}
+			},
+			error:function(){
+
+			}
+		});
+		return false;
+	}
+	else {
+		return true;
+	}
+
+}
+
+function SubmitPrivateComment(id,event,documentType,documentTypeId,counter,documentPrivateBucketThreadId)
+{
+	var key = event.keyCode;
+	if (key == 13) {
+
+		var sourceid=id.id;
+		var commentdisp=$('#'+id.id).val();
+
+		$.ajax({
+			url:'SubmitPrivateCommentAjax.json?documentPrivateBucketThreadId='+documentPrivateBucketThreadId+'&comment='+commentdisp,
+			dataType:'json',
+			success:function(jArray){
+
+				gCommentCnt++;
+				var comment='';
+					
+					comment='<div class="commentPanel" id="private-'+documentType+'-'+documentTypeId+'-'+gCommentCnt+'" align="left">';
+
+
+					if(jArray[0]["profileImageStatus"]=='notdefined') 
+						comment+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+counter+'\',\''+jArray[0]["employeeId"]+'\',\'employee\')" id="cmtimg_'+counter+'" src="'+jArray[0]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+					else
+						comment+='<a href="#"><img onmouseover="showPhotoDialog(\'cmtempimg_'+counter+'\',\''+jArray[0]["employeeId"]+'\',\'employee\')" id="cmtimg_'+counter+'" src="getEmployeeProfileImageById.json?id='+jArray[0]["employeeId"]+'" style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>';
+
+					comment+='<label class="name"><b>'+jArray[0]["employeeName"]+'<a href="#"></a></b>'+
+					'<div class="name" style="text-align:justify;float:left;">'+
+					'<em>'+jArray[0]["comment"]+'</em>'+
+
+					'</div>'+
+					'<br clear="all" />'+
+					'<br clear="all" />'+
+					'<div  class="name" align="center" style="width:350px;float:right; ">'+
+					'<div class="name" style="float:left;">';
+
+					
+					comment+='<span style="margin-bottom:10px;float:right;">'+jArray[0]["date"]+' at '+jArray[0]["time"];
+
+					comment+='&nbsp;<a href="javascript:void(0)" onclick="javascript:deletePrivateComment('+jArray[0]["documentPrivateBucketThreadId"]+',\''+documentType+'\','+counter+','+documentTypeId+')" class="c_delete">Delete</a>'+
+					'<span id="clike-panel-">'+
+					'<a href="javascript: void(0)"  onclick="javascript: replyToPrivateComment(\''+documentType+'\','+documentTypeId+','+counter+','+jArray[0]["documentPrivateBucketThreadId"]+');">reply</a>'+
+					'</span>'+
+					'</span>'+
+					'</div>'+
+					'</div>'+
+					'</div>';
+
+				if(sourceid.indexOf("commentMark-first-private") != -1)
+				{
+					$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeOut('slow');
+					$('#commentPanel-first-private-'+counter).after($(comment).fadeIn('slow'));
+				}
+				else
+				{
+					$('#temp-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeOut('slow');
+					$('#private-'+documentType+'-'+documentTypeId+'-'+counter).after($(comment).fadeIn('slow'));
+				}
+
+				counter++;
+
+			},
+			error:function(){
+
+			}
+		});
+		return false;
+	}
+	else {
+		return true;
+	}
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name for comment purpose 
+ *	@since 7th May 2012
+ */
+function deleteComment(documentThreadId,documentType,counter,documentTypeId)
+{
+	$.ajax({
+		url:'deleteCommentAjax.json?documentThreadId='+documentThreadId+'&documentType='+documentType+'&counter='+counter,
+		dataType:'json',
+		success:function(jArray){
+
+			$('#'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeIn('slow');
+
+		},
+		error:function(){
+
+		}
+	});
+}
+
+function deletePrivateComment(documentPrivateBucketThreadId,documentType,counter,documentTypeId)
+{
+	$.ajax({
+		url:'deletePrivateCommentAjax.json?documentPrivateBucketThreadId='+documentPrivateBucketThreadId,
+		dataType:'json',
+		success:function(jArray){
+
+			$('#private-'+documentType+'-'+documentTypeId+'-'+counter).remove().fadeIn('slow');
+
+		},
+		error:function(){
+
+		}
+	});
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name getSharedFiles()
+ *	@since 3rd May 2012
+ */
+function getSharedFiles()
+{
+	$.ajax({
+		url:'getSharedTextFilesAjax.json',
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			if(jArray.length > 0)
+			{
+				gjArrTextDocument = jArray;
+				showTextDocumentIcons();
+			}
+
+		},
+		error:function(){
+
+		}
+	});
+
+	$.ajax({
+		url:'getSharedUploadedFilesAjax.json',
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		async:false,
+		success:function(jArray){
+			if(jArray.length > 0)
+			{
+				gjArrUploadedDocument = jArray;
+				showUploadedDocumentIcon();
+			}
+		},
+		error:function(){
+
+		}
+	});
+}
+
+function showSharedEmployeeList(documentId,documentType,inputid)
+{
+	$('#trshowComment'+inputid).hide();
+	$('#trshowStudentShare'+inputid).hide();
+	$('#trshowPrivateComment'+inputid).hide();
+
+	var employeeShare='';
+	var doctypeId='';
+	var studsize='';
+	var empsize='';
+	employeeShare='<div id="viewSharedEmployeesAndStudents'+inputid+'"">'+
+	
+	'<h3><a href="#viewStudentSharedList'+inputid+'">View Shared Students</a></h3>';
+
+
+	employeeShare+='<div id="viewStudentSharedList'+inputid+'">';
+
+	$.ajax({
+		url:'showSharedStudentListAjax.json?d__documentId='+documentId+'&documentType='+documentType,
+		dataType:'json',
+		async:false,
+		success:function(jArray){
+
+			var size=jArray[0].length;
+			var alumcnt=0;
+			if(jArray[0].length>0)
+			{
+					employeeShare+='<div class="navbar navbar-static"><div class="navbar-inner">'+
+		            '<div class="container" style="width: auto;">'+
+		            	'<a class="brand" href="#">Shared Students</a><ul class="nav">'+
+		            '<li class="dropdown">'+
+		              '<a href="#" class="dropdown-toggle" data-toggle="dropdown">Add Private Comment <b class="caret"></b></a>'+
+		              '<ul class="dropdown-menu">';	
+					for(var i=0; i<jArray[1].length; i++)
+						employeeShare+='<li><a href="javascript:void(0)" onclick="addPrivateChat('+jArray[1][i]["documentPrivateBucketId"]+','+documentId+',\''+documentType+'\',\'student\')">'+jArray[1][i]["threadName"]+'</a></li>';
+					
+						employeeShare+='<li id="createNewThread" class="divider"></li>';
+						if(jArray[0][0]["owner"]=='yes')
+							employeeShare+='<li><a href="javascript:void(0)" onclick="newThread('+documentId+',\''+documentType+'\',\'student\')">Create New Thread</a></li>';
+					
+					employeeShare+= '  </ul>'+
+		            ' </li>'+
+		           '</ul></div></div><table style="width:100%; margin-left:0%; margin-right:0%;">'+
+					'<tr><th colspan="5">Shared Students<a href="javascript:void(0);" style="float:right;" onclick="javascript:$(\'#trshowEmployeeShare'+inputid+'\').hide();"><img src="img/remove.png" /></a></th></tr><tr>';
+					
+						for(var i=0; i<size; i++)
+						{
+							if((size-1)==i)
+							{
+								if(documentType=='textfile')
+									doctypeId=jArray[0][i]["documentBucketId"];
+								else
+									doctypeId=jArray[0][i]["documentPathBucketId"];
+								
+								if(jArray[0][i]["profileImageStatus"]=='notdefined')
+									employeeShare+='<td colspan="'+(5-alumcnt)+'" style="width:150px;"><div class="members shadow" id="sharedStud'+i+'"><img onmouseover="showPhotoDialog(\'studimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="studimg_'+i+'" src="'+jArray[0][i]["profileImage"]+'"  width="50px" height="50px" />';
+								else
+									employeeShare+='<td colspan="'+(5-alumcnt)+'" style="width:150px;"><div class="members shadow" id="sharedStud'+i+'"><img onmouseover="showPhotoDialog(\'studimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="studimg_'+i+'" src="getStudentProfileImageById.json?id='+jArray[0][i]["studentId"]+'"  width="50px" height="50px" />';
+								
+								employeeShare+='<label class="labelCircle">'+jArray[0][i]["studentName"]+'</label><input type="checkbox" class="sharedEmp" value="sharedEmp'+i+'" name="'+jArray[0][i]["employeeId"]+'" /></div></td>';
+							}
+							else
+							{
+								if(alumcnt=4)
+								{
+									alumcnt=0;
+									employeeShare+='</tr><tr>';
+								}
+									if(documentType=='textfile')
+										doctypeId=jArray[0][i]["documentBucketId"];
+									else
+										doctypeId=jArray[0][i]["documentPathBucketId"];
+			
+									if(jArray[0][i]["profileImageStatus"]=='notdefined')
+										employeeShare+='<td style="width:150px;"><div class="members shadow" id="sharedStud'+i+'"><img onmouseover="showPhotoDialog(\'studimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="studimg_'+i+'" src="'+jArray[0][i]["profileImage"]+'"  width="50px" height="50px" />';
+									else
+										employeeShare+='<td style="width:150px;"><div class="members shadow" id="sharedStud'+i+'"><img onmouseover="showPhotoDialog(\'studimg_'+i+'\',\''+jArray[0][i]["studentId"]+'\',\'student\')" id="studimg_'+i+'" src="getStudentProfileImageById.json?id='+jArray[0][i]["studentId"]+'"  width="50px" height="50px" />';
+									
+									employeeShare+='<label class="labelCircle">'+jArray[0][i]["studentName"]+'</label><input type="checkbox" class="sharedEmp" value="sharedEmp'+i+'" name="'+jArray[0][i]["employeeId"]+'" /></div></td>';
+									
+									alumcnt++;
+							}
+						}
+					employeeShare+='</tr></table></div>';
+			}
+		},
+		error:function(){
+
+		}
+	});
+
+
+	//employeeShare+='</div><h3><a href="#viewEmployeeSharedList'+inputid+'">View Shared Employees</a></h3><div id="viewEmployeeSharedList'+inputid+'">';
+
+	$.ajax({
+		url:'showSharedEmployeeListAjax.json?d__documentId='+documentId+'&documentType='+documentType,
+		dataType:'json',
+		async:false,
+		success:function(jArray){
+
+			var size=jArray[0].length;
+			empsize=jArray.length;
+			
+			var alumcnt=0;
+			if(jArray[0].length>0)
+			{
+				employeeShare+='<div class="navbar navbar-static"><div class="navbar-inner">'+
+	                '<div class="container" style="width: auto;">'+
+	            '<a class="brand" href="#">Shared Employees</a><ul class="nav">'+
+	                '<li class="dropdown">'+
+	                  '<a href="#" class="dropdown-toggle" data-toggle="dropdown">Add Private Comment <b class="caret"></b></a>'+
+	                  '<ul class="dropdown-menu">';
+				for(var i=0; i<jArray[1].length; i++)
+					employeeShare+='<li><a href="javascript:void(0)" onclick="addPrivateChat('+jArray[1][i]["documentPrivateBucketId"]+','+documentId+',\''+documentType+'\',\'employee\')">'+jArray[1][i]["threadName"]+'</a></li>';
+				
+					employeeShare+='<li id="createNewThread" class="divider"></li>';
+					if(jArray[0][0]["owner"]=='yes')
+						employeeShare+='<li><a href="javascript:void(0)" onclick="newThread('+documentId+',\''+documentType+'\',\'employee\')">Create New Thread</a></li>';
+				
+					employeeShare+= '  </ul>'+
+	               ' </li>'+
+	              '</ul></div></div><table style="width:100%; margin-left:0%; margin-right:0%;">'+
+				'<tr><th colspan="5">Shared Employees<a href="javascript:void(0);" style="float:right;" onclick="javascript:$(\'#trshowEmployeeShare'+inputid+'\').hide();"><img src="img/remove.png" /></a></th></tr><tr>';
+				
+					for(var i=0; i<size; i++)
+					{
+						if((size-1)==i)
+						{
+							if(documentType=='textfile')
+								doctypeId=jArray[0][i]["documentBucketId"];
+							else
+								doctypeId=jArray[0][i]["documentPathBucketId"];
+							
+							if(jArray[0][i]["profileImageStatus"]=='notdefined')
+								employeeShare+='<td colspan="'+(5-alumcnt)+'" style="width:150px;"><div class="members shadow" id="sharedEmp'+i+'"><img onmouseover="showPhotoDialog(\'empimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="empimg_'+i+'" src="'+jArray[0][i]["profileImage"]+'"  />';
+							else
+								employeeShare+='<td colspan="'+(5-alumcnt)+'" style="width:150px;"><div class="members shadow" id="sharedEmp'+i+'"><img onmouseover="showPhotoDialog(\'empimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="empimg_'+i+'" src="getEmployeeProfileImageById.json?id='+jArray[0][i]["employeeId"]+'" />';
+							
+							employeeShare+='<label class="labelCircle">'+jArray[0][i]["employeeName"]+'</label><input type="checkbox" class="sharedEmp" value="sharedEmp'+i+'" name="'+jArray[0][i]["employeeId"]+'" /></div></td>';
+						}
+						else
+						{
+							if(alumcnt==4)
+							{
+								alumcnt=0;
+								employeeShare+='</tr><tr>';
+							}
+								if(documentType=='textfile')
+									doctypeId=jArray[0][i]["documentBucketId"];
+								else
+									doctypeId=jArray[0][i]["documentPathBucketId"];
+		
+								if(jArray[0][i]["profileImageStatus"]=='notdefined')
+									employeeShare+='<td style="width:150px;"><div class="members shadow" id="sharedEmp'+i+'"><img onmouseover="showPhotoDialog(\'empimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="empimg_'+i+'" src="'+jArray[0][i]["profileImage"]+'"  />';
+								else
+									employeeShare+='<td style="width:150px;"><div class="members shadow" id="sharedEmp'+i+'"><img onmouseover="showPhotoDialog(\'empimg_'+i+'\',\''+jArray[0][i]["employeeId"]+'\',\'employee\')" id="empimg_'+i+'" src="getEmployeeProfileImageById.json?id='+jArray[0][i]["employeeId"]+'" />';
+								
+								employeeShare+='<label class="labelCircle">'+jArray[0][i]["employeeName"]+'</label><input type="checkbox" class="sharedEmp" name="'+jArray[0][i]["employeeId"]+'" value="sharedEmp'+i+'" /></div></td>';
+								
+								alumcnt++;
+						}
+					}
+			
+				employeeShare+='</tr></table></div>';
+			}
+		},
+		error:function(){
+
+		}
+	});
+	employeeShare+='</div></div>';
+
+	$('#trshowEmployeeShare'+inputid).show();
+	$('#showEmployeeShare'+inputid).html(employeeShare);
+	
+	 $("#viewSharedEmployeesAndStudents"+inputid).accordion('destroy');
+	   
+		$('#viewSharedEmployeesAndStudents'+inputid).accordion({ header: "h3",
+	   	 autoHeight: false, collapsible: true, active:false
+		});
+}
+
+
+function newThread(documentId,documentType,src)
+{
+	var thread='<div id="threadModal"  class="modal hide">'+
+	'<div class="modal-header">'+
+	'<button type="button" class="close" data-dismiss="modal">√É‚Äî</button>'+
+	'<h3>Thread Name</h3></div>'+
+	'<div class="modal-body" align="center">'+	
+	'		<table class="smalltable">	'+
+	'			<tr><th colspan="2"></th></tr>'+
+	'			<tr><td><label>Thread Name</label></td><td><input type="text" id="sharethradename" /></td></tr>'+
+	'		</table>'+
+	'</div>'+
+	'<div class="modal-footer"><input type="button" value="Save" class="btn btn-inverse btn-mini  " onclick="saveThreadName('+documentId+',\''+documentType+'\',\''+src+'\')" /> <a href="#" class="btn btn-inverse btn-mini  " data-dismiss="modal" style="margin-left:15px;">Close</a></div>'+
+	'</div>';
+	
+	$('#showPrivateCommentDiv').html(thread);
+	
+	$('#threadModal').modal('show');
+	
+}
+
+function addPrivateChat(documentPrivateBucketId,documentId,documentType,src)
+{
+	
+		var employee = new Array();
+		
+		$('.sharedEmp').each(function(){
+			if($(this).attr('checked'))
+			{
+				employee.push($(this).attr('name'));
+			}
+		});
+		var flag=0;
+		if(employee.length>0)
+			flag=1;
+		
+		if(flag==1)
+		{
+			$.ajax({
+				url:'addPrivateChat.json?documentPrivateBucketId='+documentPrivateBucketId+'&documentType='+documentType+'&employee='+employee+'&source='+src,
+				dataType:'json',
+				async:false,
+				beforeSend: function() {
+					startCommonAjaxSpinner();
+				},
+				complete: function() {
+					stopCommonAjaxSpinner();
+				},
+				success:function(jArray){
+					
+					jAlert("Successfully Added");
+
+				},
+				error:function(){
+
+				}
+			});
+		}
+		else
+		{
+			jAlert("Please select at least one Person.");
+		}
+	
+}
+
+function saveThreadName(documentId,documentType,src)
+{
+	var sharethradename=$('#sharethradename').val();
+	
+	$.ajax({
+		url:'addNewThreadToSharing.json?d__documentId='+documentId+'&documentType='+documentType+'&sharethradename='+sharethradename,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			
+			var thread='<li><a href="javascript:void(0)" onclick="addPrivateChat('+jArray[0]["documentPrivateBucketId"]+','+documentId+',\''+documentType+'\',\''+src+'\')">'+jArray[0]["threadName"]+'</a></li>';
+			
+			$('#createNewThread').before(thread);
+
+		},
+		error:function(){
+
+		}
+	});
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name unshareEmployee()
+ *	@since 15th May 2012
+ */
+
+
+
+function unshareEmployee(documentId,inputid,docuTypeBucketId,documentType)
+{
+	$.ajax({
+		url:'unshareEmployeeAjax.json?docuTypeBucketId='+docuTypeBucketId+'&documentType='+documentType,
+		dataType:'json',
+		async:false,
+		beforeSend: function() {
+			startCommonAjaxSpinner();
+		},
+		complete: function() {
+			stopCommonAjaxSpinner();
+		},
+		success:function(jArray){
+			showSharedEmployeeList(documentId,documentType,inputid);
+
+		},
+		error:function(){
+
+		}
+	});
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name unshareEmployee()
+ *	@since 15th May 2012
+ */
+
+
+function showExistsshareEmployeeList(documentId,inputid,documentType)
+{
+
+	var size = newshareEmployeeName.length;
+	var count=parseInt(size)/9;
+	var colspanNo=parseInt(size)%9;
+	var  employeeShare='<table class="smalltable">'+
+	'<tr><th colspan="8">Shared Employees</th><th align="right"><a href="javascript:void(0);" onclick="javascript:$(\'#trshowEmployeeShare'+inputid+'\').hide();"><img src="img/remove.png" /></a></th></tr><tr>';
+	if(count==0 && colspanNo>0)
+	{
+		for(var i=0; i<colspanNo; i++)
+		{
+			if(colspanNo==(i-1))
+			{
+				employeeShare+='<td colspan="'+colspanNo+'" style="width:120px;"><table width="100px;"><tr><td width="40px" height="50px"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /></td></tr>'+
+				'<tr><td style="width:120px"><label>'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+			}
+			else
+			{
+				employeeShare+='<td width="100px"><table class="smalltable"><tr><td style="width=100px;" height="100px"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /></td></tr>'+
+				'<tr><td style="width:120px;"><label>'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+			}
+		}
+	}
+	else
+	{
+		var k=0;
+		for(var i=0; i<size; i++)
+		{
+			if(count==0)
+			{
+				var tempSize=parseInt(9)-parseInt(colspanNo);
+				for(var j=i; j<colspanNo; j++)
+				{
+
+					employeeShare+='<td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee('+documentId+','+inputid+','+newshareEmployeeTypeId[i]+',\''+documentType+'\')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>';
+					employeeShare+='<tr><td><label style="width:50px;font-size:10px;">'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+					i++;
+				}
+
+				employeeShare+='<td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee('+documentId+','+inputid+','+newshareEmployeeTypeId[i]+',\''+documentType+'\')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>';
+				employeeShare+='<tr><td colspan="'+tempSize+'"><label style="width:50px; font-size:10px;">'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+				i++;
+			}
+			else
+			{
+				if(k==9)
+				{
+					employeeShare+='</tr><tr>';
+
+					employeeShare+='<td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee('+documentId+','+inputid+','+newshareEmployeeTypeId[i]+',\''+documentType+'\')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>';
+					employeeShare+='<tr><td style="width:120px"><label style="width:50px; font-size:10px;">'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+					k=0;
+					count--;
+				}
+				else
+				{
+					employeeShare+='<td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="'+newshareEmployeeImage[i]+'" alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee('+documentId+','+inputid+','+newshareEmployeeTypeId[i]+',\''+documentType+'\')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>';
+					employeeShare+='<tr><td style="width:120px"><label style="width:50px; font-size:10px;">'+newshareEmployeeName[i]+'</label></td></tr></table></td>';
+				}
+			}
+			k++;
+
+		}
+	}
+
+
+	var sizeShare = unshareEmployeeImage.length;
+	if(sizeShare > 0)
+	{
+		employeeShare+='<table class="gridtable">';
+		employeeShare+='<tr><th colspan="4">Already exist of shared employee List</th></tr>'+
+		'<tr><th><label>Employee Image</label></th><th><label>Employee Name</label></th><th><label>Shared Date</label></th></tr>';
+		for(var i=0; i<sizeShare; i++)
+		{
+
+			employeeShare+='<tr><td><img src="'+unshareEmployeeImage[i]+'" width="50px" height="50px" /></td>'+
+			'<td><label>'+unshareEmployeeName[i]+'</label></td>'+
+			'<td><label>'+unshareEmployeeShareDt[i]+'</label></td></tr>';
+		}
+		employeeShare+='</table>';
+	}
+
+	$('#trshowEmployeeShare'+inputid).show();
+	$('#showEmployeeShare'+inputid).html(employeeShare);
+
+
+}
+
+/**
+ * @author jignesh vaghela
+ *	@name for comment purpose 
+ *	@since 5th May 2012
+ */
+
+(function($){$.fn.extend({elastic:function(){var mimics=['paddingTop','paddingRight','paddingBottom','paddingLeft','fontSize','lineHeight','fontFamily','width','fontWeight'];return this.each(function(){if(this.type!='textarea'){return false;}
+var $textarea=$(this),$twin=$('<div />').css({'position':'absolute','display':'none'}),lineHeight=parseInt($textarea.css('lineHeight'),4)||parseInt($textarea.css('fontSize'),'10'),minheight=parseInt($textarea.css('height'),4)||lineHeight*3,maxheight=parseInt($textarea.css('max-height'),10)||Number.MAX_VALUE,goalheight=0,i=0;$twin.appendTo($textarea.parent());var i=mimics.length;while(i--){$twin.css(mimics[i].toString(),$textarea.css(mimics[i].toString()));}
+function setHeightAndOverflow(height,overflow){curratedHeight=Math.floor(parseInt(height,10));if($textarea.height()!=curratedHeight){$textarea.css({'height':curratedHeight+'px','overflow':overflow});}}
+function update(){var textareaContent=$textarea.val().replace(/<|>/g,' ').replace(/\n/g,'<br />').replace(/&/g,"&amp;");var twinContent=$twin.html();if(textareaContent+'&nbsp;'!=twinContent){$twin.html(textareaContent+'&nbsp;');if(Math.abs($twin.height()+lineHeight-$textarea.height())>3){var goalheight=$twin.height()+lineHeight;if(goalheight>=maxheight){setHeightAndOverflow(maxheight,'auto');}else if(goalheight<=minheight){setHeightAndOverflow(minheight,'hidden');}else{setHeightAndOverflow(goalheight,'hidden');}}}}
+$textarea.css({'overflow':'hidden'}).bind('focus',function(){self.periodicalUpdater=window.setInterval(function(){update();},50);}).bind('blur',function(){clearInterval(self.periodicalUpdater);});update();});}});})(jQuery);
+”ò¿ŸO  ∆       ˘m      gRoasterIdArray    kŒDá      gDepartmentName    µÍÚ      gBatchSemester     ìè      gDepartmentId      é
+      replaceAll     æÇÅÂ      txt    CN€	      with_this      ¬´õ      unshareStudentImage    °]ı      unshareStudentShareDt	      ˚ŒŒë      unshareStudentName
+     v-”      newshareStudentImage   é˚D      newshareStudentShareDt     +‡]π      newshareStudentName    |ﬁ˝      newshareStudentTypeId      $˜      showStudentShare   †ñ≠G      inputid    D8f      batchIndexId   ò’õH
+      documentid     }:¡C      documenttype   ø«ÊS      semesterName   ú∑»õ      src    v^Ê      srcid      ∑_õ      #trshowComment     üvÙ}      hide   ∏ o¢      #trshowEmployeeShare   /„û      #trshowPrivateComment      %û¸-      share      Ò@Ê©ë      <div class="shadow"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" onclick="javascript:$('#trshowStudentShare      ÖkEBI      ').fadeOut(1000);" style="color:red;">x</button><h5>Student Sharing with        +⁄ÁÒ5      " /></td><td><input type="checkbox" id="checkAllBatch&      ‹¸7      " /></td><td><input type="checkbox" id="checkAllStudent*    çKZ      #showStudentShare+      ‘„X      html,   ‹Iπx      semcapid-   ‰\]N      gBatchSemCapId.     >G∂¢      semId/      ·—¿      gSemesterId0    ≥ƒ.´      subId1      X‰±      #cmdloadsubject2    &⁄õ      val3    æd»ê      ajax4   ûöÌ)      GetBatchStudentMappingAjax.json?semcapid=5      o¬      &semesterName=6     –≥      &semId=7    b≈º¬      &subId=8    DoÄw      dataType9   Ñ–ˇ
+      beforeSend:     qm+Ô      startCommonAjaxSpinner;     Dï»á      complete<   Ü*F      stopCommonAjaxSpinner=      …©\9      success>    ı≤z      jArray?     ∏OÄ      document@   ¢Ñ
+      readyA      Az‰      #student-batch-input-B      4‚
+      tokenInputC     ¢rÿ      themeD      Dv¯D      facebookE   ≈$ä      preventDuplicatesF      VU/      #checkAllBatchG     ü™‚X      clickH      A¢Ωê      attrI   »:0ó      checkedJ    ±/}Ó      clearK      ˛tuW      errorL      ≤XÏµ3      getStudentMappingAllStudentofSemAjax.json?semcapid=M    îÀä“      #student-name-input-N   V“∞˚      #checkAllStudentO   ]Ko      #trshowStudentShareP    HáíK      showQ   üÎJ
+      #btnStudBatchR      sÂJ      sharedToStudentS    -t      studBatchArrayT      Àï7      saveStudentBatchDocumentSharingAjax.json?d__documentId=U    ã$¶b      &documentType=V     ›˙      &sharedToStudent=W      ˝3i      dmsX    SdS~      uploadDocumentY     kT      UploadDocumentZ     Z¡ñ	      getDocument[    ûíÄ      gNodeId\    kfrö      showDocument]   ÌNu¿	      elementId^      û§qª      documentList_   ˛rj      .tblFileIconList`   rS{      getTextFilesa   *°_Ä      getUploadedFilesb   ¸Á≠m      #btnStudc   DJπI      studPersonalArrayd      ÿ1?Â+      saveStudentPersonalDocumentSharingAjax.jsone    ﬂ:      POSTf   6ó(Å      datag   •ﬂ£Ç      d__documentIdh      i—Ù      documentTypei   §äÛ      shareCourseFileDocumentj    Â˘b®      unshareEmployeeImagek   ¡Ïò      unshareEmployeeShareDtl     ô÷rí      unshareEmployeeNamem    eﬁn      newshareEmployeeImagen      Á      newshareEmployeeShareDto    ìÍÌ,      newshareEmployeeNamep   ø®Ï      newshareEmployeeTypeIdq     aCpº      showEmployeeSharer      ººµ&      roasterIndexIds     S0¨      departmentNamet     ≈Â¯«      <table class="gridtable">v      !§mT       Staff</th><th align="right"><a href="#" onclick="javascript:$('#trshowEmployeeShare   a`*       " /></div></td>Ä    Á«Ä      </table>Å   Òô5u      #showEmployeeShareÇ     Rv3	      roasterIdÉ      ’ö}L)      loadEmployeeListofSharing.json?roasterId=Ñ      t¨zK      #employee-name-input-Ö      ≠4L*
+      #btnSubmitÜ     G:©Î      sharedToEmployeeá   >”Tk
+      empIdArrayà     4’h      viewâ   "/)É      #viewä      \Ôùï      editã   Ì…—      #editå      ~9ƒ+      saveDocumentSharingAjax.json?d__documentId=ç    ﬂ õì      &sharedToEmployee=é     ¨í–M      &view=è     eN…0      &edit=ê     Ì∆—      #chkAllë    p~»      loadEmployeeRoasterMappingAjaxí     ÆÑh      gCategoryTypeì      &í⁄¬
+      courseFileî     ⁄gÙ'      instCourseIdï   2π≤ﬂ      #cmbloadCourseñ     öUé|>      loadEmployeeRoasterMappingMin.json?type=required&instCourseId=ó     π	NÂ	      trustNameò      Zñ¶
+      campusNameô     ÙÊŸ!      instituteNameö       ÈäÃ
+      courseNameõ     ¬‰CGB      loadEmployeeRoasterMappingMin.json?type=notrequired&instCourseId=0ú     i
+      loadStudentBatchAjaxù    ¨~
+	      mentoringû      [“π      loadStudentMentoringü   zî'Ê1      loadStudentBatch.json?type=required&instCourseId=†      ¥O      semesterBatchId°    µòOS
+      semesterId¢     πB≠œ5      loadStudentBatch.json?type=notrequired&instCourseId=0£      Ì]8b      showComment§    ëN{      documentTypeId•     Êiﬁ      gcnt¶   ¸IÎ’      linkß   øÓA0      loadEmployeeDocumentComment.json?documentTypeId=®   ˝«∆
+      temp©   Q	£      textfile™   S
+N‰      gjArrTextDocument´      	$Qå      gjArrUploadedDocumentØ      öÑp      <div style="width:100%;"><a href="javascript:void(0)" style="float:right;" onclick="javascript:$('#trshowComment≤   +®¢      ">¥     DµMn      " align="left">∂    )	+S      hasProfileImage∑    ÅòÎ›
+      <img src="∏     ·ÃÌI      profileImageπ   ∆°πûg      " style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" />∫     õ‚E      gProfileImgPathª    ‚gÚü      yesº    Èq˜v*      <img src="getEmployeeProfileImage.json?id=Ω     GZS'
+      employeeIdæ     ‰NB       getEmployeeProfileImage.json?id=¡   -√&ù4      <textarea class="commentMark" id="commentMark-first-¬   ^ñ`Ä®      " onblur="if (this.value=='') this.value = 'Write a comment'" onfocus="if (this.value=='Write a comment') this.value = ''" onKeyPress="return SubmitComment(this,event,'√   óiäÍ      ',ƒ     O¸MM
+      documentId≈     ‹Ö‚y      );" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea>∆      —'Ü      documentPathId…     ©è^      </div>      *N∑∆      removeÀ     "kr›      gCommentCntÃ    ˛b?       personÕ     ±ÿ∏®      employeeŒ   =oΩ•      <div class="commentPanel" id="œ     úö.D      profileImageStatus–     s( 
+      notdefined—     ›a˘s9      <a href="#"><img onmouseover="showPhotoDialog('cmtempimg_“      ä…®∂      ','”    bÃ      ','employee')" id="cmtimg_‘     ód      " src="’    ‰ /X      " style="float:left; padding-right:9px;" width="40" height="40" border="0" alt="" /></a>÷   Œ–ë+      " src="getEmployeeProfileImageById.json?id=◊    B∂+Ü      <label class="name"><b>ÿ    æ\-a      employeeName‹   µé©8      comment‡    @LÍá.      <span style="margin-bottom:10px;float:right;">·     ⁄+h¶       at ‚   ÿäE      &nbsp;<a href="javascript:void(0)" onclick="javascript:deleteComment(„      ~<«Ñ      documentBucketThreadId‰     Y˛`Ï      ,'Í     æK˛2	      studentIdÎ      d‡((      ','student')" id="cmtimg_Ï      ˇ∞Ã–*      " src="getStudentProfileImageById.json?id=Ì     É:Fˇ      studentNameÓ    
+Hå      <h3><a href="#">Ô   C∏Éˆ
+      threadName     <ÑüX       Comment</a></h3>Ò      l‡åÔ	      <div id="Ú      ìﬁ@†      documentPrivateThreadId˜    êÙ4π      " onblur="if (this.value=='') this.value = 'Write a comment'" onfocus="if (this.value=='Write a comment') this.value = ''" onKeyPress="return SubmitPrivateComment(this,event,'textfile',¯      ÆÄ$A&      <div class="commentPanel" id="private-˘     7’x@      <a href="#"><img onmouseover="showPhotoDialog('privatecmtempimg_˙   j≈≤!      ','employee')" id="privatecmtimg_˚      }v§L      &nbsp;<a href="javascript:void(0)" onclick="javascript:deletePrivateComment(¸   [,W∫      documentPrivateBucketThreadId˛      cOI*      " src="getStudnentProfileImageById.htm?id=ˇ     uT,w      #commentConfig     ò©Ú      #commentaccord    ∏˝Y	      accordion     ŒÛ˝      destroy   kàˇ      header    Ìs¶
+      autoHeight    /Í•æ      collapsible   å®Px      active    0¡oê      .commentMark  æ1\•      elastic	   /∂BË      replyToComment
+    JDè®      counter   ®Aá      #temp-    :ê]Ú#      <div class="commentPanel" id="temp-   ç≥T      after     ÂÑU"      fadeIn    b{su      slow  "©œê      replyToPrivateComment     N‡q‚	      #private-     áWïP      removeCurrentComment  º”@ù      SubmitComment     II∑P      event     B¸ø;      key   ≠5      keyCode   Qˆ∂      sourceid  |c—       commentdisp   µò|$      SubmitCommentAjax.json?documentType=  πY ï      &documentTypeId=   &Q	      &comment=!     “Ô¢Z      alert"     ⁄Eú¡      indexOf#   ∏aˆ      commentMark-first$     –cH:      fadeOut%   †∫é„      #commentPanel-first-&  F\Sœ      SubmitPrivateComment'  Èea/<      SubmitPrivateCommentAjax.json?documentPrivateBucketThreadId=(  ˚ÛV      commentMark-first-private)     ‡2b      #commentPanel-first-private-*  dSç      deleteComment+     phê`      documentThreadId,  æÒ–|(      deleteCommentAjax.json?documentThreadId=-  Ø7¶ë	      &counter=.     íz7A      deletePrivateComment/  Âj<      deletePrivateCommentAjax.json?documentPrivateBucketThreadId=0  Î%∫      getSharedFiles1    Yö]`      getSharedTextFilesAjax.json2   ≥]ô1      showTextDocumentIcons3     rú       getSharedUploadedFilesAjax.json4   ¥º¨ﬂ      showUploadedDocumentIcon5  ä)…Ù      showSharedEmployeeList6    ÜGÎñ      employeeShare7     
+æT´	      doctypeId8     ô6—      studsize9  ÿ∞⁄      empsize:   Ø0` '      <div id="viewSharedEmployeesAndStudents=   √`f–      ">View Shared Students</a></h3>>   ˚dé\      <div id="viewStudentSharedList?    ,˝Ù-      showSharedStudentListAjax.json?d__documentId=@     YC,ı      alumcntG   ≠Imú9      <li><a href="javascript:void(0)" onclick="addPrivateChat(H     ,(˜i      documentPrivateBucketIdI   >=I∑      ','student')">J    #—\≥	      </a></li>K     –ÂÁ.      <li id="createNewThread" class="divider"></li>L    -} ä      ownerM     ©ˆOo4      <li><a href="javascript:void(0)" onclick="newThread(N  µæÊF(      ','student')">Create New Thread</a></li>S  ˇn¡O:      ').hide();"><img src="img/remove.pn—Ô.g" /></a></th></tr><tr>T    .Î      documentBucketIdU  Å◊AÈ      documentPathBucketIdV  öºÿ      <td colspan="W     ˛*YéA      " style="width:150px;"><div class="members shadow" id="sharedStudX     Œpπ?-      "><img onmouseover="showPhotoDialog('studimg_Y     :ÏÃ»      ','student')" id="studimg_Z    çØ˙ø       "  width="50px" height="50px" />[  „cSJ      <label class="labelCircle">\    ·V@A      </label><input type="checkbox" class="sharedEmp" value="sharedEmp]     Ùpı˙      " name="^  rØ∏	      </tr><tr>_     ßZ^´C      <td style="width:150px;"><div class="members shadow" id="sharedStud`   ÇT§      </tr></table></div>a   ôÄMµ.      showSharedEmployeeListAjax.json?d__documentId=c    Äô≈É      ','employee')">d   °«L)      ','employee')">Create New Thread</a></li>f     xˇR@      " style="width:150px;"><div class="members shadow" id="sharedEmpg  Îíù,      "><img onmouseover="showPhotoDialog('empimg_h  ˘¸ö*      ','employee')" id="empimg_i    Ë¨OE      "  />j     ¬F1      " />k  ÚÄﬂB      <td style="width:150px;"><div class="members shadow" id="sharedEmpl    l¨Ò˘7      </label><input type="checkbox" class="sharedEmp" name="m   <Ê∏1      " value="sharedEmpn    ´Bj      </div></div>o  b4éË      #viewSharedEmployeesAndStudentsp   k≤&≤	      newThreadq     ùè⁄      thread}    Ëµò
+      #showPrivateCommentDiv~    _2œ      #threadModal   ∫˚      modalÄ     _'U      addPrivateChatÅ    ?g4n
+      .sharedEmpÇ    Ñu2      pushÉ  Ä≠•ù      flagÑ  nj<,      addPrivateChat.json?documentPrivateBucketId=Ö  ±˚ï<
+      &employee=Ü    ÁÀÿz      &source=á  Òp^      jAlertà    ú’      Successfully Addedâ    È\˚"      Please select at least one Person.ä    X´      saveThreadNameã    ¿G◊¯      sharethradenameå   8‘Rú      #sharethradenameç  µÍ?)      addNewThreadToSharing.json?d__documentId=é     îîí¨      &sharethradename=è     K„ñÖ      ')">ê  t ∂v      #createNewThreadë  çÕ”O      beforeí    ›ø«      unshareEmployeeì   ˆ≠<      docuTypeBucketIdî  [n=o*      unshareEmployeeAjax.json?docuTypeBucketId=ï    –Ã»ò      showExistsshareEmployeeListñ   à)Û	      colspanNoô     È5ú∏Z      " style="width:120px;"><table width="100px;"><tr><td width="40px" height="50px"><img src="ú    Íâπ      </label></td></tr></table></td>ù   ˙î->b      <td width="100px"><table class="smalltable"><tr><td style="width=100px;" height="100px"><img src="ü    #õqR      tempSize†  tjEHN      <td style="width:120px"><table><tr><td style="vertical-align: top;"><img src="°    ·ﬂêy      " alt="boy" width="40px" height="50px" /><a href="javascript:void(0);" title="Unshare Employee" onclick="unshareEmployee(¢     ]iúõâ      ')"><img src="img/cloaseshare.jpg" alt="unshare"  width="15px" height="15px" style="margin-bottom:40px;margin-left:5px;" /></a></td></tr>£     ÖlX—2      <tr><td><label style="width:50px;font-size:10px;">§    ¯†Îœ      <tr><td colspan="•     ‘Ú≤6-      "><label style="width:50px; font-size:10px;">¶     Öo–.G      <tr><td style="width:120px"><label style="width:50px; font-size:10px;">ß   ˝…≤ˆ	      sizeShare™     ÓBdﬁ      <tr><td><img src="Æ    G⁄h      </label></td></tr>Ø    ªl‡Ù      extend∞    Ï%f      mimics±    lâçµ
+      paddingTop≤    }™Ô      paddingRight≥  ˙ûÍC      paddingBottom¥     wö9      paddingLeftµ   ˜ûe      fontSize∂  .Ó
+      lineHeight∑    ±‘Qa
+      fontFamily∏    ÎƒJ˚      widthπ     `◊∑◊
+      fontWeight∫    ÷ŸÓ      textareaª  ﬂA	      $textareaº     …∂~¯      $twinΩ      ºá      <div />æ   >ü      cssø   »Åí      position¿  H<*ê      absolute¡  e}ü      display¬   ,Ω      none√  5¡;î	      minheightƒ     ∑…≈      height≈    Y-ht	      maxheight∆     ˜E
+      max-height«     û«/	      MAX_VALUE»     ≤Vﬂ
+      goalheight…    †Á„V      appendTo   ˛Ë˘2      parentÀ    ∂∆∞‹      setHeightAndOverflowÃ  Õa@Ñ      curratedHeightÕ    `-Ñó      floorŒ     üˇc9      updateœ    æˆCh      textareaContent–   ™'›U      <|>—         \n“    |N‰7      <br />”    ˛À¿Ç      &amp;‘     [Ç#Í      twinContent’   »I·°      &nbsp;÷    ˛ .      abs◊   z¡≤S      autoÿ  Ñ€ËW      hiddenŸ    ‡Õ      bind⁄  KÃÌ      focus€     ¡§\l      self‹  »∫Ô”      periodicalUpdater›     ¯2áâ      windowﬁ    Ïà       setIntervalﬂ   ƒ∫·%      blur‡  bPk      clearInterval·     >Â/      jQuery‚    pr"é§      </h5></div><table  class="table"><tr><td colspan="2"><table class="table"><tr><th colspan="5">By Batch</th></tr><tr><td> <input type="text" id="student-batch-input-„  •/©Íf      " /><label>My Batches</label></td><td colspan="3" align="center"><input type="button" id="btnStudBatch‰    ‚¸U€      " value="Submit" class="btn btn-inverse btn-mini  " /></td></tr></table></td></tr><tr><td colspan="2"><table class="table"><tr><th colspan="5">By Student Name</th></tr><tr><td> <input type="text" id="student-name-input-Â   ÄƒjŒc      " /><label>All Students</label></td><td colspan="2" align="center"><input type="button" id="btnStudÊ   |œ?Ç`      " value="Submit" class="btn btn-inverse btn-mini  " /></td></tr></table></td></tr></table></div>Á  sƒ›ÏC      <table class="gridtable"><tr><th colspan="3">Employee Sharing with Ë   ›«sñ      ').hide();"><img src="img/remove.png" /></a></th></tr><tr><td><label>With Employee Name :</label></td><td> <input type="text" id="employee-name-input-È    Ü•b]:      " /></td><td colspan="2"><input type="checkbox" id="chkAllÍ    åƒ*¢      " /><label>select All</label></td></tr><tr><td colspan="3"><table class="smalltable"><tr><td><label>Can View :</label><input type="checkbox" value="view" id="viewÎ    Z“ÛqR      " /></td><td><label>Can Edit :</label><input type="checkbox" value="edit" id="editÏ    ]Gr      " /></td></tr></table></td><td align="center"><div class="login"><input type="button" value="Submit" id="btnSubmitÌ     ˘ä      " /></div></td></table>Ó   ˙_ñî?      <div id="commentaccord"><h3><a href="#">Public Comment</a></h3>Ô   -~ŸﬂÖ      <div id="commonChat"><div style="width:100%;"><a href="javascript:void(0)" style="float:right;" onclick="javascript:$('#trshowComment     ≥Q¥]F      ').hide();"><img src="img/remove.png" /></a></div><div id="showCommentÒ    ˙ÆBê3      "><div class="commentPanel" id="commentPanel-first-Ú   ËùâsD      " align="left"><div class="commentBox" align="right" id="commentBox-Û  ~C`?      <input type="hidden" id="owner" value="" /><label id="record-">Ù   °°£Á,      </label><br clear="all" /></div></div></div>ı  ~ä_Q      <a href="#"></a></b><div class="name" style="text-align:justify;float:left;"><em>ˆ     vÙ$ô      </em></div><br clear="all" /><br clear="all" /><div  class="name" align="center" style="width:350px;float:right; "><div class="name" style="float:left;">˜     <c¯z      )" class="c_delete">Delete</a><span id="clike-panel-"><a href="javascript: void(0)"  onclick="javascript: replyToComment('¯    ì∂äØ-      );">reply</a></span></span></div></div></div>˘     <¡íÌN      ').hide();"><img src="img/remove.png" /></a></div><div id="showComment-private˙    >z#q;      "><div class="commentPanel" id="commentPanel-first-private-˚   Z[!·K      " align="left"><div class="commentBox" align="right" id="commentBox-private¸   ıa˘{      <input type="hidden" id="owner" value="" /><label id="record-"><textarea class="commentMark" id="commentMark-first-private-˝   @‡2î•      );" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea></label><br clear="all" /></div></div></div>˛     ıœZ¨Å      )" class="c_delete">Delete</a><span id="clike-panel-"><a href="javascript: void(0)"  onclick="javascript: replyToPrivateComment('ˇ     CXñıP      " align="left"><div class="commentBox" align="right" id="commentBox-"><img src="   ¬¨Å>|     " style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" /><input type="hidden" id="owner" value="" /><label id="record-"><textarea class="commentMark" id="commentMark-" onblur="if (this.value=='') this.value = 'Write a comment'" onfocus="if (this.value=='Write a comment') this.value = ''" onKeyPress="return SubmitComment(this,event,'  Œ·Ï‰¬      );" wrap="hard" name="commentMark" style=" background-color:#fff; overflow: hidden;" cols="60">Write a comment</textarea></label><a href="javascript:void(0)" onclick="removeCurrentComment('temp-    ç]uM      ')"><img src="img/cloaseshare.jpg" /></a><br clear="all" /></div></div></div>     l<7]É     " style="float:left; padding-right:6px;" width="37" height="37" border="0" alt="" class="CommentImg" /><input type="hidden" id="owner" value="" /><label id="record-"><textarea class="commentMark" id="commentMark-" onblur="if (this.value=='') this.value = 'Write a comment'" onfocus="if (this.value=='Write a comment') this.value = ''" onKeyPress="return SubmitPrivateComment(this,event,'   ›%û›&      ""><h3><a href="#viewStudentSharedList    (uùK<     <div class="navbar navbar-static"><div class="navbar-inner"><div class="container" style="width: auto;"><a class="brand" href="#">Shared Students</a><ul class="nav"><li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown">Add Private Comment <b class="caret"></b></a><ul class="dropdown-menu">  =8Ûë€        </ul> </li></ul></div></div><table style="width:100%; margin-left:0%; margin-right:0%;"><tr><th colspan="5">Shared Students<a href="javascript:void(0);" style="float:right;" onclick="javascript:$('#trshowEmployeeShare   •cˆÁ=     <div class="navbar navbar-static"><div class="navbar-inner"><div class="container" style="width: auto;"><a class="brand" href="#">Shared Employees</a><ul class="nav"><li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown">Add Private Comment <b class="caret"></b></a><ul class="dropdown-menu">     -Olµ‹        </ul> </li></ul></div></div><table style="width:100%; margin-left:0%; margin-right:0%;"><tr><th colspan="5">Shared Employees<a href="javascript:void(0);" style="float:right;" onclick="javascript:$('#trshowEmployeeShare	  ö€ØÖ     < d i v   i d = " t h r e a d M o d a l "     c l a s s = " m o d a l   h i d e " > < d i v   c l a s s = " m o d a l - h e a d e r " > < b u t t o n   t y p e = " b u t t o n "   c l a s s = " c l o s e "   d a t a - d i s m i s s = " m o d a l " > √  < / b u t t o n > < h 3 > T h r e a d   N a m e < / h 3 > < / d i v > < d i v   c l a s s = " m o d a l - b o d y "   a l i g n = " c e n t e r " > 	 	 < t a b l e   c l a s s = " s m a l l t a b l e " > 	 	 	 	 < t r > < t h   c o l s p a n = " 2 " > < / t h > < / t r > 	 	 	 < t r > < t d > < l a b e l > T h r e a d   N a m e < / l a b e l > < / t d > < t d > < i n p u t   t y p e = " t e x t "   i d = " s h a r e t h r a d e n a m e "   / > < / t d > < / t r > 	 	 < / t a b l e > < / d i v > < d i v   c l a s s = " m o d a l - f o o t e r " > < i n p u t   t y p e = " b u t t o n "   v a l u e = " S a v e "   c l a s s = " b t n   b t n - i n v e r s e   b t n - m i n i     "   o n c l i c k = " s a v e T h r e a d N a m e ( 
+  ”ﬁ6Èz      ')" /> <a href="#" class="btn btn-inverse btn-mini  " data-dismiss="modal" style="margin-left:15px;">Close</a></div></div>    íˇ‚˛û      <table class="smalltable"><tr><th colspan="8">Shared Employees</th><th align="right"><a href="javascript:void(0);" onclick="javascript:$('#trshowEmployeeShare    ·£≈ÔV      " alt="boy" width="40px" height="50px" /></td></tr><tr><td style="width:120px"><label>    ƒ§K”W      " alt="boy" width="40px" height="50px" /></td></tr><tr><td style="width:120px;"><label>   ±Ÿƒ0∫      <tr><th colspan="4">Already exist of shared employee List</th></tr><tr><th><label>Employee Image</label></th><th><label>Employee Name</label></th><th><label>Shared Date</label></th></tr>    ¡ÕGº/      " width="50px" height="50px" /></td><td><label>   
+jÎ      </label></td><td><label>  »Ó2¿      showStudentShare/success/<    ﬁqcÔ      showStudentShare/success/</<  NX      showStudentShare/<    í∑yö      showStudentShare/</success/<   ˘
+‡;      showEmployeeShare/success/<!   ˜È      showEmployeeShare/success/</<%     p±Ôn'      showEmployeeShare/success/</</success/<.   BÍÓG      showComment/<=     ˙Ìe§      addPrivateChat/<J  &pk¡	      elastic/<M     ¶7/j      elastic/</<N   ª$æ$#      elastic/</</self.periodicalUpdater<     m   ¥  m   m          &   Ô%,â                                                                                                                                                                         	                 
+                                                                                                                                                                                                                                                                                                                                                                                                     !                  "                 #      #           $                  %                 &                 '                  (      (           )      (           *      (           +      (           ,                  -      -           .      -           /      -           0      -           1                 2      2           3      2           4      2           5                  6                  7                  8                 9      9           :      9           ;                 <      <           =      <           >                 ?      ?           @      ?           A                 B      B           C      B           D                  E      E           F      E           G      E           H      E           I      E           J      E           K      E           L      E           M                 N      N           O      N           P      N           Q      N           R                  S                 T      T           U      T           V      T           W      T           X      T           Y                 Z      Z           [      Z           \      Z           ]      Z           ^                 _      _           `      _           a      _           b      _           c                  d                 e      e          f      f       	   g      g           h      g           i      g           j      j           k      g           l      ≥Oåc(   (   (   í ê  êj  Ä ê	   êp êo      ê& êl  * ê	 ê  q  ê   ê-    ú  ên       /  £  êk  ä ê
+  p    ë  ê5 ê. êï ê  m  0 ê   ê               ⁄                ç`  P    P  P    P  P  ,  .  0                                               >  P                              i  ã                                                                >  P                              i  ã                                 R  S                                               >  X  P             >                                R  c                                               >  X  P             >                  
+            ç`  Pr    P  Ps    P  P  Ç                                               >  P                              Ü  á  à  ä                                               >  X  P             >                                i  ã                                 î              >  j  Ç  ó  ò  ô  ö  i                              >  j  Ç  ó  ò  ô  ö  i                                î              >  j  i                              >  j  i                                 P§  Ph  P•  P¶  P            >  ¯  ®  i  j                                              h  §  
+ ‹              h  §  
+ ¸  ‹               ç             ç  h  P§  P
+ P  P             >  ‹                  	            ç  h  P§  P
+ P¸    P             >  ‹                               + h  P
+ P§  P             >                               ¸  h  P
+ P§  P             >                                                                               >                                                               >                              ƒ  Ph  P  P6 P7 P8 9 P            >  ¯  @ i                              >  ¯  @ i                              ƒ  h    q             H ƒ  h    Õ  PÉ               ã                                                >                              ƒ  Ph  P  Pã                                             >  q                              ƒ  P  Pì h  P                                             >                     	         ƒ    h  ¯  W   ñ 6 i  k  ü j  ß              $ `              ∞ Pã   
+              ª Pº P∂ P√ P≈ P» i  À PŒ Pã                ƒ ¨                œ ‘ »                                                 Ø¬0∞–    —    &     IÙ$KEÆ˙ö   #      J  8  9  ;     =  K     
+   C  E     
+    ç {     #    J  8  9  ;     =  K     
+   C  E     
+    ç {     #    J  8     9  ;  =  K     
+   ]  ^  	   -    J  8  0  f     9  ;  =  K          g  h  R     
+   ]  ^     #    J  8     9  ;  =  K     
+   C  E     #    J  8     9  ;  =  K     
+   ]  ^     
+    ç {         J  8     =  K          J  8     =  K          J  8     =  K          J  8     =  K          J  8     =  K                       J  8  =  K           J  8  =  K           J  8  =  K           J  8  =  K     #      J  8     9  ;  =  K     (   J  8     9  ;     =  K           J  8     =  K          J  8     =  K                 #      J  8     9  ;  =  K     #   J  8     9  ;  =  K     #   J  8     9  ;  =  K            
+     ƒ ¨     
+    ø ¡        ¨  á&’™ç!´!m   å     ‡!ˇå  ı                S        ⁄   ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑   ª   Ä„  Å      ﬂ∑    ª   Ä„  Å       ﬂ∑!   ª   Ä„  Å   !   ﬂ∑"   ª   Ä„  Å   "   ﬂ∑#   ª   Ä„  Å   #   ﬂ∑$   ª   Ä„  Å   $   ﬂ∑%   ª   Ä„  Å   %   ﬂ∑&   ª   Ä„  Å   &   ﬂ∑'   ª   Ä„  Å   '   ﬂ∑(   ª   Ä„  Å   (   ﬂ∑)   ª   Ä„  Å   )   ﬂm*    ª+   w ﬂ•Eeì eì eì eì@eì eì eì@eì eì eì eì@Ä  Áeì eì eì eì eì eì eì@Ä ©eì eì@Ä è` Ä  ÿˇˇˇˇPPÄÄÄ`   <©ä¡`   '                         º  ·J   ‰ª   Äº    „  Å º s ¢• `
+ˇˇˇıPˇˇˇﬂPQÄ,  Úp?•,  ˜  6      	       q       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂ   ¡   &   &º &   &¡   &¡   &	   &¡   &¡   &
+   &¡   &¡   &   &¡   &¡   &   &¡   &¡   &   &¡   &¡   &   &Õ   ﬂª       ¡   &s ·J   ‰æ   w ﬂª   º KÕ  ﬂª   º KÕ  ﬂª       s ·J   ‰s  Õ  ﬂæ   ö   ó4   Õ  ﬂó4   ª   ·J   ‰9      æ  &   &º &   &æ  &   &æ  &<      <   m   <   m    <!   <"   m#   <$   m%   <&   w ﬂª   ·J   ‰9'   (   æ  &   &º &   &æ  &<      <   m)   <   m*   <!   <"   m+   <$   m,   <&   w ﬂª    -   ¡   &s ·J.   ‰w  ﬂª    /   ¡   &¡   &s ·J0   ‰m1   w ﬂª    2   ¡   &¡   &s ·J0   ‰m3   w ﬂ•∂ `ˇˇˇÓP
+P$`ˇˇˇËP
+!P$`ˇˇˇÁP
+"PD`Ä  ïUJ9@,IL8B,Dë@`ˇˇˇÎP
+#ˇˇˇ˚P$`.`N`P
+P(`,`+`%0
+%ê *JJ&J7JPD<`%:
+**JBJE&J]J<PDa`ˇˇˇÈP
+ PDc`ˇˇˇÏP
+#ˇˇˇ˙PDÄ  ë`ˇˇˇÒP
+ˇˇˇ˙P4Ä  √P4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ`   ¬3°µ`   (   	                     Ω  Œ   ﬂª    ª   s ·J   ‰m   w ﬂ•)`ˇˇˇˇP
+ˇˇˇ˙PDPƒ   ª…õƒ   j                          ª       ¡  &¡  &s ·J   ‰¡   9      <   <   w ﬂª       ¡  &¡  &s ·J	   ‰m
+   w ﬂ•@`ˇˇˇ‰P
+0%*F+PD`ˇˇˇÎP
+$ˇˇˇ˙PDPÄÑ  °w¿»t  ˜                       ﬁÕ  ﬂª    æ  s ·J   ‰   s ö†   ó   Õ   ﬂò   æ   ¡   J   öq   ó   ª       ¡  &¡  &s ·J   ‰   9   ¡   æ   KJ	   <	   ¡   æ   KJ
+   <
+   w ﬂæ   0(Õ   ﬂôˇˇˇó   ô4   ó   ª       ¡  &¡  &s ·J   ‰   w ﬂó   •&	`ˇˇˇˇPP  `fï `ˇˇˇ‰P7î î ˇˇˇÿPD%`ü0	 `ˇˇˇ‰P%PIPÄÄÄÑ         2   Ü   (   )Ò(                               •@ÄÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ`   ¬3°µ`   (   	                     Ω  Œ   ﬂª    ª   s ·J   ‰m   w ﬂ•)`ˇˇˇˇP
+ˇˇˇ˙PDPƒ   «Œƒ   j                          ª       ¡  &¡  &s ·J   ‰¡   9      <   <   w ﬂª       ¡  &¡  &s ·J	   ‰m
+   w ﬂ•@`ˇˇˇÂP
+/%*F*PD`ˇˇˇÈP
+&ˇˇˇ˙PDPÄÑ  «$öHt  ˜                       ﬁÕ  ﬂª    æ  s ·J   ‰   s ö†   ó   Õ   ﬂò   æ   ¡   J   öq   ó   ª       ¡  &¡  &s ·J   ‰   9   ¡   æ   KJ	   <	   ¡   æ   KJ
+   <
+   w ﬂæ   0(Õ   ﬂôˇˇˇó   ô4   ó   ª       ¡  &¡  &s ·J   ‰   w ﬂó   •&	`ˇˇˇˇPP  `fï `ˇˇˇÂP6î î ˇˇˇÿPD%`ü0	 `ˇˇˇÂP$PIPÄÄÄÑ         2   Ü   (   )Ò(                               •@ÄÄÄ,  ‹çÌ,,  »                         ª       ¡   &¡   &s ·J   ‰s  Õ   ﬂª   Ä„  Å  Õ  ﬂæ   ·J   ‰   s Õ  ﬂª   ·J   ‰9   	   ¡   &
+   &¡   &   &æ  &<      <   <   m   <   m   <   m   <   m   <   w ﬂ•@`ˇˇˇ‰P
+%P(`í@`ê P(`%>!**&JJJ&JPD+P4   )òrq4                             ª    w  ﬂ• `*PÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄ   õP¯   ≤                         ¡     ö`   ó   ª       ¡  &s ·J   ‰   w ﬂª   Ä„  Å  Œ   ﬂ¡   ·J   ‰ª   m	   w ﬂôF   ó   ª    
+   s ·J   ‰   w ﬂª    ª   w ﬂª    ª   w ﬂó   •@`ï `ˇˇˇ˚PP$`ì `	ˇˇˇÎP>@`PP$`ˇˇˇˇP$`ˇˇˇˇPIP\   pÉSâ\   (                         ¡   ·J   ‰9   ¡  <   º  <   w ﬂ• `%*HPDPÄÄ(   ¯‘l∆(                               •@ÄÄÄT  G¡µ“T  Ê                 !        ª       ¡   &¡   &s ·J   ‰s  Õ   ﬂª   Ä„  Å  Õ  ﬂæ   ·J   ‰   s Õ  ﬂª   ·J   ‰9   	   <
+      <      <   9   ¡   <   ¡   <   æ  ·J   ‰s  <   <   <   m   <   m   <   m   <   m   <   w ﬂ•@`ˇˇˇÂP
+$P(`í@`ê "P(`%***
+
+"P-&JJJ+JPD0PÄÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄ4   )òrq4                             ª    w  ﬂ• `*PÄÄ,  ™ 4h,  º                         ¡     ö`   ó   ª       ¡  &s ·J   ‰   w ﬂª   Ä„  Å  Œ   ﬂ¡   ·J   ‰ª   m	   w ﬂôP   ó   ª    
+   s ·J   ‰   w ﬂª    ª   w ﬂª    ª   w ﬂª    w  ﬂó   •@`ï `ˇˇˇ˚PP$`ì `	ˇˇˇÎP> `PP$`ˇˇˇˇP$`ˇˇˇˇP$`OP\   pÉSâ\   (                         ¡   ·J   ‰9   ¡  <   º  <   w ﬂ• `%*HPDPÄÄ(   ¯‘l∆(                               •@ÄÄÄh  èR≠h  Æ  6             <       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂ   º &   &¡   &   &¡   &¡   &	   &¡   &¡   &
+   &¡   &   &¡   &   &¡   &¡   &   &Õ   ﬂª       ¡   &s ·J   ‰æ   w ﬂª   º KÕ  ﬂª   ·J   ‰9      æ  &<      <   <   m   <   m   <   m   <   m   <   w ﬂª        ¡   &s ·J!   ‰w  ﬂ•∂ `ˇˇˇÓP
+P$`ˇˇˇÈP
+ P$`ˇˇˇÁP
+"P$`%/
+g,e,6,Ä  Ä,N,në@`ˇˇˇÍP
+$ˇˇˇ˚PD`.`%0**&JJJ^JPDd`ˇˇˇËP
+!P4fPÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ`   ¬†!`   (   	                     Ω  Œ   ﬂª    ª   s ·J   ‰m   w ﬂ•)`ˇˇˇˇP
+ˇˇˇ˙PDCP  bªxo  î                          ª       ¡  &¡  &s ·J   ‰¡   9      <   <   w ﬂª       ¡  &¡  &s ·J	   ‰m
+   w ﬂª       ¡  &¡  &s ·J	   ‰m   w ﬂ• `ˇˇˇ‰P
+0%*F+PD`ˇˇˇÔP
+ ˇˇˇ˙PD3`
+ˇˇˇÚP
+ˇˇˇ˙PD@P∏  áÈ1B∏  .         	       ,        ª       ¡  &¡  &s ·J   ‰s  Õ   ﬂª   Ä„  Å  Õ  ﬂæ   ·J   ‰   s Õ  ﬂª       ¡  &s ·J   ‰	   s Õ  ﬂª    
+   ¡  &s ·J   ‰	   s Õ  ﬂª   ·J   ‰9      ¡  &   &¡  &   &æ  &   &æ  &   &æ  &<      <   <   m   <   m   <   m   <   m   <   w ﬂ• `ˇˇˇ‰P
+%P(`í `ê PH`ˇˇˇ˜PP(`ˇˇˇ˜PPH`%2"**&JJJ(JPD-PÄÄ4   ›Ö¨4                             ª    w  ﬂ• `*PÄÄ4   ›Ö¨4                             ª    w  ﬂ• `*PÄÄ   uNÇU   ≤                         ¡     ö`   ó   ª       ¡  &s ·J   ‰   w ﬂª   Ä„  Å  Œ   ﬂ¡   ·J   ‰ª   m	   w ﬂôF   ó   ª    
+   s ·J   ‰   w ﬂª    ª   w ﬂª    ª   w ﬂó   •@`ï 	`ˇˇˇ˚PP$`ì 	`	ˇˇˇÎP> 	`PP$	`ˇˇˇˇP$	`ˇˇˇˇPIPÄ\   S˘≥˝\   (                         ¡   ·J   ‰9   ¡  <   º  <   w ﬂ• 
+`%*HPD	PÄÄ(   #B°(                               •@ÄÄÄÑ  °w¿»t  ˜                       ﬁÕ  ﬂª    æ  s ·J   ‰   s ö†   ó   Õ   ﬂò   æ   ¡   J   öq   ó   ª       ¡  &¡  &s ·J   ‰   9   ¡   æ   KJ	   <	   ¡   æ   KJ
+   <
+   w ﬂæ   0(Õ   ﬂôˇˇˇó   ô4   ó   ª       ¡  &¡  &s ·J   ‰   w ﬂó   •&	`ˇˇˇˇPP  `fï `ˇˇˇ‰P7î î ˇˇˇÿPD%`ü0	 `ˇˇˇ‰P%PIPÄÄÄÑ         2   Ü   (   )Ò(                               •@ÄÄÄ<  n3sÉ<  ◊                          ª      öt   ó   ª       s ·J   ‰s  Õ   ﬂª   ·J   ‰9      æ   &<	   
+   <   <   m   <   m   <   w ﬂôM   ó   ª   ·J   ‰9      <	   
+   <   <   m   <   m   <   w ﬂó   ª    w  ﬂ• `ï `P
+PH`%E**&JJP>%@'`%**&J@J'PIE`PÄ∞  H∫¶à†                  A      º  J   Õ   ﬂÕ  ﬂÕ  ﬂÕ  ﬂÕ  ﬂÕ  ﬂÕ  ﬂò   æ  æ   öÕ  ó   ª   æ  º  æ  Kæ  KNﬂº  æ  Kæ  K ú(   ó   ﬂº  æ  Kæ  K·J   ‰s     ó   ö'   ó   ª   æ  º  æ  Kæ  KNﬂô8  ó   º  æ  Kæ  K ú(   ó   ﬂº  æ  Kæ  K·J   ‰s     ó   ö'   ó   ª   æ  º  æ  Kæ  KNﬂô–   ó#   º  æ  Kæ  K ú(   ó'   ﬂº  æ  Kæ  K·J   ‰s     ó,   ö'   ó-   ª   æ  º  æ  Kæ  KNﬂôh   ó1   º  æ  Kæ  K ú(   ó5   ﬂº  æ  Kæ  K·J   ‰s     ó:   ö"   ó;   ª   æ  º  æ  Kæ  KNﬂó?   æ  0(Õ  ﬂô)˛ˇˇóA   • `-`&`&`'`'`'	 `f `ò@	`° "Pò `¢ `° #Pò `¢ `° &Pò `¢ `° #Pò `ù@`ï@PÄÄ∞         4   ‹  (   ¯‘l∆(                               •@ÄÄÄ∞  H∫¶à†                  A      º  J   Õ   ﬂÕ  ﬂÕ  ﬂÕ  ﬂÕ  ﬂÕ  ﬂÕ  ﬂò   æ  æ   öÕ  ó   ª   æ  º  æ  Kæ  KNﬂº  æ  Kæ  K ú(   ó   ﬂº  æ  Kæ  K·J   ‰s     ó   ö'   ó   ª   æ  º  æ  Kæ  KNﬂô8  ó   º  æ  Kæ  K ú(   ó   ﬂº  æ  Kæ  K·J   ‰s     ó   ö'   ó   ª   æ  º  æ  Kæ  KNﬂô–   ó#   º  æ  Kæ  K ú(   ó'   ﬂº  æ  Kæ  K·J   ‰s     ó,   ö'   ó-   ª   æ  º  æ  Kæ  KNﬂôh   ó1   º  æ  Kæ  K ú(   ó5   ﬂº  æ  Kæ  K·J   ‰s     ó:   ö"   ó;   ª   æ  º  æ  Kæ  KNﬂó?   æ  0(Õ  ﬂô)˛ˇˇóA   • `-`&`&`'`'`'	 `f `ò@	`° "Pò `¢ `° #Pò `¢ `° &Pò `¢ `° #Pò `ù@`ï@PÄÄ∞         4   ‹  (   ¯‘l∆(                               •@ÄÄÄ`  	î0∞`  ˆ                 #        ª      ö   ó   ª    w  ﬂô—   ó   ª      öt   ó   ª       s ·J   ‰s  Õ   ﬂª   ·J   ‰9	   
+   æ   &<      <   <   m   <   m   <   w ﬂôM   ó   ª   ·J   ‰9      <      <   <   m   <   m   <   w ﬂó#   • `ï `î@
+`ï `P
+P(`%8**&JJ	P> `%**&J*JP90PÄ‰   kÅ@ ‘   ä                       º  J   Õ   ﬂÕ  ﬂò   æ  æ   öb   ó   ª   æ  º  æ  KJ   Nﬂª   æ  º  æ  KJ   Nﬂª   æ  º  æ  KJ   Nﬂæ  0(Õ  ﬂôîˇˇˇó   • `-	 `f `ò `ò `ò@`ï@PÄÄ‰             q   (   ¯‘l∆(                               •@ÄÄÄ‰   kÅ@ ‘   ä                       º  J   Õ   ﬂÕ  ﬂò   æ  æ   öb   ó   ª   æ  º  æ  KJ   Nﬂª   æ  º  æ  KJ   Nﬂª   æ  º  æ  KJ   Nﬂæ  0(Õ  ﬂôîˇˇˇó   • `-	 `f `ò `ò `ò@`ï@PÄÄ‰             q   (   ¯‘l∆(                               •@ÄÄÄp  zµì›p  õ  $              :       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂ   Œ   ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂª   ·J   ‰9   	   ¡   &
+   &¡   &<      <   <   m   <   m   <   w ﬂª       ¡   &s ·J   ‰¡   w ﬂª       s ·J   ‰   w ﬂª       s ·J   ‰9      <   <   <   <   w ﬂª    ª   s ·J   ‰m    w ﬂª    !   ¡   &s ·J"   ‰w  ﬂ•§ `+`ˇˇˇÈP
+ P$`ˇˇˇËP
+!P$`ˇˇˇÁP
+"P$`%7 +*&JÄ  ËJPDÄ  Ï`ˇˇˇÓP
+ ˇˇˇ˚P `PP `P
+*FÄ  P `ˇˇˇˇP
+ˇˇˇ˙P$`ˇˇˇÓP
+PPÄÄÃ  ù·hy|                       º  KJ   Õ   ﬂª   Ä„  Å  Õ  ﬂ¡      ö   ó   ª   Õ  ﬂô   ó   ª   Õ  ﬂó      Œ   ﬂ¡      ¡   &   &¡   &	   &¡   &
+   &¡   &   &&.Œ   ﬂæ  ¡   KJ      öO   ó   ¡      º  ¡   KJ   &   &&.Œ   ﬂ∑   º  ¡   KJ       ﬂôq   ó   æ  ¡   KJ      öR   ó"   ¡      æ  ¡   KJ   &   &&.Œ   ﬂ∑      æ  ¡   KJ   &    ﬂó,   ¡      &.Œ   ﬂ¡      ö[   ó/   ¡      ¡   &   &¡   &   &æ  ¡   KJ   &   &¡   &   &&.Œ   ﬂôV   ó:   ¡      ¡   &   &¡   &   &æ  ¡   KJ   &   &¡   &   &&.Œ   ﬂóE   ¡      &.Œ   ﬂæ   ö,  óH   Õ  ﬂòH   æ  æ   öP   óJ   ª        ¡   &!   &¡   &!   &æ  &s ·J"   ‰w  ﬂæ  0(Õ  ﬂô¶ˇˇˇóU   Õ  ﬂòU   æ  ª#   öP   óX   ª        ¡   &!   &¡   &!   &æ  &s ·J"   ‰w  ﬂæ  0(Õ  ﬂô•ˇˇˇóc   Õ  ﬂòc   æ  æ   ö8  óe   º  Kæ  KJ$   %   ö˛  ój   ¡   &   ¡   &!   &¡   &!   &æ  &'   &&.Œ   ﬂº  Kæ  KJ(   )   öc   óv   ¡   *   æ  &+   &º  Kæ  KJ   &,   &æ  &-   &º  Kæ  KJ   &.   &&.Œ   ﬂô^   óÖ   ¡   *   æ  &+   &º  Kæ  KJ   &,   &æ  &/   &º  Kæ  KJ   &.   &&.Œ   ﬂóî   ¡   0   º  Kæ  KJ1   &2   &º  Kæ  KJ3   &4   &&.Œ   ﬂ¡   5   º  Kæ  KJ6   &7   &º  Kæ  KJ8   &&.Œ   ﬂ¡   9   º  Kæ  KJ:   &;   &¡   &   &æ  &   &¡   &<   &¡   &   &¡   &   &æ  &=   &&.Œ   ﬂô˘  óª   ¡   &   ¡   &!   &¡   &!   &æ  &'   &&.Œ   ﬂº  Kæ  KJ(   )   öc   ó«   ¡   *   æ  &+   &º  Kæ  KJ>   &?   &æ  &-   &º  Kæ  KJ>   &.   &&.Œ   ﬂô^   ó÷   ¡   *   æ  &+   &º  Kæ  KJ>   &?   &æ  &@   &º  Kæ  KJ>   &.   &&.Œ   ﬂóÂ   ¡   0   º  Kæ  KJA   &2   &º  Kæ  KJ3   &4   &&.Œ   ﬂ¡   5   º  Kæ  KJ6   &7   &º  Kæ  KJ8   &&.Œ   ﬂ¡   9   º  Kæ  KJ:   &;   &¡   &   &æ  &   &¡   &<   &¡   &   &¡   &   &æ  &=   &&.Œ   ﬂó  ∑#   ª#   0( #   ﬂæ  0(Õ  ﬂôæ˚ˇˇó  ¡   B   &.Œ   ﬂÕ  ﬂò  æ  º  J   ö™  ó  º  æ  KK ö  ó  ¡   C   º  æ  KKJD   &E   &&.Œ   ﬂ¡   F   º  æ  KKJD   &!   &º  æ  KKJG   &   &&.Œ   ﬂ¡   H   ¡   &I   &¡   &J   &¡   &K   &¡   &   &&.Œ   ﬂæ  ¡   KJ      öO   ó9  ¡      º  ¡   KJ   &   &&.Œ   ﬂ∑   º  ¡   KJ       ﬂôq   óB  æ  ¡   KJ      öR   óF  ¡      æ  ¡   KJ   &   &&.Œ   ﬂ∑      æ  ¡   KJ   &    ﬂóP  ¡   L   ¡   &M   &¡   &   &¡   &   &º  æ  KKJG   &N   &&.Œ   ﬂÕ  ﬂò\  æ  º  æ  KJ   öé  ó`  º  Kæ  KJ$   %   ö2  óe  ¡   O   ¡   &!   &¡   &!   &æ  &'   &&.Œ   ﬂº  Kæ  KJ(   )   öi   óq  ¡   P   æ  &+   &º  æ  Kæ  KJ   &Q   &æ  &-   &º  æ  Kæ  KJ   &.   &&.Œ   ﬂôd   óÄ  ¡   P   æ  &+   &º  æ  Kæ  KJ   &Q   &æ  &/   &º  æ  Kæ  KJ   &.   &&.Œ   ﬂóè  ¡   0   º  æ  Kæ  KJ1   &2   &º  æ  Kæ  KJ3   &4   &&.Œ   ﬂ¡   5   º  æ  Kæ  KJ6   &7   &º  æ  Kæ  KJ8   &&.Œ   ﬂ¡   R   º  æ  Kæ  KJS   &;   &¡   &   &æ  &   &¡   &T   &¡   &   &¡   &   &æ  &   &º  æ  Kæ  KJS   &=   &&.Œ   ﬂô-  óª  ¡   O   ¡   &!   &¡   &!   &æ  &'   &&.Œ   ﬂº  Kæ  KJ(   )   öi   ó«  ¡   P   æ  &+   &º  æ  Kæ  KJ>   &Q   &æ  &-   &º  æ  Kæ  KJ>   &.   &&.Œ   ﬂôd   ó÷  ¡   P   æ  &+   &º  æ  Kæ  KJ>   &Q   &æ  &U   &º  æ  Kæ  KJ>   &.   &&.Œ   ﬂóÂ  ¡   0   º  æ  Kæ  KJA   &2   &º  æ  Kæ  KJ3   &4   &&.Œ   ﬂ¡   5   º  æ  Kæ  KJ6   &7   &º  æ  Kæ  KJ8   &&.Œ   ﬂ¡   R   º  æ  Kæ  KJS   &;   &¡   &   &æ  &   &¡   &T   &¡   &   &¡   &   &æ  &   &º  æ  Kæ  KJS   &=   &&.Œ   ﬂó  æ  0(Õ  ﬂô_˚ˇˇó  æ  0(Õ  ﬂôH˘ˇˇó  ¡   B   &.Œ   ﬂ• `/`í@`ï `î@`O	`K`*x,,8,<î@`ü `
+ù `£@`ü `
+3û `
+4õ@`í@ `ï `
+=Ä  ºñ û@#`
+=Ä  ºñ !ô `í@)`ê 	 `f `ˇˇˇ◊P
+,PD+`ï@/	 `fê `ˇˇˇ◊P
+,PD/!`ï@4
+ `f 
+`ü `
+'ì@:`ü 	`
+C
+ñ ;®@=	`
+C
+ñ ;0£@?`
+ ñ@Aû@J`
+7ñ ò@L`
+Nñ -LNPù0V `
+'ì@Y`ü 	`
+C
+ñ 9®@\	`
+C
+ñ 9/£@^`
+ ñ@`û@i`
+7ñ ò@k`
+Nñ -LmPò@t`í@4`ï@w`í@y `fì `
+ `
+û `
+ñ û `
+z,%,B,Eî 	`ü `
+ù `£ `ü `
+3û `
+4õ ` EÄ  Œû@Ä  ó
+ `fò 
+`ü `
+/ì `ü 	`
+J
+ô B´ 	`
+J
+ô B0¶ `
+ ô °@Ä  ≠`
+7ô õ `
+Uô 4 W´0Ä  π `
+/ì `ü 	`
+J
+ô A´ 	`
+J
+ô A/¶ `
+ ô °@Ä  Ã`
+7ô õ `
+Uô 4 W¶@Ä  ó'`ï@y"`ï@Ä  €`í PÄÃ         q  _          €  `          F  G         ¨	  ¶         ™  Ω  (   )Ò(                               •@ÄÄÄH   9	}ãH                             ª       s ·J   ‰w  ﬂ• `P
+PPÄl  abñl  Ô                 +       ª       º  &   &º &   &º &s ·J   ‰w  ﬂ   º  &   &º &   &º &   &ª   &   &º  &	   &º &
+   &º &   &º  &   &º &   &º &   &Õ   ﬂª       º  &   &º &   &º &s ·J   ‰ª    æ   s ·J   ‰   s w ﬂ• `	
+
+ˇˇˇ“P
+7PD`&
+
+JL	Ä  ‰
+
+*O
+
+O`
+
+ˇˇˇ◊P
+8ˇˇˇ˛PPˇˇˇÔP4PÄÄx  J¡%ªx  ˘                 -       ª       º  &   &º &   &º &s ·J   ‰w  ﬂ   º  &   &º &   &º &   &ª   &   &º  &	   &º &
+   &º &
+   &º &   &º  &   &º &   &º &   &Õ   ﬂª       º  &   &º &   &º &s ·J   ‰ª    æ   s ·J   ‰   s w ﬂ• `	
+
+ˇˇˇ“P
+7PD`&
+
+JL	Ä  Î
+
+
+*O
+
+O`
+
+ˇˇˇœP
+@ˇˇˇ˛PPˇˇˇÔP4PÄÄT   ¯yT                            ª       º  &s ·J   ‰w  ﬂ• `ˇˇˇ˚P
+	PPÄÄD  Uÿ»∫D  €                       Ω Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂº J   Õ   ﬂæ   öü   ó   º  J   Œ   ﬂª       º  J   &s ·J   ‰s  Õ  ﬂª   ·J   ‰9      ¡   &	   &¡   &
+   &æ  &<      <   m   <   m   <   w ﬂ¢ô   ó   ¢ó   •õ `M`ë@`.`	ˇˇˇ˚P
+PH	`%+ **J;J	PD?`1E;A `1EVÄÄÄ8  3ª°Ü8  -                Ç       ∑   ª   0(    ﬂ   Õ   ﬂ   ¡   &   &¡   &   &ª   &   &Õ   ﬂº  KJ      öY   ó   æ      ¡   &	   &º  KJ
+   &   &¡   &   &º  KJ
+   &   &&.Õ   ﬂôT   ó   æ      ¡   &	   &º  KJ
+   &   &¡   &   &º  KJ
+   &   &&.Õ   ﬂó*   æ      º  KJ   &   &º  KJ   &   &&.Õ   ﬂª    º  KJ   w ﬂæ      º  KJ   &   &º  KJ   &&.Õ   ﬂæ      º  KJ   &   &¡   &   &ª   &   &¡   &   &¡   &   &¡   &   &ª   &   &&.Õ   ﬂ¡   ·J    ‰!   s ˇöê   óV   ª"    #   ¡   &   &¡   &   &¡   &s ·J$   ‰s  ·J%   ‰&   w ﬂª"    '   ¡   &s ·J(   ‰ª"    æ   s ·J)   ‰&   s w ﬂô£   ój   ª"    #   ¡   &   &¡   &   &¡   &s ·J$   ‰s  ·J%   ‰&   w ﬂª"    *   ¡   &   &¡   &   &¡   &s ·J(   ‰ª"    æ   s ·J)   ‰&   s w ﬂóÇ   •@`í `J`)ë@	`ö `	Fë 8¢@`	Fë 86ù@`	#ë@ò@`
+ˇˇˇˇP$`	:ë í@`	Që *LNì@$`ë 	Pê `	ˇˇˇ“P
+7P	P$`ˇˇˇËP
+'ˇˇˇ˛PPˇˇˇÔP>* `	ˇˇˇ“P
+7P	P$`ˇˇˇ◊P
+8ˇˇˇ˛PPˇˇˇÔPI.P(   ¯‘l∆(                               •@ÄÄÄ0  ™2»X0  Õ                       Ω Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂº J   Õ   ﬂæ   öë   ó   º  J   Œ   ﬂª       º  J   &s ·J   ‰s  Õ  ﬂª   ·J   ‰9      º &	   &æ  &<
+      <   m   <   m   <   w ﬂ¢ô   ó   ¢ó   •õ `-`ë@`.`	ˇˇˇ˚P
+PH`%C
+***J<JPD@`1E;B `1EV@  ‘òäö@  7                Ç       ∑   ª   0(    ﬂ   Õ   ﬂ   ¡   &   &¡   &   &ª   &   &Õ   ﬂº  KJ      öY   ó   æ      ¡   &	   &º  KJ
+   &   &¡   &   &º  KJ
+   &   &&.Õ   ﬂôT   ó   æ      ¡   &	   &º  KJ
+   &   &¡   &   &º  KJ
+   &   &&.Õ   ﬂó*   æ      º  KJ   &   &º  KJ   &   &&.Õ   ﬂæ      º  KJ   &   &º  KJ   &&.Õ   ﬂæ      º  KJ   &   &¡   &   &¡   &   &¡   &   &¡   &   &¡   &   &¡   &   &º  KJ   &   &&.Õ   ﬂ¡   ·J   ‰    s ˇöê   óT   ª!    "   ¡   &   &¡   &   &¡   &s ·J#   ‰s  ·J$   ‰%   w ﬂª!    &   ¡   &s ·J'   ‰ª!    æ   s ·J(   ‰%   s w ﬂô£   óh   ª!    "   ¡   &   &¡   &   &¡   &s ·J#   ‰s  ·J$   ‰%   w ﬂª!    )   ¡   &   &¡   &   &¡   &s ·J'   ‰ª!    æ   s ·J(   ‰%   s w ﬂóÄ   ¡   0(Œ   ﬂ•@`í `J`1ë@	`ö `	Fë 8¢@`	Fë 86ù@`	#ë@ò@`	:ë í@`	Xë 1LUò@#`ë 	Pê `	ˇˇˇ“P
+7P	P$`ˇˇˇ‡P
+/ˇˇˇ˛PPˇˇˇÔP>) `	ˇˇˇ“P
+7P	P$`ˇˇˇœP
+@ˇˇˇ˛PPˇˇˇÔPI.`M0PÄÄÄ(   ¯‘l∆(                               •@ÄÄÄ¥   $‚¥   u                        Ω Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂª   ·J   ‰9      º  &   &¡   &   &¡   &<      <	   m
+   <   m   <   w ﬂ•õ `%/
+"+*J
+JP4PÄÑ   ˇÔÑ   G                         ª       ¡   &   &¡   &   &¡   &s ·J   ‰s  ·J   ‰   w ﬂ•@`ˇˇˇ◊P
+2P	PDP(   )Ò(                               •@ÄÄÄò   ô›`ò   ]                        Ω Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂª   ·J   ‰9      º  &<      <   m   <	   m
+   <   w ﬂ•õ `%C)*J
+JP4PÄÑ   ∞GËÑ   G                         ª       ¡   &   &¡   &   &¡   &s ·J   ‰s  ·J   ‰   w ﬂ•@`ˇˇˇœP
+:P	PDP(   )Ò(                               •@ÄÄÄ  ‹lÙ‹  µ                          ª   ·J   ‰9      <      <   <   m	   <
+   m   <   m   <   m   <   w ﬂª   ·J   ‰9      <      <   <   m   <
+   m   <   <   m   <   m   <   w ﬂ• `%**&J	JJJPD`%**&J J#&J+JP4/PÄÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄd   6Ë»d   2                         º  J   ö"   ó   ∑   º      ﬂª    w  ﬂó   • `î `.`OPÄÄ(   )Ò(                               •@ÄÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄd   ïπ“d   2                         º  J   ö"   ó   ∑   º      ﬂª    w  ﬂó   • `î `.`OPÄÄ(   )Ò(                               •@ÄÄÄP  –¢cÄP  H               L       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J   ‰w  ﬂ   Œ   ﬂ   Œ   ﬂ   Õ   ﬂ   Œ   ﬂ   ¡   &   &¡   &	   &Œ   ﬂ¡   
+   ¡   &   &&.Œ   ﬂª   ·J   ‰9      ¡   &   &¡   &<      <   <   m   <   m   <   w ﬂª   ·J   ‰9      ¡   &   &¡   &<      <   <   m   <   m   <   w ﬂ¡      &.Œ   ﬂª       ¡   &s ·J   ‰w  ﬂª       ¡   &s ·J    ‰¡   w ﬂª    !   ¡   &s ·J"   ‰#   w ﬂª    !   ¡   &s ·J"   ‰9$   %   <&   <'   <(   <)   w ﬂ•õ `ˇˇˇÓP
+P$`ˇˇˇÈP
+ P$`ˇˇˇÁP
+"PD`+`+`*`+`8L(í@`
+0î@`%4+*&JVJPD^`%5+*&JÄ  ¶J^PDÄ  ™`í `ˇˇˇËP
+!P$`ˇˇˇÍP
+$ˇˇˇ˚P `"ˇˇˇ›P,P `"ˇˇˇ›P
+6*FÄ  ±0PPÄX  ÒeÊn8                  ¥      º  KJ   Õ   ﬂÕ  ﬂº  KJ   öÎ  ó   ¡      &.Œ   ﬂÕ  ﬂò   æ  º  KJ   öp   ó   ¡      º  Kæ  KJ   &   &¡   &   &¡   &   &º  Kæ  KJ   &	   &&.Œ   ﬂæ  0(Õ  ﬂôÄˇˇˇó   ¡   
+   &.Œ   ﬂº  KKJ      ö4   ó"   ¡      ¡   &   &¡   &   &&.Œ   ﬂó'   ¡      ¡   &   &&.Œ   ﬂÕ  ﬂò*   æ  æ   öò  ó,   æ   'æ  öÆ  ó/   ¡      ö$   ó1   º  Kæ  KJ   Œ   ﬂô   ó4   º  Kæ  KJ   Œ   ﬂó7   º  Kæ  KJ      ö|   ó<   ¡      æ  '&   &æ  &   &æ  &   &º  Kæ  KJ   &   &æ  &   &º  Kæ  KJ   &   &&.Œ   ﬂôw   óP   ¡      æ  '&   &æ  &   &æ  &   &º  Kæ  KJ   &   &æ  &   &º  Kæ  KJ   &   &&.Œ   ﬂód   ¡       º  Kæ  KJ!   &"   &æ  &#   &º  Kæ  KJ$   &%   &&.Œ   ﬂô≈  óq   Õ  ö"   ór   Õ  ﬂ¡   &   &.Œ   ﬂós   ¡      ö$   óu   º  Kæ  KJ   Œ   ﬂô   óx   º  Kæ  KJ   Œ   ﬂó{   º  Kæ  KJ      ön   óÄ   ¡   '   æ  &   &æ  &   &º  Kæ  KJ   &   &æ  &   &º  Kæ  KJ   &   &&.Œ   ﬂôi   óë   ¡   '   æ  &   &æ  &   &º  Kæ  KJ   &   &æ  &   &º  Kæ  KJ   &   &&.Œ   ﬂó¢   ¡       º  Kæ  KJ!   &"   &æ  &#   &º  Kæ  KJ$   &%   &&.Œ   ﬂæ  0(Õ  ﬂó±   æ  0(Õ  ﬂô^¸ˇˇó≥   ¡   (   &.Œ   ﬂó¥   •@`/`&`ñ `í@
+ `fï `
+Kñ ,!û@'`ï@`í 
+`ú `
+Fô@`JÄ  ãî@ `f `	 `ï 
+`ü@
+`ö@!`ü 
+`
+ M3
+ñ :®@$
+`
+ M3
+ñ :/£@&	`
+-ñ `®0) `ê 
+`&
+`ó@/`ï `ü@2`ö@4`ü `
+U3
+ñ :®@7`
+U3
+ñ :/£@9
+`
+-ñ `û@;
+`ê@`ï@>`ó@@PÄX         C   Ö          N  ß  (   )Ò(                               •@ÄÄÄl  "^HL  !                ∂      º  KJ   Õ   ﬂº  J   Œ   ﬂÕ  ﬂº  KJ   öÏ  ó   ¡      &.Œ   ﬂÕ  ﬂò   æ  º  KJ   öp   ó   ¡      º  Kæ  KJ   &   &¡   &   &¡   &   &º  Kæ  KJ   &	   &&.Œ   ﬂæ  0(Õ  ﬂôÄˇˇˇó   ¡   
+   &.Œ   ﬂº  KKJ      ö4   ó#   ¡      ¡   &   &¡   &   &&.Œ   ﬂó(   ¡      ¡   &   &&.Œ   ﬂÕ  ﬂò+   æ  æ   öô  ó-   æ   'æ  öÆ  ó0   ¡      ö$   ó2   º  Kæ  KJ   Œ   ﬂô   ó5   º  Kæ  KJ   Œ   ﬂó8   º  Kæ  KJ      ö|   ó=   ¡      æ  '&   &æ  &   &æ  &   &º  Kæ  KJ   &   &æ  &   &º  Kæ  KJ   &   &&.Œ   ﬂôw   óQ   ¡      æ  '&   &æ  &   &æ  &   &º  Kæ  KJ   &   &æ  &   &º  Kæ  KJ   &    &&.Œ   ﬂóe   ¡   !   º  Kæ  KJ"   &#   &æ  &$   &º  Kæ  KJ   &%   &&.Œ   ﬂô∆  ór   æ  ö"   ót   Õ  ﬂ¡   &   &.Œ   ﬂóu   ¡      ö$   ów   º  Kæ  KJ   Œ   ﬂô   óz   º  Kæ  KJ   Œ   ﬂó}   º  Kæ  KJ      ön   óÇ   ¡   '   æ  &   &æ  &   &º  Kæ  KJ   &   &æ  &   &º  Kæ  KJ   &   &&.Œ   ﬂôi   óì   ¡   '   æ  &   &æ  &   &º  Kæ  KJ   &   &æ  &   &º  Kæ  KJ   &    &&.Œ   ﬂó§   ¡   !   º  Kæ  KJ"   &(   &º  Kæ  KJ   &)   &æ  &%   &&.Œ   ﬂæ  0(Õ  ﬂó≥   æ  0(Õ  ﬂô]¸ˇˇóµ   ¡   *   &.Œ   ﬂó∂   •@`/`N`&`ñ `í@	 `fï `
+Kñ ,"û@&`ï@`í 	`ú `
+Fô@`JÄ  ãî@
+ `f `	 `ï 	`ü@!	`ö@#`ü 	`
+ L2
+ñ ;®@&	`
+ L2
+ñ ;0£@(`
+-ñ a®0+ `ë 	`&	`ó@1`ï 
+`ü@4
+`ö@6`ü 
+`
+T2
+ñ ;®@9
+`
+T2
+ñ ;0£@;	`
+-ñ Wñ 0ì@=	`ê@`ï@A`ó@CPÄl         Q   Ö          \  ®  (   )Ò(                               •@ÄÄÄ¨   À-¨   d                           º  &   &º &   &º &   &Õ   ﬂª       s ·J   ‰æ   w ﬂª       s ·J	   ‰
+   w ﬂ• `E|
+
+O`P
+ ˇˇˇ˚PD`PP4Px  C’Lx                  $       ª   Ä„  Å  Œ   ﬂª       s ·J   ‰m   w ﬂÕ   ﬂ¡   J   ö   ó
+   Õ   ﬂó
+   æ   öä   ó   ª   ·J   ‰9   	   º  &
+   &º &   &¡   &   &º &<      <   <   m   <   m   <   m   <   m   <   w ﬂô   ó"   ª       w ﬂó$   •@`ì@`P
+ˇˇˇ˚PD`&`ñ `K`ê `%3
+)
+)*&JJJ JP>& `P9*PÄÄ®   àû¨Ù®   ^                        ﬁÕ   ﬂª    æ   s ·J   ‰   s ö6   ó   ¡   ·J   ‰ª    æ   s ·J   ‰   s w ﬂó   •&`ˇˇˇˇPP `ˇˇˇ˛PPˇˇˇÛPIP4   ﬂA›4                             ª    w  ﬂ• `*PÄÄ4   ﬂA›4                             ª    w  ﬂ• `*PÄÄ<   »B<                            ª       w ﬂ•@`PDP(   ±N§d(                               •@ÄÄÄ   TC•   ≠                       Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂª       s ·J   ‰s  Õ   ﬂª   ·J   ‰9      ¡   &   &¡   &   &æ   &<	   
+   <   <   m   <   m   <   m   <   m   <   w ﬂ•õ `P
+PH`%0!**&JJJJP4PÄÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ¥   ÖÏ†Ω¥   n                           º  KJ   &   &¡   &   &¡   &   &¡   &   &º  KJ   &   &Õ   ﬂª	    
+   s ·J   ‰æ   w ﬂ•@`<ë )ñ@`P
+ˇˇˇ˘PDPÄÄ(   )Ò(                               •@ÄÄÄ»   Kb8»   É                        Ω  Œ   ﬂΩ Œ   ﬂΩ Œ   ﬂª   ·J   ‰9      º &   &¡   &<      <   <	   m
+   <   m   <   m   <   m   <   w ﬂ•õ `%1
+"+*&J	JJJP4PÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄ4   3
+µ4                             ª    w  ﬂ• `*PÄÄP   Ø4cP                            ª    ¡   ¡   ¡   w ﬂ• `ˇˇˇÁPDPÄÄ(   )Ò(                               •@ÄÄÄ  O˙-ƒ  (      	          ∑      ª   J   Õ   ﬂª    æ   s 	+Õ  ﬂª    æ   s 	,Õ  ﬂ   º &   &Õ  ﬂæ  ú   ó   ﬂæ  ó   ö÷   ó   Õ  ﬂò   æ  æ  ö≠   ó   æ  æ  'öL   ó   æ     æ  &   &ª   æ  K&	   &ª   æ  K&
+   &&.Õ  ﬂô<   ó   æ     ª   æ  K&   &ª   æ  K&
+   &&.Õ  ﬂó'   æ  0(Õ  ﬂôIˇˇˇó)   ôﬂ  ó)   Õ  ﬂÕ  ﬂò)   æ  æ   ö∫  ó+   æ  ög  ó-   ª    	s ª    æ  s 'Õ  ﬂæ  Õ  ﬂò2   æ  æ  öñ   ó4   æ     ª   æ  K&   &º  &   &º &   &ª   æ  K&   &º &   &&.Õ  ﬂæ     ª   æ  K&
+   &&.Õ  ﬂæ  0(Õ  ﬂæ  0(Õ  ﬂô`ˇˇˇóL   æ     ª   æ  K&   &º  &   &º &   &ª   æ  K&   &º &   &&.Õ  ﬂæ     æ  &   &ª   æ  K&
+   &&.Õ  ﬂæ  0(Õ  ﬂô(  ód   æ  	ö°   óf   æ     &.Õ  ﬂæ     ª   æ  K&   &º  &   &º &   &ª   æ  K&   &º &   &&.Õ  ﬂæ     ª   æ  K&
+   &&.Õ  ﬂÕ  ﬂæ  0)Õ  ﬂô{   ó}   æ     ª   æ  K&   &º  &   &º &   &ª   æ  K&   &º &   &&.Õ  ﬂæ     ª   æ  K&
+   &&.Õ  ﬂóë   æ  0(Õ  ﬂæ  0(Õ  ﬂô<˝ˇˇóï   ª   J   Õ  ﬂæ  ö±   óô   æ     &.Õ  ﬂæ     &.Õ  ﬂÕ  ﬂòõ   æ  æ  ö]   óù   æ     ª   æ  K&   &ª   æ  K&   &ª   æ  K&    &&.Õ  ﬂæ  0(Õ  ﬂôôˇˇˇó¨   æ  !   &.Õ  ﬂó≠   ª"    #   º &s ·J$   ‰w  ﬂª"    %   º &s ·J&   ‰æ  w ﬂ•@`/`	ˇˇˇˇP+`	ˇˇˇˇP+`%Ä  ä/`¶  `f `ë `	gë +¢0 `	të ,ù@
+`ü0 	`& `f `ê `P	ˇˇˇ˜P)	 `	f@#`	`ë Ä  ï
+
+ë  ë `	Dò `K `ï@(`	`ë Ä  ï
+
+ë  ë `	#9ò `ï0- `ë `ê@2`	`ë Ä  ï
+
+ë  ë `	Yò `&`ï08 `	`ë Ä  ï
+
+ë  ë `	Yù@=`K`ï@C`/`ê `ê `ê@I `f@L`	$ë ë ò@I`ï@P`ï@S`ˇˇˇËP
+!P$`ˇˇˇÍP
+$ˇˇˇ˚P4WPÄÄÄ         y   º          †  •          P  …         c  l   d   Í3@àd   .   	                     Ω  Œ   ﬂ¡   J   ·J   ‰9   m   <   w ﬂ•	`ë 
+ˇˇˇ¯PDÄ  ’P∏   ∆ZÖD∏   Ä                        ﬁÕ   ﬂh	      i       i      i      i      i      i      i      i   	   i   Œ   ﬂæ   ·J
+   ‰m   s ¢•`Â v`ˇˇˇ˚PCÄ  —QÄP  ‡fC@  S        
+       ?       ﬁÕ  ﬂm   Œ   ﬂm   Œ   ﬂæ  J      ö   ó   ¢ó   ¡   æ  s Œ   ﬂ¡      s ·J   ‰9      <	   
+   <   s Œ   ﬂª    ¡   ·J   ‰   s s ù-   ó   ﬂª    ¡   ·J   ‰   s    s ó   Œ   ﬂª    ¡   ·J   ‰   s s ù   ó   ﬂ¡   *ó   Œ   ﬂª    ¡   ·J   ‰   s 
+s ù   ó    ﬂª   J   ó"   Œ   ﬂÕ   ﬂÕ  ﬂ¡   ·J   ‰¡   ·J   ‰s  w ﬂ¡  J   Õ  ﬂÁò'   æ  0·)Õ  ﬂöV   ó*   ¡   ·J   ‰¡  æ  K·J   ‰s  ¡   ·J   ‰¡  æ  K·J   ‰s  s w ﬂôùˇˇˇó4   ¡   ·J   ‰9      <   s ·J   ‰   m   s ·J   ‰   m   w ﬂ¡    w  ﬂ•ú `ô `AÄ  ŒF`ˇˇˇˇP	`P
+
+
+ˇˇˇÂP	9`	ë 
+PˇˇˇıPî *ë 
+PˇˇˇÌP3`	ë 
+PˇˇˇıP° 4`	ë 
+PˇˇˇıP£ >```
+PˇˇˇÌP#`fñ `
+ë 
+Pë 
+PˇˇˇÚPˇˇˇ›P>`
+ˇˇˇ˚P(ˇˇˇÛPkˇˇˇÙP@`
+	PÄÄÄP         î  h   Ã   „¸]œÃ   z                         ∑   ª   ·J   ‰ª    º  
+s s     ﬂ¡   ·J   ‰s  ª   ö7   ó   ¡   ·J   ‰9   ª      &<   º <	   w ﬂó   • `ë 	ˇˇˇ˜Pˇˇˇ˙P	`
+P
+ê `ê ˇˇˇﬁP	9PÄ  √/a÷  o                %        ¡   ·J   ‰s  ·J   ‰l      s ·J   ‰l      s ·J   ‰l      s Õ   ﬂ¡   ·J	   ‰s  Õ  ﬂæ   
+   &æ  öˆ   ó   ¡   ·J	   ‰æ   
+   &w ﬂª   ·J   ‰¡   ·J   ‰s  ¡   &¡   ·J   ‰s  's öõ   ó   ¡   ·J   ‰s  ¡   &Õ  ﬂæ  ¡    ö#   ó    ¡    ¡      w ﬂôO   ó!   æ  ¡   ö#   ó#   ¡    ¡      w ﬂô   ó$   ¡    æ     w ﬂó%   • `
+P
+
+ˇˇˇ¯P
+
+ˇˇˇ¯P
+ 
+ˇˇˇ¯P&`P
+`
+`
+ˇˇˇ˚P"`	P	
+PˇˇˇÿPê D`P	`ê `
+ˇˇˇˇP`ê `
+ˇˇˇˇP`	ˇˇˇˇP	PÄÄT   ÂŒ;˛T   "                          ª   ª   ·J   ‰m   2s L   ﬂ• `ë *ˇˇˇÙP	&PÄÄ4   âæfç4                             ¡    w  ﬂ• `
+	PÄÄD   CÔCTD                             ª    ª   J   w ﬂ• `
+ˇˇˇˇPP3ıÿ  `⁄  á  g    `:    `<    `$  H  I  I  A  B       @ç {  J    `$  A  B    @D  C  E  F  G    p  `$  ?  @    p  `	  `:  
+  `<    `$  H  I  I  M  B       @ç {  J    `$  M  B    @D  C  E  N  G    p  `$  ?  @    p  `  `:    `<    `\    @]  ^    `W  $  #  +  ê   Y  Z  [    p_  `  a    `  `$  A  2  Ä  ﬁ  ,  3    @T  U  V  J  B  8       p9    p;    p=    pK    `:    `<    `\  
+  @]  ^    `W  $  #  +  ê   Y  Z  [    p_  `  a  i    `  `$  M  2  Ä  ﬁ  ,  3    @d  J  B  8  e  0  	  @g  h  "  R  f       p9    p;    p=    pK    `$              ‚    „ ‰ &  Â Ê *  +  -  /  1  2  3     @4  5  6  7  J  B  8    p9    p;       p=    pK    @L  	  p
+  p  p  pO  P  Q  G    pb    p  `:    `<  !  `:  "  `<  $  `\    @]  ^  #  `W  $  #  +  ê   Y  Z  [  $  p_  `  a  %  `   `$  Ñ  2  Ä  ﬁ  ,  â  H  I  ã  3    @å  U  ç  é  è  J  B  8     !  p9  "  p;  #  p=  %  pK  &  `$  H  I  I  Ñ  B       @ç {  J    `$  Ñ  B    @D  C  E  Ö  G     pê  &  p  `$  ?  @    p'  `  `$      O    Á v  Ë È Í Î Ï Ì Å  +     3    @É  J  B  8       p9    p;    p=  '  pK    P  )  `I     "  ê    *  `+  `I     "  ê    ,  `(  `í  ì  $  ï  2  3    @ñ  J  B  8     )  p=  *  pK    @õ  +  p,  pú  .  `I  -  †      /  °  /  `0  `I  -  †      /  °  1  `-  `í  ù  û  ì  $  ï  2  3    @ü  J  B  8     .  p=  /  pK    @¢  0  p1  p3  `I  Ä  ©  ™  ´  Ó Ô  Ò Ú ≤  ∂  ÿ ∑  ∏  π  ∫  ª  º  Ω  æ  Û ¡  ¬  √  ƒ  ,  ≈  ∆  Ù $  #  -     À  Ã  Õ  Œ  ¥  œ  –  —  “  ”  ‘  ’  ÷  ◊  ÿ  ı ‹  ˆ ‡  \   ·    ‚  „  ‰  ˜ ¯ Í  Î  Ï  Ì  …  Ó  Ô    Ò  Ú  Ø  ˘ ˙ ˚ ¸ ˜  ˝ ¯  ˘  ˙  ˚  ¸  ˛ ˛  4  `5  `$    2  `ê   $  O        3    @ß  U  J  B  8     3  p=  4  pK  ˇ  +        @C     ?  @  5  p  P  6  `$   -      ˇ ∫    √  ,    #     7  `$   -      ˇ ∫   √  ,        8  `$  #     :  `À  ê   Œ  -  ¥  œ  –  —  “  Ω  ”  ‘  ’  ÷  ◊  ÿ  ı ‹  ˆ ! „  ‡  \   ·    ‚  ‰  √  ,  ˜ ¯ " # $      $  %   #  ;  `9  ` ç $  #  2  3    @    J  B  8  :  p=  ;  pK  =  `À  ê   ¯  -  ¥  œ  –  —  “  Ω  ”  ‘  ’  ÷  ◊  ÿ  ı ‹  ˆ ‡  \   ·    ˚  ¸  ‰  √  ,  ˛ ¯ " ( $      $  )    >  `<  ` ç $  #  2  3    @'   J  B  8  =  p=  >  pK  @  `$  #  -       A  `?  `$  3    @, U  - J  B  8  @  p=  A  pK  C  `$   -       D  `B  `$  3    @/ J  B  8  C  p=  D  pK  F  `:  G  `<  H  `I  ™  2 I  `J  `:  K  `<  L  `I  ´  4 M  `E  `$  3    @1 J  B  8     F  p9  G  p;  H  p=  I  pK    @3 J  pK  pL  pM  pO  `I   G H ,  ‰  I Ô  J K L ª  M N  S ©  T U œ  –  V W X “  Í  Y ‘  ∏  Z Ï  [ Ì  \ ] Ω    ^ _ ` P  `Q  `I   G H ,  ‰  c Ô  J K L ª  M d  S ©  T U œ  –  V f g “  Ω  h ‘  ∏  i ÷  j [ ÿ  \ ]   ^ k l m ` R  `N  `$      O    ê   :  = > ≤  3    @? U  J  B  8     O  p=  P  pK    @a Q  pR  pn   P  Å  +  o     @C     S  `	 ‰  “  
+ $  } +  ~  P  U  `$  H  I  Ç {  V  `:  W  `<  X  `á à Y  `T  `Ä  $  Å å   U  pI  3    @Ñ U  Ö Ü J  B  8     V  p9  W  p;  X  p=  Y  pK  á â [  `:  \  `<  ]  `G H ,  ‰  “  è Ô  J $  ê ë ^  `Z  `$  å 2  3     @ç U  é J  B  8     [  p9  \  p;  ]  p=  ^  pK  `  `:  a  `<  b  `5 c  `_  `$  3  !  @î U  J  B  8     `  p9  a  p;  b  p=  c  pK  d  `o  I  ±   S V ô m   ú ù  † ° ,  p  ‰  ¢ £ § • ^ ¶ j  t   ™  l   k  Æ Ä  $    P  Å  +  h  `Ã Ñ  Õ ±  ƒ æ #  @a ¨  i  `2  ⁄     P     P“   P” +  ’ Ñ  ÷ ƒ ◊ ÿ k  `j  `€ › ﬁ k  p‹ l  `‡ € ‹ g  `h  pi  p0  ∫ Ω æ $  @¿ ø ¬ ¡ ±  ∂ µ @  ƒ ∆ Ö  « …   I  "  %  @ÿ ¨  Ÿ ⁄ j  pﬂ l  pf  `± ≤ ≥ ¥ µ ∂ ∑ ∏ π å   g  pe  `◊ Ø "  @f  p    `  p  p  p(  p-  p2  p6  p7  p8  p9  p<  p?  pB  pE  pN  pS  pT  pZ  p_  pd  p   Ä            	  
+        j  k  l  m  n  o  p  -  /  e  p· ˇXÑà  ,                             ´   4                 9              ;              =                                  $      K        %      9        '      ;        @      =        5             )             E      K        ]             F      9        H      ;        O      =        J             \      K        ç             u      9        w      ;        ~      =        y             å      K        7  "   q        ﬂ      9        ·      ;        1     =        $             ˙      !       „      9        Â      ;        Ï      =        Á      %       ˘      K             !       6     K        g     ë        Y     =        _     K        `     =        f     K        è     ú        }     =        Ö     K        Ü     =        é     K          #   £        ¶  V   =        ¸     K        ˝     .       $     	       5            F            v            J  +   =        u     K        ≥     &       à  *   =        ≤     K        Ã     *       ƒ     =        À     K        ‚     .       ⁄     =        ·     K              0       Ó     9             ;        Ú     =        ˆ     K        ˜     9        ˘     ;        ˚     =        ˇ     K        m  *   5         )   =        @     K        A  +   =        l     K        ó     p       ∞     Ä       ¢     =       ®     9        ™     ;        ¨     =        Ø     K        ‹     ä       À     9        Õ     ;        œ     =        €     K        ¯     í       Ò     9        Û     ;        ı     =        ˜     K        
+  '   ï       Ç               v            V      J       1  
+   À       ;     Œ       L     M       K     N       R     M       ùH©¿      ÷      ÷                  ¿     ≠     
+             Äñ  ·  }  ·                 m	  í	  e	  í	  8                ®	  Ã	  †	  Ã	  ;              ÄÔ	    Á	    ?              
+    
+    @               Õ
+    ≈
+    G   2             '  /    /  V                ›    ’    ^                  <    <  a              Ä_  Ç  W  Ç  e              Ü  |  ~  |  f               <  u  4  u  m   4             î  ú  å  ú  |               ˙  ¨  Ú  ¨  Ç   .             h  è  `  è  å                ¶  Ã  û  Ã  è              Ä·  Ü  Ÿ  Ü  í               ä  ¸  Ç  ¸  ô   2            ô  ¢  ë  ¢  ®               Ÿ  ‹  —  ‹  ∞   )             o  ñ  g  ñ  º                ≠  ”  •  ”  ø              ÄË  ∂  ‡  ∂  ¬               à  ˙  Ä  ˙  »   2            …  “  ¡  “  €              Äf  6&  L  6&                 É  ®  {  ®                 æ  ‚  ∂  ‚               Äˆ  Á%  Ó  Á%  
+               ‡%    ‡%                À  q$  √  q$    .             —!  ˛!  …!  ˛!                 "  D"  "  D"               Ä\"  ?$  T"  ?$  "              #  ë#  #  ë#  (  5            U$  a$  M$  a$  8              û$  Ÿ%  ñ$  Ÿ%  >  +             ˘%  &  Ò%  &  N              √&  /  ú&  /  ]  (             ¥'  ‹*  ¨'  ‹*  g              Ô*  ˘*  Á*  ˘*  |               û+  ∆.  ñ+  ∆.  à              Ÿ.  „.  —.  „.  ù              Õ/  î3  ∞/  î3  ¨               ı0  ◊1  Ì0  ◊1  π              Í1  Û1  ‚1  Û1  ¬               â2  k3  Å2  k3  Õ              ~3  á3  v3  á3  ÷             Ä˚3   f  Á3   f  „              \5  ‘d  T5  ‘d  Ì              Êd  Ód  ﬁd  Ód  À               ÷e  ˜e  Œe  ˜e  ÷               åf  @k  uf  @k  ﬁ              `k  bp  Bk  bp  Ú              Åp  ûp  dp  ûp              Ä	q  Ø{  Ûp  Ø{                nr  ]{  fr  ]{                p{  y{  h{  y{  K             ÄŒ{  ≤Ü  ±{  ≤Ü  W              6}  aÜ  .}  aÜ  b              tÜ  }Ü  lÜ  }Ü  ì             Ä"á  ~à  á  ~à  £              ˇá  ]à  ˜á  ]à  ®              oà  wà  gà  wà  ≠             Äùà  ˝â  Äà  ˝â  ≥              vâ  ‹â  nâ  ‹â  ∏              Óâ  ˆâ  Êâ  ˆâ  Ω              jä  Zç  Sä  Zç  »               ÷ä  ˚ä  Œä  ˚ä  Œ               ã  5ã  	ã  5ã  —               Iã  ∑ã  Aã  ∑ã  ‘              …ã  —ã  ¡ã  —ã  ‹               Cå  hå  ;å  hå  Â               ~å  ¢å  vå  ¢å  Ë               ≈å  9ç  Ωå  9ç  Ï              Kç  Sç  Cç  Sç  Û             Ä{ç  ı∞  \ç  ı∞  ˘               ‰è  9ü  ‹è  9ü                Kü  Sü  Cü  Sü  O               í†  ~Ø  ä†  ~Ø  [              êØ  òØ  àØ  òØ  ü               
+±  a¥  ¯∞  a¥  ∞            Äz¥  ò∑  c¥  ò∑  ≈             Ù¥  Mµ  Ï¥  Mµ                   s∂  ú∂  k∂  ú∂  ⁄               ¥∂  ‹∂  ¨∂  ‹∂  ›               Ú∂  +∑  Í∂  +∑  ‡              ?∑  I∑  7∑  I∑  Â             Ä±∑  d∫  ö∑  d∫  Ò              «∏  Ï∏  ø∏  Ï∏  ˘               π  &π  ˙∏  &π  ¸               :π  C∫  2π  C∫  ˇ              U∫  ]∫  M∫  ]∫               Ä◊∫  èº  ø∫  èº                ±ª  ÷ª  ©ª  ÷ª                 Ïª  º  ‰ª  º                 $º  nº  º  nº                 Äº  àº  xº  àº  $               Ω  ?œ  Èº  ?œ  1  %          Ä£œ  ÷  õœ  ÷  ê  
+          Çƒœ  ˇ’  ºœ  ˇ’  ê  +           Ça–  ¸’  Y–  ¸’  ê  »             x“  $”  [“  $”  í              4”  -’  %”  -’  ì              h’  ∞’  `’  ∞’  î  ;             ù’  ™’  ï’  ™’  î  p             ∆’  ’  æ’  ’  î  ô           5°›…ÇùO<•YŸ≈      g¯ﬁ˚g¯ﬁ˚Hıg¯Âx   d    O^partitionKey=%28https%2Ccmrit.ac.in%29,:https://erp.cmrit.ac.in/scripts/dms/manageShareDocument.js necko:classified 1 strongly-framed 1 security-info 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 request-method GET response-head HTTP/1.1 200 
+Date: Fri, 11 Apr 2025 08:08:02 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|afe1a283-a713-6576-001f-25c6b84b6f84|
+Accept-Ranges: bytes
+ETag: W/"54795-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 54795
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+ original-response-headers Date: Fri, 11 Apr 2025 08:08:02 GMT
+Server: Apache/2.4.6 (CentOS) OpenSSL/1.0.2k-fips PHP/8.1.22
+Strict-Transport-Security: max-age=63072000; includeSubdomains; preload
+Permissions-Policy: geolocation=(),midi=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()
+X-StackifyID: V1|afe1a283-a713-6576-001f-25c6b84b6f84|
+Accept-Ranges: bytes
+ETag: W/"54795-1744298492000"
+Last-Modified: Thu, 10 Apr 2025 15:21:32 GMT
+Content-Type: application/javascript
+Content-Length: 54795
+X-Frame-Options: SAMEORIGIN
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: same-origin
+Feature-Policy: geolocation 'self'; vibrate 'none'
+Access-Control-Allow-Headers: origin, x-requested-with, content-type
+Keep-Alive: timeout=5, max=92
+Connection: Keep-Alive
+ ctid 2 uncompressed-len 0 net-response-time-onstart 593 net-response-time-onstop 623 alt-data 1;54795,javascript/moz-script-bytecode-20250331133932-8l alt-data-from-child 1  ≈˜
